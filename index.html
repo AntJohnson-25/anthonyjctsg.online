@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Free Browser Games by Anthony C Johnson | AnthonyJCTSG Games</title>
     <meta name="description" content="Play free browser games by Houston game developer Anthony C Johnson — Wealth Runner, Billionaire Barber, Food Truck Billionaire (beta) and buy'n'scale (beta). No install, no download, plays right in your browser on desktop or mobile.">
-    <meta name="keywords" content="free browser games, play online games no download, Wealth Runner game, Billionaire Barber game, Food Truck Billionaire game, food truck tycoon, buy'n'scale game, business acquisition game, indie game developer, Houston game developer, Anthony C Johnson, AnthonyJCTSG, CTSG, Calamity, HTML5 games, mobile browser games, tycoon game, barber shop game, money game">
+    <meta name="keywords" content="free browser games, play online games no download, Wealth Runner game, Billionaire Barber game, Food Truck Billionaire game, food truck tycoon, buy'n'scale game, business acquisition game, indie game developer, Houston game developer, Anthony C Johnson, AnthonyJCTSG, CTSG, HTML5 games, mobile browser games, tycoon game, barber shop game, money game">
     <meta name="author" content="Anthony C Johnson">
     <meta name="robots" content="index, follow">
-    <meta name="theme-color" content="#0052cc">
+    <meta name="theme-color" content="#080c16">
     <link rel="canonical" href="https://anthonyjctsg.online/">
 
     <!-- Open Graph -->
@@ -25,8 +25,6 @@
     <meta name="twitter:title" content="Free Browser Games by Anthony C Johnson">
     <meta name="twitter:description" content="Play Wealth Runner and Billionaire Barber free in your browser. No install, no download.">
     <meta name="twitter:image" content="https://anthonyjctsg.online/wealthrunner_thumbnail.png">
-
-    <link rel="stylesheet" href="styles.css">
 
     <script type="application/ld+json">
     {
@@ -85,65 +83,194 @@
       ]
     }
     </script>
+
     <style>
-        .game {
-            display: grid;
-            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
-            gap: 2.5rem;
-            align-items: start;
+        /* This page is deliberately standalone — it does not load styles.css.
+           The main site's light corporate theme and the arcade look here are
+           different design systems, and sharing one sheet would mean fighting
+           it with overrides on every rule. */
+        :root {
+            --bg: #080c16;
+            --bg-raised: #0e1524;
+            --bg-art: #070b14;
+            --line: #1e2942;
+            --line-bright: #2f3f63;
+            --text: #eef2f9;
+            --text-muted: #93a1bd;
+            --accent: #f0a500;
+            --accent-soft: rgba(240, 165, 0, 0.14);
+            --blue: #4d8dff;
+            --radius: 14px;
         }
 
-        .game + .game {
-            margin-top: 4rem;
-            padding-top: 4rem;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .game-stage {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 10;
-            border-radius: 12px;
-            overflow: hidden;
-            border: 1px solid var(--border-color);
-            background-color: #070b14;
-            box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.35);
-        }
-
-        .game-stage iframe {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-
-        /* Click-to-load cover, so the game itself is never pulled on page load */
-        .game-cover {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
+        * {
+            box-sizing: border-box;
+            margin: 0;
             padding: 0;
-            border: none;
-            overflow: hidden;
-            cursor: pointer;
-            color: #ffffff;
-            background: #070b14;
-            font-family: inherit;
         }
 
-        /* Blurred fill behind the artwork so nothing has to be cropped */
-        .cover-bg {
+        html {
+            /* Stop iOS inflating body text when a phone is turned sideways. */
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: var(--bg);
+            /* Two wide, very soft pools of light so the flat dark ground reads
+               as a lit room rather than a black rectangle. */
+            background-image:
+                radial-gradient(1100px 620px at 12% -10%, rgba(77, 141, 255, 0.14), transparent 60%),
+                radial-gradient(900px 560px at 88% 4%, rgba(240, 165, 0, 0.10), transparent 62%);
+            background-repeat: no-repeat;
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            /* A long unbroken token (URL, email) must wrap rather than widen the page. */
+            overflow-wrap: break-word;
+        }
+
+        img {
+            max-width: 100%;
+        }
+
+        a {
+            color: var(--blue);
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* ---- Header ---------------------------------------------------- */
+        header {
+            border-bottom: 1px solid var(--line);
+            background-color: rgba(8, 12, 22, 0.82);
+            backdrop-filter: blur(8px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0.8rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .brand-logo {
+            font-size: 1.25rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .brand-logo span {
+            color: var(--accent);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.75rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            display: block;
+            /* Vertical padding rather than margin, so the tap target is a
+               full-height strip instead of just the glyphs. */
+            padding: 0.4rem 0;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.92rem;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover,
+        .nav-links a:focus-visible,
+        .nav-links a[aria-current="page"] {
+            color: var(--accent);
+        }
+
+        /* ---- Intro ------------------------------------------------------ */
+        .page-intro {
+            padding: 4rem 0 3rem;
+            text-align: center;
+        }
+
+        .kicker {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.78rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 1.1rem;
+        }
+
+        .page-intro h1 {
+            font-size: clamp(2.2rem, 6vw, 3.6rem);
+            line-height: 1.1;
+            letter-spacing: -1.5px;
+            font-weight: 800;
+        }
+
+        .page-intro p {
+            max-width: 620px;
+            margin: 1.1rem auto 0;
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        /* ---- Cabinet grid ----------------------------------------------- */
+        .arcade {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 2.25rem;
+            padding: 1rem 0 5rem;
+            list-style: none;
+        }
+
+        .cabinet {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* The art panel. A link in its own right so the picture is clickable,
+           but hidden from the accessibility tree — the title link below is the
+           labelled route to the same place, and two identical links in a row
+           is just noise for a screen reader. */
+        .cabinet-art {
+            position: relative;
+            display: block;
+            aspect-ratio: 16 / 10;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background-color: var(--bg-art);
+            box-shadow: 0 18px 34px -18px rgba(0, 0, 0, 0.9);
+            transition: transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
+        }
+
+        /* Blurred fill behind the artwork so nothing has to be cropped. */
+        .art-bg {
             position: absolute;
             inset: -8%;
             background-image: var(--shot);
             background-size: cover;
             background-position: center;
-            filter: blur(30px) saturate(1.3) brightness(0.5);
+            filter: blur(30px) saturate(1.3) brightness(0.45);
         }
 
-        .cover-shot {
+        .art-shot {
             position: absolute;
             inset: 0;
             width: 100%;
@@ -152,134 +279,200 @@
             transition: transform 0.35s ease;
         }
 
-        .cover-scrim {
+        .art-scrim {
             position: absolute;
             inset: 0;
-            background: rgba(4, 7, 14, 0.34);
-            transition: background 0.25s ease;
+            background: linear-gradient(to top, rgba(4, 7, 14, 0.55), rgba(4, 7, 14, 0.12) 55%);
+            transition: opacity 0.28s ease;
         }
 
-        .game-cover:hover .cover-scrim,
-        .game-cover:focus-visible .cover-scrim {
-            background: rgba(4, 7, 14, 0.16);
-        }
-
-        .game-cover:hover .cover-shot {
-            transform: scale(1.03);
-        }
-
-        .cover-cta {
-            position: relative;
+        /* Insert-coin overlay, revealed on hover or keyboard focus. */
+        .art-cta {
+            position: absolute;
+            inset: 0;
             z-index: 2;
-            height: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0.85rem;
-            font-size: 1.05rem;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+            gap: 0.8rem;
+            opacity: 0;
+            background: rgba(6, 10, 18, 0.5);
+            backdrop-filter: blur(1.5px);
+            transition: opacity 0.25s ease;
         }
 
-        .cover-play {
-            width: 76px;
-            height: 76px;
+        .art-play {
+            width: 68px;
+            height: 68px;
             border-radius: 50%;
-            background: rgba(10, 14, 24, 0.45);
-            backdrop-filter: blur(4px);
-            border: 2px solid rgba(255, 255, 255, 0.85);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            background: rgba(10, 14, 24, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s ease, background 0.2s ease;
+            transform: scale(0.86);
+            transition: transform 0.25s ease, background 0.25s ease;
         }
 
-        .game-cover:hover .cover-play,
-        .game-cover:focus-visible .cover-play {
-            transform: scale(1.08);
-            background: rgba(0, 82, 204, 0.75);
-        }
-
-        .cover-play::after {
+        .art-play::after {
             content: "";
             width: 0;
             height: 0;
-            border-top: 13px solid transparent;
-            border-bottom: 13px solid transparent;
-            border-left: 22px solid #ffffff;
-            margin-left: 6px;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            border-left: 20px solid #ffffff;
+            margin-left: 5px;
         }
 
-        .cover-note {
-            font-size: 0.8rem;
-            font-weight: 500;
-            opacity: 0.85;
-            letter-spacing: 0;
-        }
-
-        .game-info h2 {
-            font-size: 1.6rem;
-            letter-spacing: -0.5px;
-            margin-bottom: 0.35rem;
-        }
-
-        .game-kicker {
-            font-size: 0.78rem;
+        .art-cta span {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.72rem;
+            letter-spacing: 3px;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--primary-blue);
-            font-weight: 700;
-            margin-bottom: 0.5rem;
+            color: #ffffff;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
         }
 
-        .game-info p {
-            color: var(--text-muted);
-            margin-bottom: 1rem;
+        .cabinet:hover .cabinet-art,
+        .cabinet-art:focus-visible,
+        .cabinet:focus-within .cabinet-art {
+            transform: translateY(-6px);
+            border-color: var(--line-bright);
+            box-shadow: 0 26px 46px -20px rgba(0, 0, 0, 0.95), 0 0 0 1px var(--accent-soft);
         }
 
-        .game-actions {
+        .cabinet:hover .art-cta,
+        .cabinet:focus-within .art-cta {
+            opacity: 1;
+        }
+
+        .cabinet:hover .art-play,
+        .cabinet:focus-within .art-play {
+            transform: scale(1);
+            background: rgba(240, 165, 0, 0.8);
+        }
+
+        .cabinet:hover .art-shot {
+            transform: scale(1.04);
+        }
+
+        .cabinet-art:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 3px;
+        }
+
+        /* Placeholder art for a game with no screenshot yet: the title set
+           large on a lit gradient, so an empty slot still looks deliberate. */
+        .art-title {
+            position: absolute;
+            inset: 0;
             display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            margin-top: 1.25rem;
-        }
-
-        .meta-tags {
-            display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             gap: 0.5rem;
-            margin-top: 1.25rem;
+            padding: 1.5rem;
+            text-align: center;
+            background:
+                radial-gradient(120% 90% at 50% 0%, rgba(77, 141, 255, 0.20), transparent 62%),
+                linear-gradient(160deg, #101a2e 0%, #070b14 100%);
         }
 
-        .meta-tags span {
-            background-color: var(--light-blue);
-            border: 1px solid var(--border-color);
-            border-radius: 999px;
-            padding: 0.28rem 0.8rem;
-            font-size: 0.82rem;
+        .art-title b {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: clamp(1.6rem, 4.2vw, 2.3rem);
+            font-weight: 700;
+            letter-spacing: -1px;
+            line-height: 1.1;
+            color: #ffffff;
+        }
+
+        .art-title b i {
+            font-style: normal;
+            color: var(--accent);
+        }
+
+        .art-title em {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-style: normal;
+            font-size: 0.66rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
             color: var(--text-muted);
         }
 
-        /* Heart / thumbs-up row */
+        /* ---- Card text -------------------------------------------------- */
+        .cabinet-body {
+            padding: 1.1rem 0.25rem 0;
+        }
+
+        .cabinet-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            line-height: 1.3;
+        }
+
+        .cabinet-title a {
+            color: var(--text);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .cabinet-title a:hover,
+        .cabinet-title a:focus-visible {
+            color: var(--accent);
+            text-decoration: underline;
+            text-underline-offset: 4px;
+        }
+
+        .cabinet-title a:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 3px;
+            border-radius: 4px;
+        }
+
+        .cabinet-blurb {
+            margin-top: 0.45rem;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+
+        .beta-badge {
+            display: inline-block;
+            vertical-align: middle;
+            margin-left: 0.5rem;
+            padding: 0.14rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid rgba(240, 165, 0, 0.5);
+            background-color: var(--accent-soft);
+            color: var(--accent);
+            font-size: 0.64rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        /* ---- Reactions --------------------------------------------------- */
         .reactions {
             display: flex;
-            gap: 0.6rem;
-            margin-top: 1.25rem;
+            gap: 0.5rem;
+            margin-top: 0.9rem;
         }
 
         .react {
             display: inline-flex;
             align-items: center;
-            gap: 0.45rem;
-            padding: 0.4rem 0.9rem;
+            gap: 0.4rem;
+            padding: 0.3rem 0.75rem;
             border-radius: 999px;
-            border: 1px solid var(--border-color);
-            background-color: var(--bg-white);
+            border: 1px solid var(--line);
+            background-color: var(--bg-raised);
             color: var(--text-muted);
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
@@ -287,15 +480,15 @@
 
         .react:hover:not([aria-pressed="true"]),
         .react:focus-visible {
-            border-color: var(--primary-blue);
-            background-color: var(--light-blue);
+            border-color: var(--line-bright);
+            color: var(--text);
         }
 
         /* Reactions are one-way — once counted, the button reads as done. */
         .react[aria-pressed="true"] {
-            border-color: var(--primary-blue);
-            background-color: var(--light-blue);
-            color: var(--primary-blue);
+            border-color: rgba(240, 165, 0, 0.5);
+            background-color: var(--accent-soft);
+            color: var(--accent);
             cursor: default;
         }
 
@@ -303,35 +496,71 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* Link-only entry: no preview stage, just the copy and a fullscreen link */
-        .game--link {
-            grid-template-columns: 1fr;
+        /* ---- Footer ------------------------------------------------------ */
+        footer {
+            padding: 2.75rem 0;
+            border-top: 1px solid var(--line);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88rem;
         }
 
-        .beta-badge {
-            display: inline-block;
-            background-color: #fff4e5;
-            border: 1px solid #f0a500;
-            color: #a35b00;
-            border-radius: 999px;
-            padding: 0.2rem 0.7rem;
-            font-size: 0.72rem;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            vertical-align: middle;
-            margin-left: 0.6rem;
+        footer a {
+            color: var(--text-muted);
         }
 
-        .beta-note {
-            font-size: 0.9rem;
-            font-style: italic;
+        footer a:hover {
+            color: var(--accent);
         }
 
-        @media (max-width: 900px) {
-            .game {
-                grid-template-columns: 1fr;
+        /* ---- Phones ------------------------------------------------------ */
+        @media (max-width: 600px) {
+            .container,
+            .nav-container {
+                padding-left: 1.25rem;
+                padding-right: 1.25rem;
+            }
+
+            .nav-links {
+                gap: 1.25rem;
+            }
+
+            .page-intro {
+                padding: 2.75rem 0 2rem;
+            }
+
+            .arcade {
                 gap: 1.75rem;
+                padding-bottom: 3.5rem;
+            }
+        }
+
+        /* Touch devices have no hover, so the insert-coin overlay would never
+           appear and the art would look inert. Show it at rest instead. */
+        @media (hover: none) {
+            .art-cta {
+                opacity: 1;
+                background: rgba(6, 10, 18, 0.32);
+            }
+
+            .art-play {
+                transform: scale(1);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+            }
+
+            .cabinet:hover .cabinet-art,
+            .cabinet:focus-within .cabinet-art {
+                transform: none;
+            }
+
+            .cabinet:hover .art-shot {
+                transform: none;
             }
         }
     </style>
@@ -340,9 +569,9 @@
 
     <header>
         <div class="nav-container">
-            <a href="index.html" class="brand-logo">AnthonyJCTSG Games</a>
+            <a href="index.html" class="brand-logo">AnthonyJCTSG<span>&nbsp;Games</span></a>
             <ul class="nav-links">
-                <li><a href="index.html" aria-current="page">Games</a></li>
+                <li><a href="index.html" aria-current="page">Arcade</a></li>
                 <li><a href="https://anthonyjctsg.com/" rel="noopener">About the developer</a></li>
             </ul>
         </div>
@@ -351,39 +580,27 @@
     <main class="container">
 
         <div class="page-intro">
-            <h1>Play free browser games</h1>
-            <p>Original browser games by Anthony C Johnson. Nothing to install and no download &mdash; click to play right here, or open one fullscreen.</p>
+            <p class="kicker">Insert coin &middot; No install &middot; No download</p>
+            <h1>The Arcade</h1>
+            <p>Original browser games by Anthony C Johnson. Pick a cabinet &mdash; every title opens fullscreen and plays right in your browser, on desktop or phone.</p>
         </div>
 
-        <section>
+        <ul class="arcade">
 
-            <article class="game" data-game="wealth-runner">
-                <div class="game-stage">
-                    <button type="button" class="game-cover" data-src="WealthRunner.html"
-                            style="--shot: url('wealthrunner_thumbnail.png')"
-                            aria-label="Load and play Wealth Runner">
-                        <span class="cover-bg"></span>
-                        <img class="cover-shot" src="wealthrunner_thumbnail.png" alt="Wealth Runner title art" loading="lazy">
-                        <span class="cover-scrim"></span>
-                        <span class="cover-cta">
-                            <span class="cover-play"></span>
-                            Play Wealth Runner
-                            <span class="cover-note">Click to play</span>
-                        </span>
-                    </button>
-                </div>
-                <div class="game-info">
-                    <p class="game-kicker">Game 01</p>
-                    <h2>Wealth Runner</h2>
-                    <p>A run for the money. Keep moving, keep stacking, and see how far your decisions carry you before the run ends.</p>
-                    <p>Featured on the <a href="https://www.youtube.com/@AgentAJ001" target="_blank" rel="noopener">A.I Build with AJ</a> channel.</p>
-                    <div class="meta-tags">
-                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span>
-                    </div>
-                    <div class="game-actions">
-                        <a href="WealthRunner.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
-                        <a href="https://www.youtube.com/watch?v=jGQuyQsd5zQ" target="_blank" rel="noopener" class="btn btn-secondary">Watch the Video</a>
-                    </div>
+            <li class="cabinet game" data-game="wealth-runner">
+                <a class="cabinet-art" href="WealthRunner.html" tabindex="-1" aria-hidden="true"
+                   style="--shot: url('wealthrunner_thumbnail.png')">
+                    <span class="art-bg"></span>
+                    <img class="art-shot" src="wealthrunner_thumbnail.png" alt="" loading="lazy">
+                    <span class="art-scrim"></span>
+                    <span class="art-cta">
+                        <span class="art-play"></span>
+                        <span>Play</span>
+                    </span>
+                </a>
+                <div class="cabinet-body game-actions">
+                    <h2 class="cabinet-title"><a href="WealthRunner.html">Wealth Runner</a></h2>
+                    <p class="cabinet-blurb">A run for the money. Keep moving, keep stacking, and see how far your decisions carry you before the run ends.</p>
                     <div class="reactions">
                         <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Wealth Runner">
                             <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
@@ -393,34 +610,22 @@
                         </button>
                     </div>
                 </div>
-            </article>
+            </li>
 
-            <article class="game" data-game="billionaire-barber">
-                <div class="game-stage">
-                    <button type="button" class="game-cover" data-src="BillionaireBarber.html"
-                            style="--shot: url('billionairebarber_thumbnail.png')"
-                            aria-label="Load and play Billionaire Barber">
-                        <span class="cover-bg"></span>
-                        <img class="cover-shot" src="billionairebarber_thumbnail.png" alt="Billionaire Barber title screen" loading="lazy">
-                        <span class="cover-scrim"></span>
-                        <span class="cover-cta">
-                            <span class="cover-play"></span>
-                            Play Billionaire Barber
-                            <span class="cover-note">Click to play</span>
-                        </span>
-                    </button>
-                </div>
-                <div class="game-info">
-                    <p class="game-kicker">Game 02 &middot; New</p>
-                    <h2>Billionaire Barber</h2>
-                    <p>Pick your barber, pick your cut, and work the chair. Tapers pay reliably, fades show off the skill, bald-and-beard is fast money with a low ceiling &mdash; build the shop from the chair up.</p>
-                    <p>Cut hair. Build wealth. Own the city. Choose your barber and work your way up from a single chair.</p>
-                    <div class="meta-tags">
-                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span>
-                    </div>
-                    <div class="game-actions">
-                        <a href="BillionaireBarber.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
-                    </div>
+            <li class="cabinet game" data-game="billionaire-barber">
+                <a class="cabinet-art" href="BillionaireBarber.html" tabindex="-1" aria-hidden="true"
+                   style="--shot: url('billionairebarber_thumbnail.png')">
+                    <span class="art-bg"></span>
+                    <img class="art-shot" src="billionairebarber_thumbnail.png" alt="" loading="lazy">
+                    <span class="art-scrim"></span>
+                    <span class="art-cta">
+                        <span class="art-play"></span>
+                        <span>Play</span>
+                    </span>
+                </a>
+                <div class="cabinet-body game-actions">
+                    <h2 class="cabinet-title"><a href="BillionaireBarber.html">Billionaire Barber</a></h2>
+                    <p class="cabinet-blurb">Cut hair, build wealth, own the city. Tapers pay reliably, fades show off the skill &mdash; work your way up from a single chair.</p>
                     <div class="reactions">
                         <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Billionaire Barber">
                             <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
@@ -430,20 +635,23 @@
                         </button>
                     </div>
                 </div>
-            </article>
+            </li>
 
-            <article class="game game--link" data-game="food-truck-billionaire">
-                <div class="game-info">
-                    <p class="game-kicker">Game 03</p>
-                    <h2>Food Truck Billionaire <span class="beta-badge">Beta</span></h2>
-                    <p>Run the window. Work the rail, fill the orders, and turn one truck into a fleet before the rush buries you.</p>
-                    <p class="beta-note">Beta mode &mdash; testers, be my guest. Expect rough edges, and the save may reset between builds.</p>
-                    <div class="meta-tags">
-                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span><span>Beta</span>
-                    </div>
-                    <div class="game-actions">
-                        <a href="food-truck-billionaire.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
-                    </div>
+            <li class="cabinet game" data-game="food-truck-billionaire">
+                <a class="cabinet-art" href="food-truck-billionaire.html" tabindex="-1" aria-hidden="true">
+                    <span class="art-title">
+                        <b>Food Truck <i>Billionaire</i></b>
+                        <em>Serve &middot; Scale &middot; Repeat</em>
+                    </span>
+                    <span class="art-scrim"></span>
+                    <span class="art-cta">
+                        <span class="art-play"></span>
+                        <span>Play</span>
+                    </span>
+                </a>
+                <div class="cabinet-body game-actions">
+                    <h2 class="cabinet-title"><a href="food-truck-billionaire.html">Food Truck Billionaire</a><span class="beta-badge">Beta</span></h2>
+                    <p class="cabinet-blurb">Run the window. Work the rail, fill the orders, and turn one truck into a fleet before the rush buries you.</p>
                     <div class="reactions">
                         <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Food Truck Billionaire">
                             <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
@@ -453,20 +661,23 @@
                         </button>
                     </div>
                 </div>
-            </article>
+            </li>
 
-            <article class="game game--link" data-game="buy-n-scale">
-                <div class="game-info">
-                    <p class="game-kicker">Game 04</p>
-                    <h2>buy'n'scale <span class="beta-badge">Beta</span></h2>
-                    <p>Acquire, improve, compound. Start with $150,000 and a used sedan, buy real businesses, fix what's broken in them, and let the multiple do the rest. Sitting on cash is a decision too &mdash; and it earns 4.4%.</p>
-                    <p class="beta-note">Beta mode &mdash; testers, be my guest. Expect rough edges, and the save may reset between builds.</p>
-                    <div class="meta-tags">
-                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span><span>Beta</span>
-                    </div>
-                    <div class="game-actions">
-                        <a href="buynscale.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
-                    </div>
+            <li class="cabinet game" data-game="buy-n-scale">
+                <a class="cabinet-art" href="buynscale.html" tabindex="-1" aria-hidden="true">
+                    <span class="art-title">
+                        <b>buy<i>'n'</i>scale</b>
+                        <em>Acquire &middot; Improve &middot; Compound</em>
+                    </span>
+                    <span class="art-scrim"></span>
+                    <span class="art-cta">
+                        <span class="art-play"></span>
+                        <span>Play</span>
+                    </span>
+                </a>
+                <div class="cabinet-body game-actions">
+                    <h2 class="cabinet-title"><a href="buynscale.html">buy'n'scale</a><span class="beta-badge">Beta</span></h2>
+                    <p class="cabinet-blurb">Start with $150,000 and a used sedan. Buy real businesses, fix what's broken in them, and let the multiple do the rest.</p>
                     <div class="reactions">
                         <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart buy'n'scale">
                             <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
@@ -476,9 +687,9 @@
                         </button>
                     </div>
                 </div>
-            </article>
+            </li>
 
-        </section>
+        </ul>
 
     </main>
 
@@ -490,20 +701,8 @@
 
     <script src="ctsg-data.js"></script>
     <script>
-        // Swap the cover for a real iframe only when the visitor asks to play,
-        // so the multi-megabyte game files are never fetched on page load.
-        document.querySelectorAll('.game-cover').forEach(function (cover) {
-            cover.addEventListener('click', function () {
-                var frame = document.createElement('iframe');
-                frame.src = cover.dataset.src;
-                frame.title = cover.getAttribute('aria-label');
-                frame.allow = 'fullscreen; autoplay';
-                cover.replaceWith(frame);
-            });
-        });
-
         // Play tracking + reactions. Every part of this fails quietly: if
-        // Supabase is unreachable the games still load and the buttons still
+        // Supabase is unreachable the games still open and the buttons still
         // respond, they just stop counting.
         (function () {
             if (!window.CTSG) { return; }
@@ -539,12 +738,9 @@
             document.querySelectorAll('.game[data-game]').forEach(function (article) {
                 var slug = article.dataset.game;
 
-                // The two ways into a game: the inline cover and the fullscreen link.
-                var cover = article.querySelector('.game-cover');
-                if (cover) {
-                    cover.addEventListener('click', function () { CTSG.track(slug, 'select'); });
-                }
-                article.querySelectorAll('.game-actions a[href$=".html"]').forEach(function (link) {
+                // Both routes into a game — the art panel and the title link —
+                // count as the same "opened it" event.
+                article.querySelectorAll('a[href$=".html"]').forEach(function (link) {
                     link.addEventListener('click', function () { CTSG.track(slug, 'select'); });
                 });
 
