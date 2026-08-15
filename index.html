@@ -251,6 +251,9 @@
         .cabinet-art {
             position: relative;
             display: block;
+            /* The rebuilt title screens below size themselves in cqw, so they
+               scale with the card rather than with the viewport. */
+            container-type: inline-size;
             aspect-ratio: 16 / 10;
             border-radius: var(--radius);
             overflow: hidden;
@@ -362,8 +365,10 @@
             outline-offset: 3px;
         }
 
-        /* Placeholder art for a game with no screenshot yet: the title set
-           large on a lit gradient, so an empty slot still looks deliberate. */
+        /* Placeholder art for a game with no screenshot yet: the game's own
+           title screen rebuilt at card size, so an empty slot still looks
+           deliberate — and stays sharp at any resolution, which a PNG would
+           not. Swap in a real screenshot whenever one exists. */
         .art-title {
             position: absolute;
             inset: 0;
@@ -371,7 +376,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 0.5rem;
+            gap: 0.55rem;
             padding: 1.5rem;
             text-align: center;
             background:
@@ -400,6 +405,169 @@
             letter-spacing: 3px;
             text-transform: uppercase;
             color: var(--text-muted);
+        }
+
+        /* buy'n'scale's own title screen, matched to the values in
+           buynscale.html: gold #e7b23a, Georgia display face with the gold
+           'n', mono eyebrow at .22em, and the three tier rungs. */
+        .art-title--bns {
+            gap: 0.7rem;
+            background:
+                radial-gradient(ellipse at 30% 20%, rgba(79, 140, 255, 0.14), transparent 55%),
+                radial-gradient(ellipse at 80% 80%, rgba(231, 178, 58, 0.12), transparent 55%),
+                #0a0e16;
+        }
+
+        .art-title--bns em {
+            letter-spacing: 0.22em;
+            font-size: 0.6rem;
+            color: #e7b23a;
+        }
+
+        .art-title--bns b {
+            font-size: clamp(1.9rem, 5.4vw, 2.9rem);
+            line-height: 0.9;
+            letter-spacing: -0.5px;
+            color: #eaf0fb;
+        }
+
+        .art-title--bns b i {
+            color: #e7b23a;
+        }
+
+        .art-rungs {
+            display: flex;
+            gap: 0.4rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 0.15rem;
+        }
+
+        .art-rungs span {
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            padding: 0.32rem 0.55rem;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.52rem;
+            line-height: 1.35;
+            letter-spacing: 0.04em;
+            color: #8fa1bd;
+        }
+
+        .art-rungs span b {
+            display: block;
+            font-family: inherit;
+            font-size: 0.6rem;
+            letter-spacing: 0.08em;
+            color: #eaf0fb;
+        }
+
+        /* The rungs are the first thing worth dropping on a narrow card —
+           the title and eyebrow carry the identity on their own. */
+        @media (max-width: 380px) {
+            .art-rungs {
+                display: none;
+            }
+        }
+
+        /* Food Truck Billionaire's title screen: the name spelled out in
+           three rows of tiles — burger circles, slate squares, green stalls
+           with an awning stripe. Sized in cqw against the card. */
+        .art-title--ftb {
+            gap: 2cqw;
+            padding: 1rem;
+            background:
+                radial-gradient(ellipse at 50% 38%, #3d1a11 0%, transparent 62%),
+                linear-gradient(170deg, #1d0d08 0%, #140806 100%);
+        }
+
+        .ftb-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .ftb-row i {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-style: normal;
+            font-weight: 800;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1;
+        }
+
+        /* FOOD — patty and bun circles */
+        .ftb-food {
+            gap: 1.9cqw;
+        }
+
+        .ftb-food i {
+            width: 10cqw;
+            height: 10cqw;
+            border-radius: 50%;
+            font-size: 4cqw;
+            background: #d9532c;
+            color: #ffffff;
+        }
+
+        .ftb-food i.bun {
+            background: #f2c94c;
+            color: #7a3b12;
+        }
+
+        /* TRUCK — slate panel squares */
+        .ftb-truck {
+            gap: 1.5cqw;
+        }
+
+        .ftb-truck i {
+            width: 8cqw;
+            height: 8cqw;
+            border-radius: 1.4cqw;
+            font-size: 3cqw;
+            background: #aab5c0;
+            color: #2f3540;
+        }
+
+        .ftb-truck i.mid {
+            background: #8b98a6;
+        }
+
+        .ftb-truck i.dark {
+            background: #3f4855;
+            color: #aab5c0;
+        }
+
+        /* BILLIONAIRE — park stalls under orange awnings */
+        .ftb-bill {
+            gap: 0.6cqw;
+            align-items: flex-end;
+        }
+
+        .ftb-bill i {
+            width: 6cqw;
+            height: 9.5cqw;
+            border-radius: 0.8cqw;
+            font-size: 2.8cqw;
+            background: #4a9e63;
+            color: #ffffff;
+            /* The awning is a top border rather than a child element, so each
+               stall stays a single box. */
+            border-top: 1.3cqw solid #e2622f;
+        }
+
+        .ftb-tag {
+            margin-top: 0.8cqw;
+            padding: 1cqw 2.4cqw;
+            border: 1px solid #b8862b;
+            border-radius: 999px;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 1.5cqw;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #e0a83c;
+            white-space: nowrap;
         }
 
         /* ---- Card text -------------------------------------------------- */
@@ -639,9 +807,17 @@
 
             <li class="cabinet game" data-game="food-truck-billionaire">
                 <a class="cabinet-art" href="food-truck-billionaire.html" tabindex="-1" aria-hidden="true">
-                    <span class="art-title">
-                        <b>Food Truck <i>Billionaire</i></b>
-                        <em>Serve &middot; Scale &middot; Repeat</em>
+                    <span class="art-title art-title--ftb">
+                        <span class="ftb-row ftb-food">
+                            <i>F</i><i class="bun">O</i><i class="bun">O</i><i>D</i>
+                        </span>
+                        <span class="ftb-row ftb-truck">
+                            <i class="mid">T</i><i>R</i><i class="dark">U</i><i>C</i><i class="mid">K</i>
+                        </span>
+                        <span class="ftb-row ftb-bill">
+                            <i>B</i><i>I</i><i>L</i><i>L</i><i>I</i><i>O</i><i>N</i><i>A</i><i>I</i><i>R</i><i>E</i>
+                        </span>
+                        <span class="ftb-tag">One truck &middot; One park &middot; One billion</span>
                     </span>
                     <span class="art-scrim"></span>
                     <span class="art-cta">
@@ -665,9 +841,14 @@
 
             <li class="cabinet game" data-game="buy-n-scale">
                 <a class="cabinet-art" href="buynscale.html" tabindex="-1" aria-hidden="true">
-                    <span class="art-title">
-                        <b>buy<i>'n'</i>scale</b>
+                    <span class="art-title art-title--bns">
                         <em>Acquire &middot; Improve &middot; Compound</em>
+                        <b>buy<i>'n'</i>scale</b>
+                        <span class="art-rungs">
+                            <span><b>Starter</b>$150K &rarr; $10M</span>
+                            <span><b>On the way</b>$10M &rarr; $100M</span>
+                            <span><b>Made it</b>$100M &rarr; $1B</span>
+                        </span>
                     </span>
                     <span class="art-scrim"></span>
                     <span class="art-cta">
