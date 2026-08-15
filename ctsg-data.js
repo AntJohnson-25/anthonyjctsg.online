@@ -73,15 +73,22 @@
     global.CTSG = {
         visitorId: visitorId,
 
-        /* Fire-and-forget: analytics must never block a click or surface an
-         * error to someone who just wanted to play a game. */
+        /* Resolves true if the event was stored, false for any failure -
+         * offline, blocked, rejected. Deliberately never rejects, so a
+         * fire-and-forget caller cannot raise an unhandled rejection and
+         * analytics never surfaces an error to someone who just wanted to
+         * play a game.
+         *
+         * A 409 counts as stored: the unique index caught a repeat, so the
+         * reaction is already in the table. */
         track: function (gameSlug, eventType) {
-            insert('game_events', {
+            return insert('game_events', {
                 game_slug: gameSlug,
                 event_type: eventType,
                 visitor_id: visitorId(),
                 site: site()
-            })['catch'](function () { /* offline, blocked, whatever */ });
+            }).then(function () { return true; })
+              ['catch'](function () { return false; });
         },
 
         signUp: function (email, name, source) {

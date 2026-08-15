@@ -1094,11 +1094,26 @@
 
                     btn.addEventListener('click', function () {
                         if (btn.getAttribute('aria-pressed') === 'true') { return; }
+
+                        // Respond immediately — the counter should not wait on
+                        // a round trip to feel connected to the click.
                         btn.setAttribute('aria-pressed', 'true');
                         delta[key] = 1;
-                        remember(key);
                         render(btn);
-                        CTSG.track(slug, btn.dataset.react);
+
+                        CTSG.track(slug, btn.dataset.react).then(function (stored) {
+                            // Only remember a reaction that actually landed.
+                            // Recording it optimistically means a failed write
+                            // locks the visitor out of ever counting it: the
+                            // button reads as pressed on every later visit and
+                            // the click returns early above.
+                            if (stored) { remember(key); return; }
+
+                            // Hand the button back instead of burning it.
+                            btn.setAttribute('aria-pressed', 'false');
+                            delta[key] = 0;
+                            render(btn);
+                        });
                     });
                 });
             });
