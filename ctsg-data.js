@@ -12,6 +12,22 @@
     var URL_BASE = 'https://tgpifrhkksycjtwymoxx.supabase.co';
     var API_KEY = 'sb_publishable_nc5cZW4r3Cp3VcL0DqwZSQ_vcIW2prZ';
 
+    /* Which site an event came from. The games run on both anthonyjctsg.com
+     * and anthonyjctsg.online, and both write to the same table, so the rows
+     * are indistinguishable without this.
+     *
+     * Read from the hostname rather than hard-coded, so this file stays byte
+     * for byte identical in both repos. game_events has a check constraint on
+     * the column, and an unlisted value would fail the insert — hence the
+     * whitelist and the fallback, which covers file:// and localhost while
+     * testing. */
+    function site() {
+        var host = '';
+        try { host = (global.location.hostname || '').replace(/^www\./, ''); }
+        catch (e) { /* no location worth reading */ }
+        return (host === 'anthonyjctsg.online') ? 'anthonyjctsg.online' : 'anthonyjctsg.com';
+    }
+
     /* A random id kept in localStorage. Not a login and not tied to a person —
      * it exists only so one browser cannot heart the same game repeatedly. */
     function visitorId() {
@@ -63,7 +79,8 @@
             insert('game_events', {
                 game_slug: gameSlug,
                 event_type: eventType,
-                visitor_id: visitorId()
+                visitor_id: visitorId(),
+                site: site()
             })['catch'](function () { /* offline, blocked, whatever */ });
         },
 
