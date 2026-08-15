@@ -1,0 +1,297 @@
+:root {
+    --primary-blue: #0052cc;
+    --accent-blue: #0747a6;
+    --light-blue: #f4f7fb;
+    --text-dark: #172b4d;
+    --text-muted: #5e6c84;
+    --bg-white: #ffffff;
+    --border-color: #e2e8f0;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+html {
+    /* Stop iOS inflating body text when a phone is turned sideways. */
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    background-color: var(--bg-white);
+    color: var(--text-dark);
+    line-height: 1.6;
+    /* A long unbroken token (URL, email) must wrap rather than widen the page. */
+    overflow-wrap: break-word;
+}
+
+img,
+video,
+iframe {
+    max-width: 100%;
+}
+
+/* The hidden attribute has to beat any display rule set further down, or
+   scripts that hide a finished form get ignored. */
+[hidden] {
+    display: none !important;
+}
+
+a {
+    color: var(--primary-blue);
+}
+
+header {
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px);
+    z-index: 100;
+}
+
+.nav-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.65rem 2rem;
+    flex-wrap: wrap;
+}
+
+.brand-logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--primary-blue);
+    text-decoration: none;
+    letter-spacing: -0.5px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+}
+
+.nav-links a {
+    display: block;
+    /* Vertical padding rather than margin, so the tap target is a full-height
+       strip instead of just the glyphs. */
+    padding: 0.4rem 0;
+    text-decoration: none;
+    color: var(--text-dark);
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: color 0.2s ease;
+}
+
+.nav-links a:hover,
+.nav-links a[aria-current="page"] {
+    color: var(--primary-blue);
+}
+
+.container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    background-color: var(--primary-blue);
+    color: var(--bg-white);
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background-color 0.2s ease;
+}
+
+.btn:hover {
+    background-color: var(--accent-blue);
+}
+
+.btn-secondary {
+    background-color: transparent;
+    color: var(--primary-blue);
+    border: 1px solid var(--primary-blue);
+}
+
+.btn-secondary:hover {
+    background-color: var(--light-blue);
+}
+
+/* Sections */
+section {
+    padding: 3.5rem 0;
+    border-top: 1px solid var(--border-color);
+}
+
+.section-header {
+    margin-bottom: 2.5rem;
+}
+
+.section-header h2 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.section-header p {
+    color: var(--text-muted);
+}
+
+/* Cards */
+.card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    padding: 2rem;
+    border-radius: 8px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 82, 204, 0.3);
+}
+
+.card-icon {
+    width: 48px;
+    height: 48px;
+    background-color: var(--light-blue);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-blue);
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.card p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.grid-auto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+/* Page intro (sub-pages) */
+.page-intro {
+    padding: 3rem 0 0;
+}
+
+.page-intro h1 {
+    font-size: 2.1rem;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.page-intro p {
+    color: var(--text-muted);
+    max-width: 720px;
+}
+
+.back-link {
+    display: inline-block;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+/* Footer */
+footer {
+    padding: 3rem 0;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* ---- Phones -------------------------------------------------------------
+   The desktop gutters and section padding eat roughly a third of a 390px
+   screen. Every page-specific layout already collapses to a single column
+   by this width, so this only reclaims spacing. */
+@media (max-width: 600px) {
+    .container,
+    .nav-container {
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
+
+    .nav-container {
+        gap: 0.5rem 1.25rem;
+    }
+
+    .nav-links {
+        gap: 1.25rem;
+    }
+
+    .brand-logo {
+        font-size: 1.2rem;
+    }
+
+    section {
+        padding: 2.25rem 0;
+    }
+
+    .section-header {
+        margin-bottom: 1.75rem;
+    }
+
+    .section-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .card {
+        padding: 1.5rem;
+    }
+
+    .card-icon {
+        margin-bottom: 1rem;
+    }
+
+    .grid-auto {
+        gap: 1.25rem;
+    }
+
+    .page-intro {
+        padding-top: 2rem;
+    }
+
+    .page-intro h1 {
+        font-size: 1.8rem;
+    }
+
+    footer {
+        padding: 2.25rem 0;
+    }
+
+    /* Full-width tap targets for the stacked calls to action. */
+    .cta-actions .btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+    }
+}

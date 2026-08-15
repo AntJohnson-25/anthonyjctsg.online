@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free Browser Games by Anthony C Johnson | AnthonyJCTSG Games</title>
+    <meta name="description" content="Play free browser games by Houston game developer Anthony C Johnson — Wealth Runner, Billionaire Barber, Food Truck Billionaire (beta) and buy'n'scale (beta). No install, no download, plays right in your browser on desktop or mobile.">
+    <meta name="keywords" content="free browser games, play online games no download, Wealth Runner game, Billionaire Barber game, Food Truck Billionaire game, food truck tycoon, buy'n'scale game, business acquisition game, indie game developer, Houston game developer, Anthony C Johnson, AnthonyJCTSG, CTSG, Calamity, HTML5 games, mobile browser games, tycoon game, barber shop game, money game">
+    <meta name="author" content="Anthony C Johnson">
+    <meta name="robots" content="index, follow">
+    <meta name="theme-color" content="#0052cc">
+    <link rel="canonical" href="https://anthonyjctsg.online/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="AnthonyJCTSG Games">
+    <meta property="og:title" content="Free Browser Games by Anthony C Johnson">
+    <meta property="og:description" content="Play Wealth Runner and Billionaire Barber free in your browser. No install, no download, desktop or mobile.">
+    <meta property="og:url" content="https://anthonyjctsg.online/">
+    <meta property="og:image" content="https://anthonyjctsg.online/wealthrunner_thumbnail.png">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Free Browser Games by Anthony C Johnson">
+    <meta name="twitter:description" content="Play Wealth Runner and Billionaire Barber free in your browser. No install, no download.">
+    <meta name="twitter:image" content="https://anthonyjctsg.online/wealthrunner_thumbnail.png">
+
+    <link rel="stylesheet" href="styles.css">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": "AnthonyJCTSG Games",
+      "url": "https://anthonyjctsg.online/",
+      "description": "Free browser games by Anthony C Johnson.",
+      "hasPart": [
+        {
+          "@type": "VideoGame",
+          "name": "Wealth Runner",
+          "url": "https://anthonyjctsg.online/WealthRunner.html",
+          "image": "https://anthonyjctsg.online/wealthrunner_thumbnail.png",
+          "description": "A run for the money. Keep moving, keep stacking, and see how far your decisions carry you before the run ends.",
+          "author": { "@type": "Person", "name": "Anthony C Johnson" },
+          "gamePlatform": "Web Browser",
+          "applicationCategory": "Game",
+          "operatingSystem": "Any",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        },
+        {
+          "@type": "VideoGame",
+          "name": "Billionaire Barber",
+          "url": "https://anthonyjctsg.online/BillionaireBarber.html",
+          "image": "https://anthonyjctsg.online/billionairebarber_thumbnail.png",
+          "description": "Cut hair. Build wealth. Own the city. Choose your barber and work your way up from a single chair.",
+          "author": { "@type": "Person", "name": "Anthony C Johnson" },
+          "gamePlatform": "Web Browser",
+          "applicationCategory": "Game",
+          "operatingSystem": "Any",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        },
+        {
+          "@type": "VideoGame",
+          "name": "Food Truck Billionaire",
+          "url": "https://anthonyjctsg.online/food-truck-billionaire.html",
+          "description": "Beta. Run the window, work the order rail, and turn one food truck into a fleet.",
+          "author": { "@type": "Person", "name": "Anthony C Johnson" },
+          "gamePlatform": "Web Browser",
+          "applicationCategory": "Game",
+          "operatingSystem": "Any",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        },
+        {
+          "@type": "VideoGame",
+          "name": "buy'n'scale",
+          "url": "https://anthonyjctsg.online/buynscale.html",
+          "description": "Beta. Acquire, improve, compound. Start with $150,000 and buy real businesses, fix what's broken in them, and let the multiple do the rest.",
+          "author": { "@type": "Person", "name": "Anthony C Johnson" },
+          "gamePlatform": "Web Browser",
+          "applicationCategory": "Game",
+          "operatingSystem": "Any",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+        }
+      ]
+    }
+    </script>
+    <style>
+        .game {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+            gap: 2.5rem;
+            align-items: start;
+        }
+
+        .game + .game {
+            margin-top: 4rem;
+            padding-top: 4rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .game-stage {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 10;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            background-color: #070b14;
+            box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.35);
+        }
+
+        .game-stage iframe {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Click-to-load cover, so the game itself is never pulled on page load */
+        .game-cover {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            border: none;
+            overflow: hidden;
+            cursor: pointer;
+            color: #ffffff;
+            background: #070b14;
+            font-family: inherit;
+        }
+
+        /* Blurred fill behind the artwork so nothing has to be cropped */
+        .cover-bg {
+            position: absolute;
+            inset: -8%;
+            background-image: var(--shot);
+            background-size: cover;
+            background-position: center;
+            filter: blur(30px) saturate(1.3) brightness(0.5);
+        }
+
+        .cover-shot {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform 0.35s ease;
+        }
+
+        .cover-scrim {
+            position: absolute;
+            inset: 0;
+            background: rgba(4, 7, 14, 0.34);
+            transition: background 0.25s ease;
+        }
+
+        .game-cover:hover .cover-scrim,
+        .game-cover:focus-visible .cover-scrim {
+            background: rgba(4, 7, 14, 0.16);
+        }
+
+        .game-cover:hover .cover-shot {
+            transform: scale(1.03);
+        }
+
+        .cover-cta {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.85rem;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
+        }
+
+        .cover-play {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background: rgba(10, 14, 24, 0.45);
+            backdrop-filter: blur(4px);
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .game-cover:hover .cover-play,
+        .game-cover:focus-visible .cover-play {
+            transform: scale(1.08);
+            background: rgba(0, 82, 204, 0.75);
+        }
+
+        .cover-play::after {
+            content: "";
+            width: 0;
+            height: 0;
+            border-top: 13px solid transparent;
+            border-bottom: 13px solid transparent;
+            border-left: 22px solid #ffffff;
+            margin-left: 6px;
+        }
+
+        .cover-note {
+            font-size: 0.8rem;
+            font-weight: 500;
+            opacity: 0.85;
+            letter-spacing: 0;
+        }
+
+        .game-info h2 {
+            font-size: 1.6rem;
+            letter-spacing: -0.5px;
+            margin-bottom: 0.35rem;
+        }
+
+        .game-kicker {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary-blue);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .game-info p {
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+
+        .game-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-top: 1.25rem;
+        }
+
+        .meta-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1.25rem;
+        }
+
+        .meta-tags span {
+            background-color: var(--light-blue);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 0.28rem 0.8rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        /* Heart / thumbs-up row */
+        .reactions {
+            display: flex;
+            gap: 0.6rem;
+            margin-top: 1.25rem;
+        }
+
+        .react {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.4rem 0.9rem;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-white);
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+
+        .react:hover:not([aria-pressed="true"]),
+        .react:focus-visible {
+            border-color: var(--primary-blue);
+            background-color: var(--light-blue);
+        }
+
+        /* Reactions are one-way — once counted, the button reads as done. */
+        .react[aria-pressed="true"] {
+            border-color: var(--primary-blue);
+            background-color: var(--light-blue);
+            color: var(--primary-blue);
+            cursor: default;
+        }
+
+        .react-count {
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Link-only entry: no preview stage, just the copy and a fullscreen link */
+        .game--link {
+            grid-template-columns: 1fr;
+        }
+
+        .beta-badge {
+            display: inline-block;
+            background-color: #fff4e5;
+            border: 1px solid #f0a500;
+            color: #a35b00;
+            border-radius: 999px;
+            padding: 0.2rem 0.7rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            vertical-align: middle;
+            margin-left: 0.6rem;
+        }
+
+        .beta-note {
+            font-size: 0.9rem;
+            font-style: italic;
+        }
+
+        @media (max-width: 900px) {
+            .game {
+                grid-template-columns: 1fr;
+                gap: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="brand-logo">AnthonyJCTSG Games</a>
+            <ul class="nav-links">
+                <li><a href="index.html" aria-current="page">Games</a></li>
+                <li><a href="https://anthonyjctsg.com/" rel="noopener">About the developer</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <div class="page-intro">
+            <h1>Play free browser games</h1>
+            <p>Original browser games by Anthony C Johnson. Nothing to install and no download &mdash; click to play right here, or open one fullscreen.</p>
+        </div>
+
+        <section>
+
+            <article class="game" data-game="wealth-runner">
+                <div class="game-stage">
+                    <button type="button" class="game-cover" data-src="WealthRunner.html"
+                            style="--shot: url('wealthrunner_thumbnail.png')"
+                            aria-label="Load and play Wealth Runner">
+                        <span class="cover-bg"></span>
+                        <img class="cover-shot" src="wealthrunner_thumbnail.png" alt="Wealth Runner title art" loading="lazy">
+                        <span class="cover-scrim"></span>
+                        <span class="cover-cta">
+                            <span class="cover-play"></span>
+                            Play Wealth Runner
+                            <span class="cover-note">Click to play</span>
+                        </span>
+                    </button>
+                </div>
+                <div class="game-info">
+                    <p class="game-kicker">Game 01</p>
+                    <h2>Wealth Runner</h2>
+                    <p>A run for the money. Keep moving, keep stacking, and see how far your decisions carry you before the run ends.</p>
+                    <p>Featured on the <a href="https://www.youtube.com/@AgentAJ001" target="_blank" rel="noopener">A.I Build with AJ</a> channel.</p>
+                    <div class="meta-tags">
+                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span>
+                    </div>
+                    <div class="game-actions">
+                        <a href="WealthRunner.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
+                        <a href="https://www.youtube.com/watch?v=jGQuyQsd5zQ" target="_blank" rel="noopener" class="btn btn-secondary">Watch the Video</a>
+                    </div>
+                    <div class="reactions">
+                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Wealth Runner">
+                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                        </button>
+                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Wealth Runner">
+                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="game" data-game="billionaire-barber">
+                <div class="game-stage">
+                    <button type="button" class="game-cover" data-src="BillionaireBarber.html"
+                            style="--shot: url('billionairebarber_thumbnail.png')"
+                            aria-label="Load and play Billionaire Barber">
+                        <span class="cover-bg"></span>
+                        <img class="cover-shot" src="billionairebarber_thumbnail.png" alt="Billionaire Barber title screen" loading="lazy">
+                        <span class="cover-scrim"></span>
+                        <span class="cover-cta">
+                            <span class="cover-play"></span>
+                            Play Billionaire Barber
+                            <span class="cover-note">Click to play</span>
+                        </span>
+                    </button>
+                </div>
+                <div class="game-info">
+                    <p class="game-kicker">Game 02 &middot; New</p>
+                    <h2>Billionaire Barber</h2>
+                    <p>Pick your barber, pick your cut, and work the chair. Tapers pay reliably, fades show off the skill, bald-and-beard is fast money with a low ceiling &mdash; build the shop from the chair up.</p>
+                    <p>Cut hair. Build wealth. Own the city. Choose your barber and work your way up from a single chair.</p>
+                    <div class="meta-tags">
+                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span>
+                    </div>
+                    <div class="game-actions">
+                        <a href="BillionaireBarber.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
+                    </div>
+                    <div class="reactions">
+                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Billionaire Barber">
+                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                        </button>
+                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Billionaire Barber">
+                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="game game--link" data-game="food-truck-billionaire">
+                <div class="game-info">
+                    <p class="game-kicker">Game 03</p>
+                    <h2>Food Truck Billionaire <span class="beta-badge">Beta</span></h2>
+                    <p>Run the window. Work the rail, fill the orders, and turn one truck into a fleet before the rush buries you.</p>
+                    <p class="beta-note">Beta mode &mdash; testers, be my guest. Expect rough edges, and the save may reset between builds.</p>
+                    <div class="meta-tags">
+                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span><span>Beta</span>
+                    </div>
+                    <div class="game-actions">
+                        <a href="food-truck-billionaire.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
+                    </div>
+                    <div class="reactions">
+                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Food Truck Billionaire">
+                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                        </button>
+                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Food Truck Billionaire">
+                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+            <article class="game game--link" data-game="buy-n-scale">
+                <div class="game-info">
+                    <p class="game-kicker">Game 04</p>
+                    <h2>buy'n'scale <span class="beta-badge">Beta</span></h2>
+                    <p>Acquire, improve, compound. Start with $150,000 and a used sedan, buy real businesses, fix what's broken in them, and let the multiple do the rest. Sitting on cash is a decision too &mdash; and it earns 4.4%.</p>
+                    <p class="beta-note">Beta mode &mdash; testers, be my guest. Expect rough edges, and the save may reset between builds.</p>
+                    <div class="meta-tags">
+                        <span>Browser</span><span>Play free</span><span>Desktop &amp; mobile</span><span>Beta</span>
+                    </div>
+                    <div class="game-actions">
+                        <a href="buynscale.html" target="_blank" rel="noopener" class="btn">Open Fullscreen</a>
+                    </div>
+                    <div class="reactions">
+                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart buy'n'scale">
+                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                        </button>
+                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up buy'n'scale">
+                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                        </button>
+                    </div>
+                </div>
+            </article>
+
+        </section>
+
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 AnthonyJCTSG. All rights reserved. &middot; <a href="https://anthonyjctsg.com/" rel="noopener">anthonyjctsg.com</a></p>
+        </div>
+    </footer>
+
+    <script src="ctsg-data.js"></script>
+    <script>
+        // Swap the cover for a real iframe only when the visitor asks to play,
+        // so the multi-megabyte game files are never fetched on page load.
+        document.querySelectorAll('.game-cover').forEach(function (cover) {
+            cover.addEventListener('click', function () {
+                var frame = document.createElement('iframe');
+                frame.src = cover.dataset.src;
+                frame.title = cover.getAttribute('aria-label');
+                frame.allow = 'fullscreen; autoplay';
+                cover.replaceWith(frame);
+            });
+        });
+
+        // Play tracking + reactions. Every part of this fails quietly: if
+        // Supabase is unreachable the games still load and the buttons still
+        // respond, they just stop counting.
+        (function () {
+            if (!window.CTSG) { return; }
+
+            var MINE_KEY = 'ctsg_reactions';
+            var server = {};   // totals from the database
+            var delta = {};    // this page view's own clicks, not yet in `server`
+            var loaded = false;
+
+            function mine() {
+                try { return JSON.parse(localStorage.getItem(MINE_KEY)) || {}; }
+                catch (e) { return {}; }
+            }
+
+            function remember(key) {
+                var m = mine();
+                m[key] = true;
+                try { localStorage.setItem(MINE_KEY, JSON.stringify(m)); } catch (e) { /* private mode */ }
+            }
+
+            function keyOf(btn) {
+                return btn.closest('.game').dataset.game + ':' + btn.dataset.react;
+            }
+
+            function render(btn) {
+                var k = keyOf(btn);
+                var total = (server[k] || 0) + (delta[k] || 0);
+                // An em dash until there is a real number to show.
+                btn.querySelector('.react-count').textContent =
+                    (loaded || delta[k]) ? total : '—';
+            }
+
+            document.querySelectorAll('.game[data-game]').forEach(function (article) {
+                var slug = article.dataset.game;
+
+                // The two ways into a game: the inline cover and the fullscreen link.
+                var cover = article.querySelector('.game-cover');
+                if (cover) {
+                    cover.addEventListener('click', function () { CTSG.track(slug, 'select'); });
+                }
+                article.querySelectorAll('.game-actions a[href$=".html"]').forEach(function (link) {
+                    link.addEventListener('click', function () { CTSG.track(slug, 'select'); });
+                });
+
+                article.querySelectorAll('.react').forEach(function (btn) {
+                    var key = keyOf(btn);
+                    if (mine()[key]) { btn.setAttribute('aria-pressed', 'true'); }
+
+                    btn.addEventListener('click', function () {
+                        if (btn.getAttribute('aria-pressed') === 'true') { return; }
+                        btn.setAttribute('aria-pressed', 'true');
+                        delta[key] = 1;
+                        remember(key);
+                        render(btn);
+                        CTSG.track(slug, btn.dataset.react);
+                    });
+                });
+            });
+
+            CTSG.reactionCounts().then(function (rows) {
+                rows.forEach(function (row) {
+                    server[row.game_slug + ':' + row.event_type] = row.total;
+                });
+                loaded = true;
+                // A click that landed before this response is already in `delta`,
+                // and may or may not be in `server` — drop it if it is.
+                document.querySelectorAll('.react').forEach(function (btn) {
+                    var k = keyOf(btn);
+                    if (delta[k] && mine()[k] && server[k]) { delta[k] = 0; }
+                    render(btn);
+                });
+            });
+        }());
+    </script>
+
+</body>
+</html>

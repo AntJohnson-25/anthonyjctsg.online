@@ -1,0 +1,17 @@
+.claude/
+repo_https.txt
+
+# Source resume — the site publishes an About Me written from it, never the file
+# itself (static.yml uploads the whole repo, so anything tracked is downloadable).
+*.docx
+
+# Local backups of game builds — never publish a superseded build
+*.bak
+
+# Unedited source clip for the Viewer Feedback list — 150MB, over GitHub's
+# 100MB file limit. The site serves the re-encoded feedback_1_1.mp4 instead.
+feedback_1.mp4
+
+# Database setup — run once in the Supabase dashboard, no reason to publish
+# the schema (static.yml uploads the whole repo).
+supabase-schema.sql
