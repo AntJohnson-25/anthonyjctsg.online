@@ -90,17 +90,26 @@
            different design systems, and sharing one sheet would mean fighting
            it with overrides on every rule. */
         :root {
-            --bg: #080c16;
-            --bg-raised: #0e1524;
+            --bg: #05070d;
+            --bg-raised: rgba(255, 255, 255, 0.07);
             --bg-art: #070b14;
-            --line: #1e2942;
-            --line-bright: #2f3f63;
-            --text: #eef2f9;
-            --text-muted: #93a1bd;
-            --accent: #f0a500;
-            --accent-soft: rgba(240, 165, 0, 0.14);
-            --blue: #4d8dff;
-            --radius: 14px;
+            --line: rgba(255, 255, 255, 0.12);
+            --line-bright: rgba(255, 255, 255, 0.26);
+            --text: #f5f8ff;
+            --text-muted: #b7c1dc;
+            --accent: #ffb648;
+            --accent-soft: rgba(255, 182, 72, 0.16);
+            --blue: #7fb4ff;
+            --radius: 16px;
+
+            /* Liquid-glass surface tokens. Frosted panels float over the
+               drifting color blobs behind them, so every surface needs its
+               own translucent fill + blur rather than a flat solid. */
+            --glass-fill: rgba(18, 22, 36, 0.42);
+            --glass-fill-strong: rgba(20, 25, 40, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.14);
+            --glass-highlight: rgba(255, 255, 255, 0.06);
+            --glass-blur: blur(22px) saturate(160%);
         }
 
         * {
@@ -115,19 +124,102 @@
         }
 
         body {
+            position: relative;
             min-height: 100vh;
             background-color: var(--bg);
-            /* Two wide, very soft pools of light so the flat dark ground reads
-               as a lit room rather than a black rectangle. */
-            background-image:
-                radial-gradient(1100px 620px at 12% -10%, rgba(77, 141, 255, 0.14), transparent 60%),
-                radial-gradient(900px 560px at 88% 4%, rgba(240, 165, 0, 0.10), transparent 62%);
-            background-repeat: no-repeat;
             color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             line-height: 1.6;
             /* A long unbroken token (URL, email) must wrap rather than widen the page. */
             overflow-wrap: break-word;
+            /* Blobs render on a fixed, page-behind layer (below) instead of
+               here, so they stay put in the viewport while the page scrolls
+               rather than smearing across the whole document height. */
+            overflow-x: hidden;
+        }
+
+        /* ---- Liquid glass background -------------------------------------
+           A handful of large, heavily blurred color pools drifting slowly
+           behind fixed position, so every glass panel above has something
+           soft and colorful to refract. Fixed + huge blur keeps this cheap:
+           the browser paints it once and the panels do the visual work. */
+        .liquid-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            overflow: hidden;
+            background: var(--bg);
+        }
+
+        .liquid-bg span {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.55;
+            will-change: transform;
+        }
+
+        .liquid-bg .blob-1 {
+            top: -18%;
+            left: -10%;
+            width: 52vw;
+            height: 52vw;
+            background: radial-gradient(circle at 35% 35%, #4d8dff, transparent 70%);
+            animation: drift-a 26s ease-in-out infinite;
+        }
+
+        .liquid-bg .blob-2 {
+            top: 8%;
+            right: -14%;
+            width: 46vw;
+            height: 46vw;
+            background: radial-gradient(circle at 60% 40%, #ffb648, transparent 70%);
+            animation: drift-b 32s ease-in-out infinite;
+        }
+
+        .liquid-bg .blob-3 {
+            bottom: -20%;
+            left: 18%;
+            width: 50vw;
+            height: 50vw;
+            background: radial-gradient(circle at 50% 50%, #8b5cf6, transparent 70%);
+            animation: drift-c 30s ease-in-out infinite;
+        }
+
+        .liquid-bg .blob-4 {
+            bottom: 4%;
+            right: 6%;
+            width: 34vw;
+            height: 34vw;
+            background: radial-gradient(circle at 50% 50%, #22c8b0, transparent 70%);
+            opacity: 0.35;
+            animation: drift-a 22s ease-in-out infinite reverse;
+        }
+
+        /* A faint grain so the huge blur gradients don't band on darker
+           displays — pure CSS, no image asset needed. */
+        .liquid-bg::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+            background-size: 3px 3px;
+            mix-blend-mode: overlay;
+        }
+
+        @keyframes drift-a {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(6%, 8%) scale(1.08); }
+        }
+
+        @keyframes drift-b {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-8%, 6%) scale(1.12); }
+        }
+
+        @keyframes drift-c {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(5%, -7%) scale(1.06); }
         }
 
         img {
@@ -146,9 +238,10 @@
 
         /* ---- Header ---------------------------------------------------- */
         header {
-            border-bottom: 1px solid var(--line);
-            background-color: rgba(8, 12, 22, 0.82);
-            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--glass-border);
+            background-color: var(--glass-fill-strong);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -203,17 +296,8 @@
 
         /* ---- Intro ------------------------------------------------------ */
         .page-intro {
-            padding: 4rem 0 3rem;
+            padding: 2.25rem 0 3rem;
             text-align: center;
-        }
-
-        .kicker {
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-            font-size: 0.78rem;
-            letter-spacing: 4px;
-            text-transform: uppercase;
-            color: var(--accent);
-            margin-bottom: 1.1rem;
         }
 
         .page-intro h1 {
@@ -221,6 +305,7 @@
             line-height: 1.1;
             letter-spacing: -1.5px;
             font-weight: 800;
+            text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
         }
 
         .page-intro p {
@@ -228,6 +313,7 @@
             margin: 1.1rem auto 0;
             color: var(--text-muted);
             font-size: 1.05rem;
+            text-shadow: 0 1px 16px rgba(0, 0, 0, 0.4);
         }
 
         /* ---- Cabinet grid ----------------------------------------------- */
@@ -257,9 +343,9 @@
             aspect-ratio: 16 / 10;
             border-radius: var(--radius);
             overflow: hidden;
-            border: 1px solid var(--line);
+            border: 1px solid var(--glass-border);
             background-color: var(--bg-art);
-            box-shadow: 0 18px 34px -18px rgba(0, 0, 0, 0.9);
+            box-shadow: 0 18px 34px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 var(--glass-highlight);
             transition: transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
         }
 
@@ -570,9 +656,18 @@
             white-space: nowrap;
         }
 
-        /* ---- Card text -------------------------------------------------- */
+        /* ---- Card text --------------------------------------------------
+           A frosted glass panel behind the title/blurb/reactions, so text
+           stays legible no matter where a color blob drifts underneath. */
         .cabinet-body {
-            padding: 1.1rem 0.25rem 0;
+            margin-top: 1.1rem;
+            padding: 1rem 1.1rem 1.15rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--glass-border);
+            background-color: var(--glass-fill);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
+            box-shadow: inset 0 1px 0 var(--glass-highlight);
         }
 
         .cabinet-title {
@@ -636,8 +731,10 @@
             gap: 0.4rem;
             padding: 0.3rem 0.75rem;
             border-radius: 999px;
-            border: 1px solid var(--line);
+            border: 1px solid var(--glass-border);
             background-color: var(--bg-raised);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
             color: var(--text-muted);
             font-family: inherit;
             font-size: 0.85rem;
@@ -667,7 +764,7 @@
         /* ---- Player reactions -------------------------------------------- */
         .reactions-block {
             padding: 0 0 4.5rem;
-            border-top: 1px solid var(--line);
+            border-top: 1px solid var(--glass-border);
             padding-top: 3.25rem;
         }
 
@@ -706,9 +803,9 @@
             aspect-ratio: 16 / 9;
             border-radius: var(--radius);
             overflow: hidden;
-            border: 1px solid var(--line);
+            border: 1px solid var(--glass-border);
             background-color: var(--bg-art);
-            box-shadow: 0 18px 34px -18px rgba(0, 0, 0, 0.9);
+            box-shadow: 0 18px 34px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 var(--glass-highlight);
         }
 
         .feedback-stage video {
@@ -740,8 +837,10 @@
             font-size: 0.92rem;
             color: var(--text-muted);
             text-decoration: none;
-            border: 1px solid var(--line);
+            border: 1px solid var(--glass-border);
             background-color: var(--bg-raised);
+            backdrop-filter: var(--glass-blur);
+            -webkit-backdrop-filter: var(--glass-blur);
             transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
         }
 
@@ -781,7 +880,7 @@
         /* ---- Footer ------------------------------------------------------ */
         footer {
             padding: 2.75rem 0;
-            border-top: 1px solid var(--line);
+            border-top: 1px solid var(--glass-border);
             text-align: center;
             color: var(--text-muted);
             font-size: 0.88rem;
@@ -808,7 +907,7 @@
             }
 
             .page-intro {
-                padding: 2.75rem 0 2rem;
+                padding: 1.75rem 0 2rem;
             }
 
             .arcade {
@@ -844,10 +943,33 @@
             .cabinet:hover .art-shot {
                 transform: none;
             }
+
+            .liquid-bg span {
+                animation: none !important;
+            }
+        }
+
+        /* Safari/iOS fall back to a solid-ish dark fill when backdrop-filter
+           isn't supported, so panels stay readable instead of vanishing to
+           the transparent color underneath. */
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            header,
+            .cabinet-body,
+            .react,
+            .feedback-list a {
+                background-color: #10141f;
+            }
         }
     </style>
 </head>
 <body>
+
+    <div class="liquid-bg" aria-hidden="true">
+        <span class="blob-1"></span>
+        <span class="blob-2"></span>
+        <span class="blob-3"></span>
+        <span class="blob-4"></span>
+    </div>
 
     <header>
         <div class="nav-container">
@@ -862,7 +984,6 @@
     <main class="container">
 
         <div class="page-intro">
-            <p class="kicker">Insert coin &middot; No install &middot; No download</p>
             <h1>The Arcade</h1>
             <p>Original browser games by Anthony C Johnson. Pick a cabinet &mdash; every title opens fullscreen and plays right in your browser, on desktop or phone.</p>
         </div>
