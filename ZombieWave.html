@@ -281,8 +281,13 @@ const META = {
 /* ================================================================== setup */
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
-ctx.imageSmoothingEnabled = false;
 const W = cv.width, H = cv.height;
+// render at higher backing resolution so the CSS stretch (fit()) doesn't blur/blockify HUD text
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+cv.width = W * DPR;
+cv.height = H * DPR;
+ctx.scale(DPR, DPR);
+ctx.imageSmoothingEnabled = false;
 const GROUND = 452;              // y of the ground contact line
 const WORLD = 2600;              // alley length in world px
 const FINAL_WAVE = 15;           // the run ends here, on the airstrike
@@ -1401,24 +1406,31 @@ function drawAirstrikeBanner(){
 }
 
 function drawHUD(){
+  // contrast panels so text stays legible over busy/bright backgrounds
+  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.fillRect(8, 8, 190, 56);
+  ctx.fillRect(W-198, 8, 190, 56);
+
   ctx.textAlign = 'left';
-  ctx.font = '700 13px Consolas,monospace';
+  ctx.font = '700 15px Consolas,monospace';
   ctx.fillStyle = '#e8e2d6';
-  ctx.fillText('SCORE ' + score, 16, 24);
-  ctx.fillText('WAVE ' + wave + '/' + FINAL_WAVE, 16, 42);
+  ctx.fillText('SCORE ' + score, 16, 26);
+  ctx.fillText('WAVE ' + wave + '/' + FINAL_WAVE, 16, 45);
 
   // hp bar
-  ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(16, 50, 160, 10);
+  ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(16, 52, 160, 12);
   ctx.fillStyle = P.hp>30 ? '#7fae52' : '#c8442e';
-  ctx.fillRect(16, 50, 160*Math.max(0,P.hp/P.maxHp), 10);
+  ctx.fillRect(16, 52, 160*Math.max(0,P.hp/P.maxHp), 12);
 
   // weapon / ammo
   const g = GUN[P.gun];
   ctx.textAlign = 'right';
+  ctx.font = '700 15px Consolas,monospace';
   ctx.fillStyle = '#e0a33a';
-  ctx.fillText(g.name, W-16, 24);
-  ctx.fillStyle = '#e8e2d6';
-  ctx.fillText((P.reloadT>0?'RELOADING':(P.mag+' / '+P.reserve)), W-16, 42);
+  ctx.fillText(g.name, W-16, 26);
+  ctx.font = '700 17px Consolas,monospace';
+  ctx.fillStyle = P.reloadT>0 ? '#c8442e' : '#e8e2d6';
+  ctx.fillText((P.reloadT>0?'RELOADING':(P.mag+' / '+P.reserve)), W-16, 47);
 
   if(phase==='buy'){
     ctx.textAlign = 'center';
@@ -1465,9 +1477,10 @@ document.getElementById('go').addEventListener('click', ()=>{
 /* =================================================================== loop */
 const PAD_H = 172;
 function fit(){
-  // one uniform scale for screen + deck, so the two never drift apart
-  const s = Math.min(innerWidth / W, innerHeight / (H + PAD_H));
-  document.getElementById('frame').style.transform = 'scale(' + s + ')';
+  // stretch to fill the viewport exactly on both axes — no black bars
+  const sx = innerWidth / W;
+  const sy = innerHeight / (H + PAD_H);
+  document.getElementById('frame').style.transform = 'scale(' + sx + ',' + sy + ')';
 }
 window.addEventListener('resize', fit);
 window.addEventListener('orientationchange', ()=>setTimeout(fit, 100));
