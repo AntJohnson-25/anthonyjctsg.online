@@ -1476,10 +1476,13 @@ document.getElementById('go').addEventListener('click', ()=>{
 
 /* =================================================================== loop */
 const PAD_H = 172;
+const MAX_STRETCH = 1.15; // cap on how far either axis may stretch past the true-aspect fit, before we let black bars show instead
 function fit(){
-  // stretch to fill the viewport exactly on both axes — no black bars
-  const sx = innerWidth / W;
-  const sy = innerHeight / (H + PAD_H);
+  const rawSx = innerWidth / W;
+  const rawSy = innerHeight / (H + PAD_H);
+  const cap = Math.min(rawSx, rawSy) * MAX_STRETCH;
+  const sx = Math.min(rawSx, cap);
+  const sy = Math.min(rawSy, cap);
   document.getElementById('frame').style.transform = 'scale(' + sx + ',' + sy + ')';
 }
 window.addEventListener('resize', fit);
