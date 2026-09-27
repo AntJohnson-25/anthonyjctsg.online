@@ -306,46 +306,115 @@
             color: var(--accent);
         }
 
-        /* ---- Intro ------------------------------------------------------ */
-        .page-intro {
-            padding: 2.25rem 0 3rem;
+        /* ---- Carousel ---------------------------------------------------
+           Cards lined up in one horizontal row, the selected one in the
+           centre. Desktop slides the row with the mouse wheel; phones swipe.
+           Card positions are set from JS (a transform per card). */
+        .arcade-stage {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            /* break out of the 1180px container so the row can use a wide screen */
+            width: 100vw;
+            margin-left: calc(50% - 50vw);
+            /* one screen under the sticky header, so the wheel belongs to the carousel */
+            height: calc(100vh - 62px);
+            height: calc(100svh - 62px);
+            min-height: 480px;
+        }
+
+        .carousel-head {
+            padding: 1.1rem 0 0.2rem;
             text-align: center;
         }
 
-        .page-intro h1 {
-            font-size: clamp(2.2rem, 6vw, 3.6rem);
+        .carousel-head h1 {
+            font-size: clamp(1.6rem, 4vw, 2.4rem);
             line-height: 1.1;
-            letter-spacing: -1.5px;
+            letter-spacing: -1px;
             font-weight: 800;
             text-shadow: 0 2px 24px rgba(0, 0, 0, 0.45);
         }
 
-        .page-intro p {
-            max-width: 620px;
-            margin: 1.1rem auto 0;
+        .carousel-hint {
+            margin-top: 0.35rem;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
             color: var(--text-muted);
-            font-size: 1.05rem;
-            text-shadow: 0 1px 16px rgba(0, 0, 0, 0.4);
         }
 
-        /* ---- Cabinet grid ----------------------------------------------- */
-        .arcade {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-            gap: 2.25rem;
-            padding: 1rem 0 5rem;
+        .carousel {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+            outline: none;
+            /* vertical page scrolling stays native; horizontal swipes are ours */
+            touch-action: pan-y;
+        }
+
+        .carousel:focus-visible {
+            box-shadow: inset 0 0 0 2px var(--accent-soft);
+        }
+
+        .carousel-track {
+            list-style: none;
+            position: absolute;
+            inset: 0;
+        }
+
+        .card {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: var(--card-w, 560px);
+            transform: translate(-50%, -50%);
+            transition: transform 0.5s cubic-bezier(0.2, 0.75, 0.2, 1), opacity 0.5s ease, filter 0.5s ease;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card:not(.is-active) {
+            filter: brightness(0.55) saturate(0.8);
+        }
+
+        .carousel-dots {
+            position: absolute;
+            display: flex;
+            gap: 0.55rem;
+            z-index: 5;
             list-style: none;
         }
 
-        .cabinet {
-            display: flex;
-            flex-direction: column;
+        .carousel.is-horizontal .carousel-dots {
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
         }
 
-        /* The art panel. A link in its own right so the picture is clickable,
-           but hidden from the accessibility tree — the title link below is the
-           labelled route to the same place, and two identical links in a row
-           is just noise for a screen reader. */
+        .carousel-dots button {
+            width: 10px;
+            height: 10px;
+            padding: 0;
+            border-radius: 50%;
+            border: 1px solid var(--line-bright);
+            background: rgba(255, 255, 255, 0.12);
+            cursor: pointer;
+            transition: background-color 0.25s ease, transform 0.25s ease;
+        }
+
+        .carousel-dots button[aria-current="true"] {
+            background: var(--accent);
+            border-color: var(--accent);
+            transform: scale(1.3);
+        }
+
+        /* The art panel. Not a link itself: the whole card launches the game
+           from JS, and the title link below is the labelled, no-JS route to
+           the same place. */
         .cabinet-art {
             position: relative;
             display: block;
@@ -435,32 +504,27 @@
             text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
         }
 
-        .cabinet:hover .cabinet-art,
-        .cabinet-art:focus-visible,
-        .cabinet:focus-within .cabinet-art {
-            transform: translateY(-6px);
+        /* The selected card glows; hover/focus reveals the play overlay. */
+        .card.is-active .cabinet-art {
             border-color: var(--line-bright);
-            box-shadow: 0 26px 46px -20px rgba(0, 0, 0, 0.95), 0 0 0 1px var(--accent-soft);
+            box-shadow: 0 30px 60px -24px rgba(0, 0, 0, 0.95), 0 0 0 1px var(--accent-soft), 0 0 48px -12px rgba(255, 182, 72, 0.35);
         }
 
-        .cabinet:hover .art-cta,
-        .cabinet:focus-within .art-cta {
+        .card.is-active:hover .art-cta,
+        .card.is-active:focus-within .art-cta,
+        .carousel:focus-visible .card.is-active .art-cta {
             opacity: 1;
         }
 
-        .cabinet:hover .art-play,
-        .cabinet:focus-within .art-play {
+        .card.is-active:hover .art-play,
+        .card.is-active:focus-within .art-play,
+        .carousel:focus-visible .card.is-active .art-play {
             transform: scale(1);
             background: rgba(240, 165, 0, 0.8);
         }
 
-        .cabinet:hover .art-shot {
+        .card.is-active:hover .art-shot {
             transform: scale(1.04);
-        }
-
-        .cabinet-art:focus-visible {
-            outline: 2px solid var(--accent);
-            outline-offset: 3px;
         }
 
         /* Placeholder art for a game with no screenshot yet: the game's own
@@ -523,7 +587,8 @@
         }
 
         .art-title--bns b {
-            font-size: clamp(1.9rem, 5.4vw, 2.9rem);
+            /* sized to the card, not the viewport, so it fits a small carousel card */
+            font-size: clamp(1.2rem, 14cqw, 2.9rem);
             line-height: 0.9;
             letter-spacing: -0.5px;
             color: #eaf0fb;
@@ -561,8 +626,9 @@
         }
 
         /* The rungs are the first thing worth dropping on a narrow card —
-           the title and eyebrow carry the identity on their own. */
-        @media (max-width: 380px) {
+           the title and eyebrow carry the identity on their own. Keyed to the
+           card's width (container query), since carousel cards are small. */
+        @container (max-width: 340px) {
             .art-rungs {
                 display: none;
             }
@@ -668,18 +734,42 @@
             white-space: nowrap;
         }
 
-        /* ---- Card text --------------------------------------------------
-           A frosted glass panel behind the title/blurb/reactions, so text
-           stays legible no matter where a color blob drifts underneath. */
-        .cabinet-body {
-            margin-top: 1.1rem;
-            padding: 1rem 1.1rem 1.15rem;
+        /* ---- Card bar ---------------------------------------------------
+           Title + reactions in one frosted strip under the art. The game
+           summaries were dropped for the carousel (2026-09-26); they live on
+           in the JSON-LD above for search. */
+        .card-bar {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.4rem;
+            margin-top: 0.7rem;
+            padding: 0.55rem 0.8rem 0.6rem;
             border-radius: var(--radius);
             border: 1px solid var(--glass-border);
             background-color: var(--glass-fill);
             backdrop-filter: var(--glass-blur);
             -webkit-backdrop-filter: var(--glass-blur);
             box-shadow: inset 0 1px 0 var(--glass-highlight);
+        }
+
+        /* the name stays on one line; a Beta badge drops below it if there's no room */
+        .card-bar .cabinet-title {
+            max-width: 100%;
+            font-size: 1.05rem;
+        }
+
+        .card-bar .cabinet-title a {
+            white-space: nowrap;
+        }
+
+        .card-bar .reactions {
+            margin-top: 0;
+        }
+
+        .card-bar .react {
+            padding: 0.18rem 0.6rem;
+            font-size: 0.8rem;
         }
 
         .cabinet-title {
@@ -706,13 +796,6 @@
             outline: 2px solid var(--accent);
             outline-offset: 3px;
             border-radius: 4px;
-        }
-
-        .cabinet-blurb {
-            margin-top: 0.45rem;
-            color: var(--text-muted);
-            font-size: 0.92rem;
-            line-height: 1.55;
         }
 
         .beta-badge {
@@ -773,120 +856,153 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* ---- Player reactions -------------------------------------------- */
-        .reactions-block {
-            padding: 0 0 4.5rem;
-            border-top: 1px solid var(--glass-border);
-            padding-top: 3.25rem;
+        /* ---- Player Reactions menu + clip pop-up -------------------------
+           The clips moved out of the page into the header (2026-09-26) so the
+           carousel is the whole page: pick a clip from the drop-down and it
+           plays in a pop-up (<dialog>) over the arcade. */
+        .nav-dropdown {
+            position: relative;
         }
 
-        .block-label {
+        .nav-drop-btn {
             display: flex;
-            align-items: baseline;
-            justify-content: space-between;
-            gap: 1rem;
-            flex-wrap: wrap;
-            margin-bottom: 1.1rem;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.4rem 0;
+            border: 0;
+            background: none;
+            color: var(--text-muted);
+            font: inherit;
+            font-size: 0.92rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s ease;
         }
 
-        .block-label h2 {
-            font-size: 1.35rem;
-            letter-spacing: -0.4px;
-        }
-
-        .block-label span {
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-            font-size: 0.72rem;
-            letter-spacing: 3px;
-            text-transform: uppercase;
+        .nav-drop-btn:hover,
+        .nav-drop-btn:focus-visible,
+        .nav-drop-btn[aria-expanded="true"] {
             color: var(--accent);
         }
 
-        .feedback-layout {
-            display: grid;
-            grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-            gap: 1.75rem;
-            align-items: start;
+        .nav-drop-btn .caret {
+            font-size: 0.7rem;
+            transition: transform 0.2s ease;
         }
 
-        .feedback-stage {
-            width: 100%;
-            /* Letterboxed on a dark ground so portrait clips fit without cropping. */
-            aspect-ratio: 16 / 9;
-            border-radius: var(--radius);
-            overflow: hidden;
-            border: 1px solid var(--glass-border);
-            background-color: var(--bg-art);
-            box-shadow: 0 18px 34px -18px rgba(0, 0, 0, 0.9), inset 0 1px 0 var(--glass-highlight);
+        .nav-drop-btn[aria-expanded="true"] .caret {
+            transform: rotate(180deg);
         }
 
-        .feedback-stage video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            display: block;
-            background-color: var(--bg-art);
-        }
-
-        .feedback-list {
+        .nav-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 0.6rem);
+            z-index: 200;
+            min-width: 270px;
+            padding: 0.4rem;
             list-style: none;
-            counter-reset: fb;
-            display: flex;
-            flex-direction: column;
-            gap: 0.4rem;
-        }
-
-        .feedback-list li {
-            counter-increment: fb;
-        }
-
-        .feedback-list a {
-            display: flex;
-            align-items: baseline;
-            gap: 0.55rem;
-            padding: 0.65rem 0.8rem;
-            border-radius: 8px;
-            font-size: 0.92rem;
-            color: var(--text-muted);
-            text-decoration: none;
+            border-radius: 12px;
             border: 1px solid var(--glass-border);
-            background-color: var(--bg-raised);
+            background-color: var(--glass-fill-strong);
             backdrop-filter: var(--glass-blur);
             -webkit-backdrop-filter: var(--glass-blur);
-            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+            box-shadow: 0 22px 44px -18px rgba(0, 0, 0, 0.9);
         }
 
-        .feedback-list a::before {
-            content: counter(fb) ")";
+        .nav-menu[hidden] {
+            display: none;
+        }
+
+        .nav-menu button {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            width: 100%;
+            padding: 0.6rem 0.7rem;
+            border: 0;
+            border-radius: 8px;
+            background: none;
+            color: var(--text);
+            font: inherit;
+            font-size: 0.9rem;
+            text-align: left;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .nav-menu button::before {
+            content: "\25B6";
+            font-size: 0.65rem;
             color: var(--accent);
-            font-weight: 700;
         }
 
-        .feedback-list a:hover,
-        .feedback-list a:focus-visible {
-            border-color: var(--line-bright);
-            color: var(--text);
-        }
-
-        .feedback-list a[aria-current="true"] {
-            border-color: rgba(240, 165, 0, 0.5);
+        .nav-menu button:hover,
+        .nav-menu button:focus-visible {
             background-color: var(--accent-soft);
+            outline: none;
+        }
+
+        .clip-modal {
+            width: min(920px, 92vw);
+            max-height: 92vh;
+            margin: auto;
+            padding: 0;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius);
+            background-color: rgba(10, 13, 22, 0.92);
             color: var(--text);
-            font-weight: 600;
+            box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.95);
+            overflow: hidden;
         }
 
-        .feedback-list a span {
-            margin-left: auto;
-            font-size: 0.75rem;
-            font-weight: 400;
-            color: var(--text-muted);
+        .clip-modal::backdrop {
+            background: rgba(3, 5, 10, 0.72);
+            backdrop-filter: blur(4px);
         }
 
-        @media (max-width: 780px) {
-            .feedback-layout {
-                grid-template-columns: 1fr;
-                gap: 1.25rem;
-            }
+        .clip-modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.7rem 0.8rem 0.7rem 1.1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .clip-modal-head h2 {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+
+        .clip-close {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            background: var(--bg-raised);
+            color: var(--text);
+            font-size: 1.3rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .clip-close:hover,
+        .clip-close:focus-visible {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .clip-modal video {
+            display: block;
+            width: 100%;
+            /* letterboxed so portrait clips fit without cropping */
+            aspect-ratio: 16 / 9;
+            max-height: calc(92vh - 60px);
+            object-fit: contain;
+            background: #000;
         }
 
         /* ---- Footer ------------------------------------------------------ */
@@ -918,25 +1034,24 @@
                 gap: 1.25rem;
             }
 
-            .page-intro {
-                padding: 1.75rem 0 2rem;
+            .card-bar {
+                padding: 0.5rem 0.7rem;
             }
 
-            .arcade {
-                gap: 1.75rem;
-                padding-bottom: 3.5rem;
+            .cabinet-title {
+                font-size: 1.05rem;
             }
         }
 
         /* Touch devices have no hover, so the insert-coin overlay would never
-           appear and the art would look inert. Show it at rest instead. */
+           appear and the art would look inert. Show it on the selected card. */
         @media (hover: none) {
-            .art-cta {
+            .card.is-active .art-cta {
                 opacity: 1;
                 background: rgba(6, 10, 18, 0.32);
             }
 
-            .art-play {
+            .card.is-active .art-play {
                 transform: scale(1);
             }
         }
@@ -947,12 +1062,7 @@
                 animation-duration: 0.01ms !important;
             }
 
-            .cabinet:hover .cabinet-art,
-            .cabinet:focus-within .cabinet-art {
-                transform: none;
-            }
-
-            .cabinet:hover .art-shot {
+            .card.is-active:hover .art-shot {
                 transform: none;
             }
 
@@ -966,9 +1076,9 @@
            the transparent color underneath. */
         @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
             header,
-            .cabinet-body,
+            .card-bar,
             .react,
-            .feedback-list a {
+            .nav-menu {
                 background-color: #10141f;
             }
         }
@@ -987,7 +1097,16 @@
         <div class="nav-container">
             <a href="index.html" class="brand-logo">AnthonyJCTSG<span>&nbsp;Games</span></a>
             <ul class="nav-links">
-                <li><a href="index.html" aria-current="page">Arcade</a></li>
+                <li class="nav-dropdown">
+                    <button type="button" class="nav-drop-btn" id="reactions-btn"
+                            aria-haspopup="true" aria-expanded="false" aria-controls="reactions-menu">
+                        Player Reactions <span class="caret" aria-hidden="true">&#9662;</span>
+                    </button>
+                    <ul class="nav-menu" id="reactions-menu" hidden>
+                        <li><button type="button" data-src="feedback_1_1.mp4">Wealth Runner &mdash; player reaction</button></li>
+                        <li><button type="button" data-src="feedback2.mp4">Wealth Runner &mdash; player reaction 2</button></li>
+                    </ul>
+                </li>
                 <li><a href="https://anthonyjctsg.com/" rel="noopener">About the developer</a></li>
             </ul>
         </div>
@@ -995,211 +1114,369 @@
 
     <main class="container">
 
-        <div class="page-intro">
-            <h1>The Arcade</h1>
-            <p>Original browser games by Anthony C Johnson. Pick a cabinet &mdash; every title opens fullscreen and plays right in your browser, on desktop or phone.</p>
-        </div>
-
-        <ul class="arcade">
-
-            <li class="cabinet game" data-game="wealth-runner">
-                <a class="cabinet-art" href="WealthRunner.html" tabindex="-1" aria-hidden="true"
-                   style="--shot: url('wealthrunner_thumbnail.png')">
-                    <span class="art-bg"></span>
-                    <img class="art-shot" src="wealthrunner_thumbnail.png" alt="" loading="lazy">
-                    <span class="art-scrim"></span>
-                    <span class="art-cta">
-                        <span class="art-play"></span>
-                        <span>Play</span>
-                    </span>
-                </a>
-                <div class="cabinet-body game-actions">
-                    <h2 class="cabinet-title"><a href="WealthRunner.html">Wealth Runner</a></h2>
-                    <p class="cabinet-blurb">A run for the money. Keep moving, keep stacking, and see how far your decisions carry you before the run ends.</p>
-                    <div class="reactions">
-                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Wealth Runner">
-                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
-                        </button>
-                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Wealth Runner">
-                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
-                        </button>
-                    </div>
-                </div>
-            </li>
-
-            <li class="cabinet game" data-game="billionaire-barber">
-                <a class="cabinet-art" href="BillionaireBarber.html" tabindex="-1" aria-hidden="true"
-                   style="--shot: url('billionairebarber_thumbnail.png')">
-                    <span class="art-bg"></span>
-                    <img class="art-shot" src="billionairebarber_thumbnail.png" alt="" loading="lazy">
-                    <span class="art-scrim"></span>
-                    <span class="art-cta">
-                        <span class="art-play"></span>
-                        <span>Play</span>
-                    </span>
-                </a>
-                <div class="cabinet-body game-actions">
-                    <h2 class="cabinet-title"><a href="BillionaireBarber.html">Billionaire Barber</a></h2>
-                    <p class="cabinet-blurb">Cut hair, build wealth, own the city. Tapers pay reliably, fades show off the skill &mdash; work your way up from a single chair.</p>
-                    <div class="reactions">
-                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Billionaire Barber">
-                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
-                        </button>
-                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Billionaire Barber">
-                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
-                        </button>
-                    </div>
-                </div>
-            </li>
-
-            <li class="cabinet game" data-game="food-truck-billionaire">
-                <a class="cabinet-art" href="food-truck-billionaire.html" tabindex="-1" aria-hidden="true">
-                    <span class="art-title art-title--ftb">
-                        <span class="ftb-row ftb-food">
-                            <i>F</i><i class="bun">O</i><i class="bun">O</i><i>D</i>
-                        </span>
-                        <span class="ftb-row ftb-truck">
-                            <i class="mid">T</i><i>R</i><i class="dark">U</i><i>C</i><i class="mid">K</i>
-                        </span>
-                        <span class="ftb-row ftb-bill">
-                            <i>B</i><i>I</i><i>L</i><i>L</i><i>I</i><i>O</i><i>N</i><i>A</i><i>I</i><i>R</i><i>E</i>
-                        </span>
-                        <span class="ftb-tag">One truck &middot; One park &middot; One billion</span>
-                    </span>
-                    <span class="art-scrim"></span>
-                    <span class="art-cta">
-                        <span class="art-play"></span>
-                        <span>Play</span>
-                    </span>
-                </a>
-                <div class="cabinet-body game-actions">
-                    <h2 class="cabinet-title"><a href="food-truck-billionaire.html">Food Truck Billionaire</a><span class="beta-badge">Beta</span></h2>
-                    <p class="cabinet-blurb">Run the window. Work the rail, fill the orders, and turn one truck into a fleet before the rush buries you.</p>
-                    <div class="reactions">
-                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Food Truck Billionaire">
-                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
-                        </button>
-                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Food Truck Billionaire">
-                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
-                        </button>
-                    </div>
-                </div>
-            </li>
-
-            <li class="cabinet game" data-game="buy-n-scale">
-                <a class="cabinet-art" href="buynscale.html" tabindex="-1" aria-hidden="true">
-                    <span class="art-title art-title--bns">
-                        <em>Acquire &middot; Improve &middot; Compound</em>
-                        <b>buy<i>'n'</i>scale</b>
-                        <span class="art-rungs">
-                            <span><b>Starter</b>$150K &rarr; $10M</span>
-                            <span><b>On the way</b>$10M &rarr; $100M</span>
-                            <span><b>Made it</b>$100M &rarr; $1B</span>
-                        </span>
-                    </span>
-                    <span class="art-scrim"></span>
-                    <span class="art-cta">
-                        <span class="art-play"></span>
-                        <span>Play</span>
-                    </span>
-                </a>
-                <div class="cabinet-body game-actions">
-                    <h2 class="cabinet-title"><a href="buynscale.html">buy'n'scale</a><span class="beta-badge">Beta</span></h2>
-                    <p class="cabinet-blurb">Start with $150,000 and a used sedan. Buy real businesses, fix what's broken in them, and let the multiple do the rest.</p>
-                    <div class="reactions">
-                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart buy'n'scale">
-                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
-                        </button>
-                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up buy'n'scale">
-                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
-                        </button>
-                    </div>
-                </div>
-            </li>
-
-            <li class="cabinet game" data-game="zombie-wave">
-                <a class="cabinet-art" href="ZombieWave.html" tabindex="-1" aria-hidden="true"
-                   style="--shot: url('zombiewave_thumbnail.jpg')">
-                    <span class="art-bg"></span>
-                    <img class="art-shot" src="zombiewave_thumbnail.jpg" alt="" loading="lazy">
-                    <span class="art-scrim"></span>
-                    <span class="art-cta">
-                        <span class="art-play"></span>
-                        <span>Play</span>
-                    </span>
-                </a>
-                <div class="cabinet-body game-actions">
-                    <h2 class="cabinet-title"><a href="ZombieWave.html">Zombie Wave</a></h2>
-                    <p class="cabinet-blurb">A pixel-art side-scrolling shooter. Hold the alley against 15 waves of shambling walkers, sprinting runners, and crawlers before the horde breaks through.</p>
-                    <div class="reactions">
-                        <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Zombie Wave">
-                            <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
-                        </button>
-                        <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Zombie Wave">
-                            <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
-                        </button>
-                    </div>
-                </div>
-            </li>
-
-        </ul>
-
-        <section class="reactions-block" aria-labelledby="feedback-heading">
-            <div class="block-label">
-                <h2 id="feedback-heading">Player Reactions</h2>
-                <span>Clips</span>
+        <section class="arcade-stage" aria-labelledby="arcade-heading">
+            <div class="carousel-head">
+                <h1 id="arcade-heading">The Arcade</h1>
+                <p class="carousel-hint" id="carousel-hint">Scroll to browse &middot; Click to play</p>
             </div>
-            <div class="feedback-layout">
-                <div class="feedback-stage">
-                    <video id="feedback-player"
-                           src="feedback_1_1.mp4"
-                           controls preload="metadata" playsinline
-                           aria-label="Player reaction clip"></video>
-                </div>
-                <ol class="feedback-list" id="feedback-list">
-                    <li>
-                        <a href="feedback_1_1.mp4" data-src="feedback_1_1.mp4" aria-current="true">
-                            Wealth Runner &mdash; player reaction <span>Video</span>
-                        </a>
+
+            <div class="carousel" id="carousel" tabindex="0" role="region"
+                 aria-roledescription="carousel" aria-label="Games" aria-describedby="carousel-hint">
+                <ul class="carousel-track">
+
+                    <li class="card game" data-game="wealth-runner" data-href="WealthRunner.html">
+                        <span class="cabinet-art" style="--shot: url('wealthrunner_thumbnail.png')">
+                            <span class="art-bg"></span>
+                            <img class="art-shot" src="wealthrunner_thumbnail.png" alt="">
+                            <span class="art-scrim"></span>
+                            <span class="art-cta"><span class="art-play"></span><span>Play</span></span>
+                        </span>
+                        <div class="card-bar game-actions">
+                            <h2 class="cabinet-title"><a href="WealthRunner.html">Wealth Runner</a></h2>
+                            <div class="reactions">
+                                <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Wealth Runner">
+                                    <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                                </button>
+                                <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Wealth Runner">
+                                    <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                                </button>
+                            </div>
+                        </div>
                     </li>
-                    <li>
-                        <a href="feedback2.mp4" data-src="feedback2.mp4">
-                            Wealth Runner &mdash; player reaction 2 <span>Video</span>
-                        </a>
+
+                    <li class="card game" data-game="billionaire-barber" data-href="BillionaireBarber.html">
+                        <span class="cabinet-art" style="--shot: url('billionairebarber_thumbnail.png')">
+                            <span class="art-bg"></span>
+                            <img class="art-shot" src="billionairebarber_thumbnail.png" alt="">
+                            <span class="art-scrim"></span>
+                            <span class="art-cta"><span class="art-play"></span><span>Play</span></span>
+                        </span>
+                        <div class="card-bar game-actions">
+                            <h2 class="cabinet-title"><a href="BillionaireBarber.html">Billionaire Barber</a></h2>
+                            <div class="reactions">
+                                <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Billionaire Barber">
+                                    <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                                </button>
+                                <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Billionaire Barber">
+                                    <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                                </button>
+                            </div>
+                        </div>
                     </li>
-                </ol>
+
+                    <li class="card game" data-game="food-truck-billionaire" data-href="food-truck-billionaire.html">
+                        <span class="cabinet-art">
+                            <span class="art-title art-title--ftb">
+                                <span class="ftb-row ftb-food">
+                                    <i>F</i><i class="bun">O</i><i class="bun">O</i><i>D</i>
+                                </span>
+                                <span class="ftb-row ftb-truck">
+                                    <i class="mid">T</i><i>R</i><i class="dark">U</i><i>C</i><i class="mid">K</i>
+                                </span>
+                                <span class="ftb-row ftb-bill">
+                                    <i>B</i><i>I</i><i>L</i><i>L</i><i>I</i><i>O</i><i>N</i><i>A</i><i>I</i><i>R</i><i>E</i>
+                                </span>
+                                <span class="ftb-tag">One truck &middot; One park &middot; One billion</span>
+                            </span>
+                            <span class="art-scrim"></span>
+                            <span class="art-cta"><span class="art-play"></span><span>Play</span></span>
+                        </span>
+                        <div class="card-bar game-actions">
+                            <h2 class="cabinet-title"><a href="food-truck-billionaire.html">Food Truck Billionaire</a><span class="beta-badge">Beta</span></h2>
+                            <div class="reactions">
+                                <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Food Truck Billionaire">
+                                    <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                                </button>
+                                <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Food Truck Billionaire">
+                                    <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+
+                    <li class="card game" data-game="buy-n-scale" data-href="buynscale.html">
+                        <span class="cabinet-art">
+                            <span class="art-title art-title--bns">
+                                <em>Acquire &middot; Improve &middot; Compound</em>
+                                <b>buy<i>'n'</i>scale</b>
+                                <span class="art-rungs">
+                                    <span><b>Starter</b>$150K &rarr; $10M</span>
+                                    <span><b>On the way</b>$10M &rarr; $100M</span>
+                                    <span><b>Made it</b>$100M &rarr; $1B</span>
+                                </span>
+                            </span>
+                            <span class="art-scrim"></span>
+                            <span class="art-cta"><span class="art-play"></span><span>Play</span></span>
+                        </span>
+                        <div class="card-bar game-actions">
+                            <h2 class="cabinet-title"><a href="buynscale.html">buy'n'scale</a><span class="beta-badge">Beta</span></h2>
+                            <div class="reactions">
+                                <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart buy'n'scale">
+                                    <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                                </button>
+                                <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up buy'n'scale">
+                                    <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+
+                    <li class="card game" data-game="zombie-wave" data-href="ZombieWave.html">
+                        <span class="cabinet-art" style="--shot: url('zombiewave_thumbnail.jpg')">
+                            <span class="art-bg"></span>
+                            <img class="art-shot" src="zombiewave_thumbnail.jpg" alt="">
+                            <span class="art-scrim"></span>
+                            <span class="art-cta"><span class="art-play"></span><span>Play</span></span>
+                        </span>
+                        <div class="card-bar game-actions">
+                            <h2 class="cabinet-title"><a href="ZombieWave.html">Zombie Wave</a></h2>
+                            <div class="reactions">
+                                <button type="button" class="react" data-react="heart" aria-pressed="false" aria-label="Heart Zombie Wave">
+                                    <span aria-hidden="true">&hearts;</span><span class="react-count">&mdash;</span>
+                                </button>
+                                <button type="button" class="react" data-react="thumbs_up" aria-pressed="false" aria-label="Thumbs up Zombie Wave">
+                                    <span aria-hidden="true">&#128077;</span><span class="react-count">&mdash;</span>
+                                </button>
+                            </div>
+                        </div>
+                    </li>
+
+                </ul>
+                <ol class="carousel-dots" id="carousel-dots" aria-label="Choose a game"></ol>
             </div>
         </section>
 
     </main>
 
+    <!-- Player Reactions pop-up: opened from the header drop-down -->
+    <dialog class="clip-modal" id="clip-modal" aria-labelledby="clip-title">
+        <div class="clip-modal-head">
+            <h2 id="clip-title">Player reaction</h2>
+            <button type="button" class="clip-close" id="clip-close" aria-label="Close">&times;</button>
+        </div>
+        <video id="clip-player" controls playsinline preload="none"></video>
+    </dialog>
+
     <footer>
         <div class="container">
-            <p>&copy; 2026 AnthonyJCTSG. All rights reserved. &middot; <a href="https://anthonyjctsg.com/" rel="noopener">anthonyjctsg.com</a></p>
+            <p>&copy; 2026 AnthonyJCTSG. All rights reserved. &middot; <a href="https://anthonyjctsg.online/">anthonyjctsg.online</a></p>
         </div>
     </footer>
 
     <script src="ctsg-data.js"></script>
     <script>
-        // Player reaction clips — each link loads its clip into the player.
-        // Without JS the links still resolve to the raw file, so nothing is lost.
+        // Game carousel: one horizontal row of cards. Desktop: the mouse wheel
+        // over the carousel slides the row one card at a time; past the first/
+        // last card the page scrolls as normal, so the clips below stay
+        // reachable. Phones: swipe left/right.
+        // Clicking or tapping a card launches that game. Arrow keys + Enter work
+        // too. Without JS the title links still open every game.
         (function () {
-            var list = document.getElementById('feedback-list');
-            var player = document.getElementById('feedback-player');
-            if (!list || !player) { return; }
+            var root = document.getElementById('carousel');
+            if (!root) { return; }
+            var cards = Array.prototype.slice.call(root.querySelectorAll('.card'));
+            var dotsEl = document.getElementById('carousel-dots');
+            var hint = document.getElementById('carousel-hint');
+            var phone = window.matchMedia('(max-width: 780px), (hover: none) and (pointer: coarse)');
+            var active = 0, wide = true, cardW = 560, cardH = 400;
+            var lockUntil = 0, wheelAcc = 0, wheelDir = 0, suppressClickUntil = 0;
 
-            list.addEventListener('click', function (e) {
-                var link = e.target.closest('a[data-src]');
-                if (!link) { return; }
-                e.preventDefault();
+            // Start on the middle game so the row is balanced on both sides;
+            // coming back from a game lands on the card you left from.
+            active = Math.floor(cards.length / 2);
+            try {
+                var saved = parseInt(sessionStorage.getItem('arcade_card'), 10);
+                if (saved >= 0 && saved < cards.length) { active = saved; }
+            } catch (e) { /* storage blocked */ }
 
-                list.querySelectorAll('a[data-src]').forEach(function (a) {
-                    a.removeAttribute('aria-current');
+            var dots = cards.map(function (card, i) {
+                var li = document.createElement('li');
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.setAttribute('aria-label', card.querySelector('.cabinet-title a').textContent);
+                b.addEventListener('click', function (e) { e.stopPropagation(); go(i); });
+                li.appendChild(b);
+                dotsEl.appendChild(li);
+                return b;
+            });
+
+            function layout() {
+                // Cards line up in one horizontal row everywhere (the user
+                // didn't want a vertical stack). `wide` = desktop: the mouse
+                // wheel slides the row and more neighbours are visible.
+                wide = !phone.matches;
+                root.classList.add('is-horizontal');
+                hint.innerHTML = wide ? 'Scroll to browse &middot; Click to play' : 'Swipe to browse &middot; Tap to play';
+                var r = root.getBoundingClientRect();
+                var barH = 84;   // name line + reactions line under the art
+                // Desktop: ~21% of the width so all five games sit in one row.
+                // Phone: ~74%, so the neighbours just peek at the edges.
+                cardW = wide
+                    ? Math.min(400, r.width * 0.195, (r.height * 0.72 - barH) * 1.6)
+                    : Math.min(520, r.width * 0.74, (r.height * 0.8 - barH) * 1.6);
+                cardW = Math.max(200, cardW);
+                cardH = cardW / 1.6 + barH;
+                root.style.setProperty('--card-w', cardW + 'px');
+                render();
+            }
+
+            function render() {
+                var step = wide ? cardW * 1.0 : cardW * 0.92;
+                var reach = wide ? 4 : 1;   // how many neighbours stay visible each side
+                cards.forEach(function (card, i) {
+                    var d = i - active, a = Math.abs(d);
+                    card.style.transform = 'translate(-50%, -50%) translateX(' + (d * step) + 'px) scale(' + (a ? (wide ? 0.86 : 0.82) : 1) + ')';
+                    card.style.opacity = a === 0 ? 1 : a === 1 ? 0.8 : a <= reach ? 0.55 : 0;
+                    card.style.zIndex = 10 - a;
+                    card.style.pointerEvents = a > reach ? 'none' : '';
+                    card.classList.toggle('is-active', a === 0);
+                    card.setAttribute('aria-hidden', a === 0 ? 'false' : 'true');
+                    // only the selected card's title link and buttons are tabbable
+                    card.querySelectorAll('a, button').forEach(function (el) { el.tabIndex = a === 0 ? 0 : -1; });
                 });
-                link.setAttribute('aria-current', 'true');
+                dots.forEach(function (b, i) { b.setAttribute('aria-current', i === active ? 'true' : 'false'); });
+                try { sessionStorage.setItem('arcade_card', String(active)); } catch (e) { /* storage blocked */ }
+            }
 
-                player.src = link.dataset.src;
+            function go(i) {
+                i = Math.max(0, Math.min(cards.length - 1, i));
+                if (i === active) { return false; }
+                active = i;
+                render();
+                return true;
+            }
+
+            function launch(card) {
+                if (window.CTSG) {
+                    try { CTSG.track(card.dataset.game, 'select'); } catch (e) { /* tracking is best-effort */ }
+                }
+                window.location.href = card.dataset.href;
+            }
+
+            // Wheel: one card per gesture. Trackpads fire a long tail of small
+            // events, so deltas accumulate to a threshold and a short lock
+            // stops one flick from skipping several cards.
+            // Wheel up/down (or a sideways trackpad swipe) slides the row.
+            root.addEventListener('wheel', function (e) {
+                var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                if (!wide || !delta) { return; }
+                var dir = delta > 0 ? 1 : -1;
+                var target = active + dir;
+                if (target < 0 || target >= cards.length) { return; }   // let the page scroll past the ends
+                e.preventDefault();
+                var now = Date.now();
+                if (dir !== wheelDir) { wheelAcc = 0; wheelDir = dir; }
+                if (now < lockUntil) { return; }
+                wheelAcc += Math.abs(delta) * (e.deltaMode === 1 ? 30 : 1);
+                if (wheelAcc < 40) { return; }
+                wheelAcc = 0;
+                lockUntil = now + 550;
+                go(target);
+            }, { passive: false });
+
+            // Swipe: a mostly-horizontal drag of 40px+ moves one card. Vertical
+            // drags are left to the browser (touch-action: pan-y) so the page
+            // still scrolls on a phone.
+            var sx = 0, sy = 0;
+            root.addEventListener('touchstart', function (e) {
+                sx = e.touches[0].clientX;
+                sy = e.touches[0].clientY;
+            }, { passive: true });
+            root.addEventListener('touchend', function (e) {
+                var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+                if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.2) {
+                    suppressClickUntil = Date.now() + 450;   // a swipe is not a tap
+                    go(active + (dx < 0 ? 1 : -1));
+                }
+            }, { passive: true });
+
+            root.addEventListener('click', function (e) {
+                if (Date.now() < suppressClickUntil) { e.preventDefault(); return; }
+                if (e.target.closest('.react, .carousel-dots')) { return; }
+                var card = e.target.closest('.card');
+                if (!card || e.target.closest('a')) { return; }   // the title link navigates itself
+                launch(card);
+            });
+
+            function onKey(e) {
+                var k = e.key;
+                if (k === 'ArrowDown' || k === 'ArrowRight') { if (go(active + 1)) { e.preventDefault(); } }
+                else if (k === 'ArrowUp' || k === 'ArrowLeft') { if (go(active - 1)) { e.preventDefault(); } }
+                else if (k === 'Home') { go(0); e.preventDefault(); }
+                else if (k === 'End') { go(cards.length - 1); e.preventDefault(); }
+                else if ((k === 'Enter' || k === ' ') && (e.target === root || e.target === document.body)) {
+                    e.preventDefault();
+                    launch(cards[active]);
+                }
+            }
+            root.addEventListener('keydown', onKey);
+            // arrows also work before anything is focused
+            document.addEventListener('keydown', function (e) { if (e.target === document.body) { onKey(e); } });
+
+            window.addEventListener('resize', layout);
+            if (phone.addEventListener) { phone.addEventListener('change', layout); }
+            // First paint lands in place; the slide animation is only for moves.
+            cards.forEach(function (c) { c.style.transition = 'none'; });
+            layout();
+            void root.offsetWidth;
+            requestAnimationFrame(function () {
+                cards.forEach(function (c) { c.style.transition = ''; });
+            });
+        }());
+
+        // Player Reactions: header drop-down -> pick a clip -> it plays in a
+        // pop-up. Closing the pop-up (x, Esc, or a click on the dim backdrop)
+        // stops the video.
+        (function () {
+            var btn = document.getElementById('reactions-btn');
+            var menu = document.getElementById('reactions-menu');
+            var modal = document.getElementById('clip-modal');
+            var player = document.getElementById('clip-player');
+            var title = document.getElementById('clip-title');
+            if (!btn || !menu || !modal || !player) { return; }
+
+            function setMenu(open) {
+                menu.hidden = !open;
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) { menu.querySelector('button').focus(); }
+            }
+
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                setMenu(menu.hidden);
+            });
+            document.addEventListener('click', function (e) {
+                if (!menu.hidden && !e.target.closest('.nav-dropdown')) { setMenu(false); }
+            });
+            menu.addEventListener('keydown', function (e) {
+                var items = Array.prototype.slice.call(menu.querySelectorAll('button'));
+                var i = items.indexOf(document.activeElement);
+                if (e.key === 'Escape') { setMenu(false); btn.focus(); }
+                else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+                e.stopPropagation();   // arrows here must not move the carousel
+            });
+
+            menu.addEventListener('click', function (e) {
+                var item = e.target.closest('button[data-src]');
+                if (!item) { return; }
+                setMenu(false);
+                title.textContent = item.textContent;
+                player.src = item.dataset.src;
+                if (modal.showModal) { modal.showModal(); } else { modal.setAttribute('open', ''); }
                 player.play().catch(function () { /* autoplay blocked — controls are there */ });
+            });
+
+            function closeModal() {
+                player.pause();
+                player.removeAttribute('src');
+                player.load();
+                if (modal.open) { modal.close ? modal.close() : modal.removeAttribute('open'); }
+            }
+            document.getElementById('clip-close').addEventListener('click', closeModal);
+            modal.addEventListener('close', function () { player.pause(); });   // Esc closes natively
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) { closeModal(); }   // click on the backdrop
             });
         }());
 
