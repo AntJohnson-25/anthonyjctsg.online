@@ -178,59 +178,45 @@
   // An <audio> element, not WebAudio: fetch/decode is blocked on file:// but <audio> plays fine there.
   // Browsers only allow playback after a user gesture, so start() runs on every key/tap until it sticks.
   // One mute switch covers music and sound effects, remembered across visits.
-  // Two tracks: the calm one on every menu screen, the hype one in fights (the brawl and the duels).
-  // update() runs every frame and crossfades toward whichever track the current screen wants.
+  // A playlist on ONE <audio> element: the calm track, then the hype track, then round again.
+  // One element means two songs can never overlap. (v1 used an element per track with a crossfade,
+  // and on iPhone both kept playing: Safari ignores .volume, so the old track never faded out.)
+  // Swapping src on the same element also keeps iPhone's "user tapped" unlock for the next song.
   const Music = {
-    tracks: {}, want: 'calm', gesture: false, VOL: 0.45, FADE: 0.015,
-    // iPhone Safari ignores <audio>.volume (always 1), so there it switches tracks instantly instead of fading
-    canFade: (() => { try { const a = new Audio(); a.volume = 0.5; return a.volume === 0.5; } catch (e) { return false; } })(),
+    el: null, idx: 0, gesture: false, VOL: 0.45,
+    PLAYLIST: ['late_night_heat.mp3', 'cold_pavement.mp3'],
     get muted() { return Sound.muted; },
+    get track() { return this.PLAYLIST[this.idx]; },
     init() {
       try { Sound.muted = localStorage.getItem('antcombat.muted') === '1'; } catch (e) { /* private mode */ }
-      for (const [name, file] of [['calm', 'late_night_heat.mp3'], ['fight', 'cold_pavement.mp3']]) {
-        const el = new Audio(`assets/music/${file}`);
-        el.loop = true; el.preload = 'auto'; el.volume = 0;
-        this.tracks[name] = el;
-      }
+      this.el = new Audio(`assets/music/${this.track}`);
+      this.el.preload = 'auto'; this.el.volume = this.VOL;
+      this.el.addEventListener('ended', () => this.next());
       // a phone call, app switch or background tab pauses it; coming back resumes it
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) Object.values(this.tracks).forEach((el) => el.pause());
-        else this.start();
+        if (document.hidden) this.el.pause(); else this.start();
       });
+    },
+    next() {
+      this.idx = (this.idx + 1) % this.PLAYLIST.length;
+      this.el.src = `assets/music/${this.track}`;
+      if (!this.muted && !document.hidden && this.gesture) this.el.play().catch(() => {});
     },
     // called on every key/tap: the first one is the gesture that unlocks playback
     start() {
       if (params.has('selftest')) return;
       this.gesture = true;
-      const el = this.tracks[this.want];
-      if (el && !this.muted && el.paused) el.play().catch(() => {});
+      if (!this.muted && this.el.paused) this.el.play().catch(() => {});
     },
     toggle() {
       Sound.muted = !Sound.muted;
       try { localStorage.setItem('antcombat.muted', Sound.muted ? '1' : '0'); } catch (e) { /* private mode */ }
-      if (Sound.muted) Object.values(this.tracks).forEach((el) => { el.pause(); el.volume = 0; });
-      else { this.start(); Sound.play('select'); }
+      if (Sound.muted) this.el.pause(); else { this.start(); Sound.play('select'); }
     },
+    // quieter under the pause menu (desktop/Android; iPhone ignores volume, which is harmless here)
     update(screen, paused) {
-      if (!this.gesture || this.muted || document.hidden) return;
-      const want = screen === 'fight' ? 'fight' : 'calm';
-      if (want !== this.want) {
-        this.want = want;
-        const el = this.tracks[want];
-        el.currentTime = 0;   // each fight kicks off from the top of the track
-        el.play().catch(() => {});
-      }
-      if (!this.canFade) {
-        for (const [name, el] of Object.entries(this.tracks)) if (name !== this.want && !el.paused) el.pause();
-        return;
-      }
-      const target = paused ? this.VOL * 0.35 : this.VOL;   // quieter under the pause menu
-      for (const [name, el] of Object.entries(this.tracks)) {
-        const goal = name === this.want ? target : 0;
-        const v = el.volume + Math.sign(goal - el.volume) * Math.min(this.FADE, Math.abs(goal - el.volume));
-        el.volume = Math.max(0, Math.min(1, v));
-        if (name !== this.want && el.volume === 0 && !el.paused) el.pause();
-      }
+      const v = paused && screen === 'fight' ? this.VOL * 0.35 : this.VOL;
+      if (this.el.volume !== v) this.el.volume = v;
     },
   };
   Music.init();
@@ -1758,15 +1744,14 @@
     loseTry(); game.phase = 'fight'; game.enemies.forEach((f) => { f.ai = still; });
     loseTry(); check('qualify: 3 KOs -> disqualified', game.screen === 'disqualified', game.screen);
 
-    // music: the calm track on menus, the fight track in fights, and mute silences both
-    Music.gesture = true; Sound.muted = false;
-    Music.update('fight', false);
-    check('music: fights play the fight track', Music.want === 'fight', Music.want);
-    Music.update('bracket', false);
-    check('music: menus play the calm track', Music.want === 'calm', Music.want);
-    Music.toggle(); Music.update('fight', false);
-    check('music: mute stops every track', Sound.muted && Object.values(Music.tracks).every((el) => el.paused), `muted ${Sound.muted}`);
-    Music.toggle(); Object.values(Music.tracks).forEach((el) => el.pause()); Music.gesture = false;
+    // music: one player on rotation, calm first, then hype, then back to calm; mute stops it
+    const order = [Music.track];
+    Music.next(); order.push(Music.track); Music.next(); order.push(Music.track);
+    check('music: calm -> hype -> calm rotation', order.join() === 'late_night_heat.mp3,cold_pavement.mp3,late_night_heat.mp3', order.join(' > '));
+    check('music: one player, so songs never overlap', Music.el instanceof HTMLAudioElement && !('tracks' in Music), 'single <audio>');
+    Sound.muted = false; Music.gesture = true; Music.toggle();
+    check('music: mute stops it', Sound.muted && Music.el.paused, `muted ${Sound.muted}`);
+    Music.toggle(); Music.el.pause(); Music.gesture = false;
     try { localStorage.removeItem('antcombat.muted'); } catch (e) { /* private mode */ }
 
     // touch pad (only with ?touch&selftest): real pointer events on the real DOM pad

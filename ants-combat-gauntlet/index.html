@@ -3,6 +3,28 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no (Apple turned it off for accessibility), so a quick
+   double tap on a button zooms the page and pinching back out is fiddly mid-game. Block it here:
+   - the second tap of a double tap has its touchend cancelled (that is what triggers the zoom);
+   - Safari's pinch gestures, and any two-finger move, are cancelled.
+   The game reads input from pointer events, which fire before touchend, so no press is lost. */
+(function () {
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('touchmove', function (e) {
+    if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0b0710">
