@@ -436,8 +436,8 @@
 
   const CONTROLS = [
     ['A / D', 'Move'], ['W', 'Jump'], ['S', 'Block (hold)'], ['Space', 'Evade roll'], ['E / Q', 'Front / back flip (dodge)'],
-    ['J', 'Punch (tap twice: combo)'], ['K', 'Kick  (in air: dive kick)'], ['U', 'Uppercut'],
-    ['I', 'Roundhouse'], ['L', 'Revolver / weapon'], ['O', 'Special'], ['Esc', 'Pause'],
+    ['1', 'Punch (tap twice: combo)'], ['2', 'Kick  (in air: dive kick)'], ['3', 'Uppercut'],
+    ['4', 'Roundhouse'], ['5', 'Revolver / weapon'], ['6', 'Special'], ['Esc', 'Pause'],
   ];
 
   window.GAME_DATA = { CHARACTERS, GAUNTLET_ORDER, AI_LEVELS, AI_STYLE, AI_GOON, STAGES, CONTROLS, QUALIFY };

@@ -224,7 +224,10 @@
   // ---------------------------------------------------------------- input
   const keys = new Set();
   const buffered = {}; // action -> ticks left
+  // number keys 1-6 are the shown attack keys; the old J/K/U/I/L/O layout still works
+  const ATTACK_ORDER = ['punch', 'kick', 'heavy', 'sweep', 'shoot', 'special'];
   const ATTACK_KEYS = { KeyJ: 'punch', KeyK: 'kick', KeyU: 'heavy', KeyI: 'sweep', KeyL: 'shoot', KeyO: 'special' };
+  ATTACK_ORDER.forEach((name, i) => { ATTACK_KEYS[`Digit${i + 1}`] = name; ATTACK_KEYS[`Numpad${i + 1}`] = name; });
   const GAME_KEYS = new Set(['KeyA', 'KeyD', 'KeyW', 'KeyS', 'KeyE', 'KeyQ', 'Space', 'ShiftLeft', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'KeyP', 'KeyM', ...Object.keys(ATTACK_KEYS)]);
 
   function pressKey(code) {
@@ -1296,18 +1299,16 @@
       }
       ctx.restore();
       this.drawHud();
+      if (!TOUCH && !DEMO && !this.paused) { this.drawKeyStrip(); this.drawPauseButton(); }
       this.drawBanner();
       if (this.paused) {
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H);
-        text('PAUSED', W / 2, 250, 90, '#ffcf5a');
         if (TOUCH) {
+          text('PAUSED', W / 2, 250, 90, '#ffcf5a');
           this.tapButton('RESUME', W / 2 - 170, 400, 300, 96, () => { this.paused = false; Sound.play('select'); });
           this.tapButton('QUIT', W / 2 + 170, 400, 300, 96, () => { this.paused = false; this.screen = 'title'; }, '#3a2a30');
           this.tapButton(Sound.muted ? 'SOUND: OFF' : 'SOUND: ON', W / 2, 530, 300, 76, () => Music.toggle(), '#3a2a30');
-        } else {
-          text(`ESC resume    ·    Q quit to title    ·    M sound ${Sound.muted ? 'OFF' : 'ON'}`, W / 2, 350, 28, '#fff', 'center', null);
-          this.drawControls(W / 2, 430);
-        }
+        } else this.drawPauseMenu();
       }
     },
     drawShot(s) {
@@ -1354,7 +1355,7 @@
         bar(p1, 130, false);
         portrait(p1.c, 24, 18, 94, false);
         text(p1.c.name, 136, 92, 30, p1.c.color, 'left');
-        ready(p1, 'shoot', prompt('L', 'GUN'), 136, 'left'); ready(p1, 'special', prompt('O', 'SPEC'), 250, 'left');
+        ready(p1, 'shoot', 'GUN', 136, 'left'); ready(p1, 'special', 'SPEC', 250, 'left');
         text('QUALIFYING', W / 2 + 95, 36, 30, '#ffcf5a');
         // attempts left as hearts-style pips
         for (let i = 0; i < QUALIFY.attempts; i++) {
@@ -1396,7 +1397,86 @@
       }
       const secs = Math.ceil(this.timer / 60);
       text(String(secs), W / 2, 54, 58, secs <= 10 ? '#ff5a5a' : '#fff');
-      ready(p1, 'shoot', prompt('L', 'GUN'), 136, 'left'); ready(p1, 'special', prompt('O', 'SPEC'), 250, 'left');
+      ready(p1, 'shoot', 'GUN', 136, 'left'); ready(p1, 'special', 'SPEC', 250, 'left');
+    },
+    // desktop only: a keycap strip under the fighters so the controls are always on screen.
+    // Caps light up while held; GUN/SPEC show their recharge like the touch pad does.
+    drawKeyStrip() {
+      const p1 = this.p1, y = 694, capH = 34;
+      const held = (codes) => codes.some((c) => keys.has(c));
+      const items = [
+        { k: 'A D', l: 'MOVE', codes: ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'] },
+        { k: 'W', l: 'JUMP', codes: ['KeyW', 'ArrowUp'] },
+        { k: 'S', l: 'BLOCK', codes: ['KeyS', 'ArrowDown'] },
+        { k: 'SPACE', l: 'ROLL', codes: ['Space', 'ShiftLeft'] },
+        { k: 'E Q', l: 'FLIP', codes: ['KeyE', 'KeyQ'] },
+        ...['PUNCH', 'KICK', 'UPPER', 'ROUND', 'GUN', 'SPEC'].map((l, i) => {
+          const name = ATTACK_ORDER[i], codes = Object.keys(ATTACK_KEYS).filter((c) => ATTACK_KEYS[c] === name);
+          const left = p1.cool[name] || 0;
+          return { k: String(i + 1), l: left ? `${Math.ceil(left / 60)}s` : l, codes, attack: true, off: !p1.c.moves[name] || left > 0 };
+        }),
+      ];
+      // measure first so the whole strip can be centred
+      const gap = 18, groupGap = 44;
+      for (const it of items) {
+        ctx.font = `${it.attack ? 22 : 17}px ${FONT}`; it.capW = Math.max(capH, ctx.measureText(it.k).width + 18);
+        ctx.font = `17px ${FONT}`; it.w = it.capW + 7 + ctx.measureText(it.l).width;
+      }
+      const total = items.reduce((s, it) => s + it.w, 0) + gap * (items.length - 2) + groupGap;
+      let x = W / 2 - total / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath(); ctx.roundRect(x - 16, y - capH / 2 - 7, total + 32, capH + 14, 12); ctx.fill();
+      items.forEach((it, i) => {
+        const on = held(it.codes);
+        ctx.globalAlpha = it.off && !on ? 0.45 : 1;
+        this.keycap(it.k, x, y, it.capW, capH, it.attack, on);
+        text(it.l, x + it.capW + 7, y + 1, 17, it.attack ? '#ffe6b0' : 'rgba(255,255,255,0.8)', 'left', '#000', 3);
+        ctx.globalAlpha = 1;
+        x += it.w + (i === 4 ? groupGap : gap);
+      });
+    },
+    keycap(k, x, y, w, h, attack, on) {
+      ctx.fillStyle = on ? 'rgba(255,90,60,0.9)' : attack ? 'rgba(150,20,20,0.85)' : 'rgba(40,30,45,0.9)';
+      ctx.strokeStyle = on || attack ? '#ffcf5a' : 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(x, y - h / 2, w, h, 7); ctx.fill(); ctx.stroke();
+      text(k, x + w / 2, y + 1, attack ? 22 : 17, '#fff', 'center', null);
+    },
+    // desktop: an always-visible pause button under the timer (click it or press ESC / P)
+    drawPauseButton() {
+      const x = W / 2, y = 134, w = 150, h = 36;
+      const on = keys.has('Escape') || keys.has('KeyP');
+      ctx.fillStyle = on ? 'rgba(255,90,60,0.9)' : 'rgba(0,0,0,0.55)'; ctx.strokeStyle = '#ffcf5a'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2); ctx.fill(); ctx.stroke();
+      // two bars = the universal pause icon
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - w / 2 + 18, y - 9, 5, 18); ctx.fillRect(x - w / 2 + 27, y - 9, 5, 18);
+      text('PAUSE', x - w / 2 + 42, y + 1, 18, '#fff', 'left', '#000', 3);
+      text('ESC', x + w / 2 - 14, y + 1, 14, '#ffcf5a', 'right', null);
+      this.taps.push({ x: x - w / 2, y: y - h / 2, w, h, fn: () => this.onKey('Escape') });
+    },
+    // desktop pause: a small controls card plus clickable resume / quit / sound
+    drawPauseMenu() {
+      text('PAUSED', W / 2, 92, 76, '#ffcf5a');
+      const px = 250, py = 150, pw = W - 500, ph = 380;
+      ctx.fillStyle = 'rgba(20,10,24,0.92)'; ctx.strokeStyle = 'rgba(255,207,90,0.7)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 18); ctx.fill(); ctx.stroke();
+      text('CONTROLS', W / 2, py + 34, 30, '#fff');
+      const cols = [
+        { x: px + 50, head: 'MOVE', rows: [['A D', 'Walk left / right'], ['W', 'Jump'], ['S', 'Block (hold)'], ['SPACE', 'Evade roll'], ['E', 'Front flip'], ['Q', 'Back flip']] },
+        { x: px + pw / 2 + 30, head: 'FIGHT', attack: true, rows: [['1', 'Punch (tap twice: combo)'], ['2', 'Kick (in air: dive kick)'], ['3', 'Uppercut'], ['4', 'Roundhouse'], ['5', 'Gun'], ['6', 'Special']] },
+      ];
+      for (const col of cols) {
+        text(col.head, col.x, py + 80, 20, col.attack ? '#ff8a6a' : '#9ad0ff', 'left', null);
+        col.rows.forEach(([k, l], i) => {
+          const y = py + 120 + i * 42;
+          ctx.font = `${col.attack ? 22 : 17}px ${FONT}`;
+          const w = Math.max(36, ctx.measureText(k).width + 18);
+          this.keycap(k, col.x, y, w, 34, col.attack, false);
+          text(l, col.x + 84, y + 1, 19, '#fff', 'left', '#000', 3);
+        });
+      }
+      this.tapButton('RESUME  (ESC)', W / 2 - 300, 600, 270, 60, () => this.onKey('Escape'));
+      this.tapButton('QUIT  (Q)', W / 2, 600, 220, 60, () => this.onKey('KeyQ'), '#3a2a30');
+      this.tapButton(`SOUND ${Sound.muted ? 'OFF' : 'ON'}  (M)`, W / 2 + 300, 600, 270, 60, () => Music.toggle(), '#3a2a30');
     },
     // goons still waiting their turn, standing along the back of the stage
     drawBench() {
@@ -1804,6 +1884,7 @@
     setupTouch();
     const ff = parseInt(params.get('ticks') || '0', 10);
     for (let i = 0; i < ff; i++) game.update();
+    if (params.has('paused') && game.screen === 'fight') game.paused = true; // screenshot the pause menu
     game.render();
     requestAnimationFrame(frame);
   });
