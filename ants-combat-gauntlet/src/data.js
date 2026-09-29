@@ -213,7 +213,7 @@
   function challenger(c) {
     return {
       name: c.name, title: c.title, sprite: c.id, color: c.color,
-      hp: c.hp, speed: c.speed, jump: c.jump, teleport: !!c.teleport,
+      hp: c.hp, speed: c.speed, jump: c.jump, teleport: !!c.teleport, keepBlock: !!c.keepBlock,
       frames: {
         idle: ['idle'], walk: c.walk || ['walk_1', 'idle', 'walk_2', 'idle'], jump: c.jumpFrames,
         block: c.block, hit: c.hit, knockdown: c.knockdown, getup: c.getup,
@@ -341,6 +341,57 @@
         cool: 190, sfx: 'magic',
       },
     }),
+    // raw-assets/pop_diva.jpg (2026-09-28). Her kick and its music-note blast are one
+    // painted frame (kick_fx), so the kick, the dive kick and the special all use it.
+    competitor8: challenger({
+      id: 'competitor8', name: 'STARLA', title: 'The Pop Diva', color: '#e59ae0',
+      hp: 940, speed: 5.0, jump: 20,
+      block: 'block', hit: 'hit', knockdown: ['hit', 'taunt'],
+      getup: ['taunt', 'idle_alt'], evade: ['jump_1', 'jump_1', 'jump_1'], win: 'pose',
+      // her sheet idle has a hand on the hip, so the stride cycles through the run pose instead
+      walk: ['walk_1', 'walk_2', 'run', 'walk_2'],
+      jumpFrames: ['jump_1', 'jump_1'], air: 'kick_fx',
+      punch: [['punch_1', 5], ['punch_2', 7], ['punch_3', 8]],
+      kick: [['kick_recover', 6], ['kick_fx', 9], ['kick_recover', 7]],
+      heavy: [['punch_3', 8], ['punch_2', 5], ['punch_1', 14]],
+      sweep: [['kick_recover', 7], ['kick_fx', 17]],
+      damage: [50, 68, 100, 108, 82],
+      shoot: { // the water-swirl punch throws a sound wave
+        frames: [['punch_1', 8], ['punch_2', 16]],
+        shots: [{ at: 10, dx: 120, dy: 185, vx: 13, dmg: 56, r: 15, kind: 'orb', stun: 17, push: 6 }],
+        cool: 65, sfx: 'magic',
+      },
+      special: { // music-note blast: a long reach off the kick
+        frames: [['kick_recover', 10], ['kick_fx', 24]], lunge: 6,
+        hits: [{ from: 10, to: 28, x: [40, 300], y: [0, 250], ...P(128, 0, 13, { kd: true }) }],
+        cool: 175, sfx: 'magic',
+      },
+    }),
+    // raw-assets/Hawaain_surfer.jpg (2026-09-28). The sheet's bottom row is cut-off
+    // head shots, so it isn't extracted; he has no knockdown/get-up art of his own.
+    competitor9: challenger({
+      id: 'competitor9', name: 'KAI', title: 'The North Shore Surfer', color: '#ffb347',
+      hp: 1040, speed: 4.6, jump: 19, keepBlock: true,
+      block: 'block', hit: 'hit', knockdown: ['hit', 'hit'],
+      getup: ['jump_1', 'idle'], evade: ['run', 'run', 'run'], win: 'board_wave',
+      walk: ['walk_1', 'walk_2', 'run', 'walk_2'],
+      jumpFrames: ['jump_1', 'jump_1'], air: 'kick_3',
+      punch: [['board_punch', 5], ['board_wave', 7], ['board_punch', 8]],
+      kick: [['kick_1', 6], ['kick_3', 9], ['kick_1', 7]],
+      heavy: [['board_punch', 8], ['spark_punch', 5], ['spark_punch', 14]],
+      sweep: [['kick_1', 7], ['kick_board', 6], ['kick_board', 13]],
+      damage: [54, 70, 104, 112, 84],
+      shoot: { // board-and-fist splash: a wave that rolls forward
+        frames: [['board_punch', 8], ['board_wave', 16]],
+        shots: [{ at: 10, dx: 150, dy: 180, vx: 12, dmg: 60, r: 16, kind: 'orb', stun: 18, push: 7 }],
+        cool: 70, sfx: 'magic',
+      },
+      special: { // surfboard kick riding a wave
+        frames: [['kick_1', 9], ['kick_board', 22]], lunge: 11,
+        hits: [{ from: 8, to: 24, x: [30, 280], y: [20, 240], ...P(135, 0, 13, { kd: true }) }],
+        cool: 180, sfx: 'heavy',
+      },
+    }),
   });
 
   // ---- qualifying-round goons
@@ -410,7 +461,7 @@
   // is reshuffled for each run (see beginGauntlet in game.js). This list is
   // the pool.
   const GAUNTLET_ORDER = ['ant', 'competitor1', 'competitor2', 'competitor3',
-    'competitor4', 'competitor5', 'competitor6', 'competitor7'];
+    'competitor4', 'competitor5', 'competitor6', 'competitor7', 'competitor8', 'competitor9'];
 
   // AI grows sharper with each gauntlet stage.
   const AI_LEVELS = [
@@ -434,11 +485,6 @@
     { name: 'Mission Ruins at Dawn', kind: 'street', img: 'mission' },
   ];
 
-  const CONTROLS = [
-    ['A / D', 'Move'], ['W', 'Jump'], ['S', 'Block (hold)'], ['Space', 'Evade roll'], ['E / Q', 'Front / back flip (dodge)'],
-    ['1', 'Punch (tap twice: combo)'], ['2', 'Kick  (in air: dive kick)'], ['3', 'Uppercut'],
-    ['4', 'Roundhouse'], ['5', 'Revolver / weapon'], ['6', 'Special'], ['Esc', 'Pause'],
-  ];
-
-  window.GAME_DATA = { CHARACTERS, GAUNTLET_ORDER, AI_LEVELS, AI_STYLE, AI_GOON, STAGES, CONTROLS, QUALIFY };
+  // the desktop keys are the player's own choice: see BIND_ACTIONS in game.js
+  window.GAME_DATA = { CHARACTERS, GAUNTLET_ORDER, AI_LEVELS, AI_STYLE, AI_GOON, STAGES, QUALIFY };
 })();

@@ -4,7 +4,7 @@
 (() => {
   'use strict';
 
-  const { CHARACTERS, GAUNTLET_ORDER, AI_LEVELS, AI_STYLE, AI_GOON, STAGES, CONTROLS, QUALIFY } = window.GAME_DATA;
+  const { CHARACTERS, GAUNTLET_ORDER, AI_LEVELS, AI_STYLE, AI_GOON, STAGES, QUALIFY } = window.GAME_DATA;
   const SPRITES = window.SPRITES;
 
   const W = 1280, H = 720, FLOOR = 650, TARGET_H = 270;
@@ -105,14 +105,16 @@
     // up plays the forward walk in reverse
     const spr = SPRITES[c.sprite];
     if (!c.goon) {
-      // generated guard-stance walk (fists up, stepping toward the way we face)
-      if (spr.fwd_1) c.frames.walk = ['fwd_1', 'fwd_2', 'fwd_3', 'fwd_2'];
-      // stand in the guard stance in fights (the user's template look), on
+      // Walking forward uses each fighter's own sheet walk (data.js `walk`). The
+      // generated guard walk (fwd_1-3) stays extracted but unused: 2026-09-28 the
+      // user wanted real walking movement for all 10, with the guard only at rest.
+      // Stand in the guard stance in fights (the user's template look), on
       // whichever side you face; mirrored art covers facing left
       if (spr.fwd_guard) c.frames.idle = ['fwd_guard'];
       // real block poses where generated; blockstun shows the impact pose
-      if (spr.guard_block) c.frames.block = 'guard_block';
-      if (spr.guard_block_hit) c.frames.blockHit = 'guard_block_hit';
+      // (keepBlock: Kai keeps his own surfboard-shield block from his sheet)
+      if (spr.guard_block && !c.keepBlock) c.frames.block = 'guard_block';
+      if (spr.guard_block_hit && !c.keepBlock) c.frames.blockHit = 'guard_block_hit';
       c.frames.back = spr.back_1 ? ['back_1', 'back_2', 'back_3', 'back_2'] : [...c.frames.walk].reverse();
       // front/back flip dodges: the three airborne poses of each generated flip
       if (spr.flipf_1) c.frames.flipF = ['flipf_1', 'flipf_2', 'flipf_3'];
@@ -244,12 +246,107 @@
     game.onKey(code);
   }
   function releaseKey(code) { keys.delete(code); }
+
+  // ---- key bindings (desktop): two options. DEFAULT = the original layout, every key
+  // as before (A/D or arrows, W, S, Space, E/Q, 1-6, J/K/U/I/L/O). CUSTOM = the player
+  // set their own keys on the CONTROLS screen; then a physical key is translated to the
+  // code the game already speaks (KeyA = left, Digit1 = punch...), so the fighter, the
+  // touch pad and the self-test are unchanged, and in a fight ONLY the player's keys
+  // (plus Esc, and P / M when unbound) do anything.
+  const BIND_ACTIONS = [
+    { id: 'left', label: 'Move left', code: 'KeyA', menu: 'ArrowLeft' },
+    { id: 'right', label: 'Move right', code: 'KeyD', menu: 'ArrowRight' },
+    { id: 'jump', label: 'Jump', code: 'KeyW', menu: 'ArrowUp' },
+    { id: 'block', label: 'Block (hold)', code: 'KeyS', menu: 'ArrowDown' },
+    { id: 'roll', label: 'Evade roll', code: 'Space' },
+    { id: 'flipF', label: 'Front flip', code: 'KeyE' },
+    { id: 'flipB', label: 'Back flip', code: 'KeyQ' },
+    { id: 'punch', label: 'Punch (tap twice: combo)', code: 'Digit1', attack: true },
+    { id: 'kick', label: 'Kick (in air: dive kick)', code: 'Digit2', attack: true },
+    { id: 'heavy', label: 'Uppercut', code: 'Digit3', attack: true },
+    { id: 'sweep', label: 'Roundhouse', code: 'Digit4', attack: true },
+    { id: 'shoot', label: 'Gun', code: 'Digit5', attack: true },
+    { id: 'special', label: 'Special', code: 'Digit6', attack: true },
+  ];
+  const BIND_BY_ID = Object.fromEntries(BIND_ACTIONS.map((a) => [a.id, a]));
+  // the arrows are the standard controls in both modes (user, 2026-09-28): up jump, down block,
+  // left / right move. They can't be given to another move.
+  const ARROWS = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'jump', ArrowDown: 'block' };
+  // Esc = pause/back, Enter = confirm, Backspace = step back in setup; the rest would fight the browser
+  const RESERVED = /^(Escape|Enter|NumpadEnter|Tab|Backspace|CapsLock|Meta.*|OS.*|ContextMenu|F\d+|PrintScreen|ScrollLock|Pause)$/;
+  const KEY_NAMES = {
+    Space: 'SPACE', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
+    ShiftLeft: 'L-SHIFT', ShiftRight: 'R-SHIFT', ControlLeft: 'L-CTRL', ControlRight: 'R-CTRL', AltLeft: 'L-ALT', AltRight: 'R-ALT',
+    Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", BracketLeft: '[', BracketRight: ']',
+    Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`', Insert: 'INS', Delete: 'DEL', PageUp: 'PG UP', PageDown: 'PG DN',
+    NumpadAdd: 'NUM +', NumpadSubtract: 'NUM -', NumpadMultiply: 'NUM *', NumpadDivide: 'NUM /', NumpadDecimal: 'NUM .',
+  };
+  const keyName = (code) => {
+    if (!code) return '?';
+    if (KEY_NAMES[code]) return KEY_NAMES[code];
+    let m = code.match(/^(?:Key|Digit)(.)$/); if (m) return m[1];
+    m = code.match(/^Numpad(\d)$/); if (m) return `NUM ${m[1]}`;
+    return code.toUpperCase();
+  };
+  const Binds = {
+    saved: null,   // { actionId: physical code } in custom mode; null = default layout
+    load() {
+      try {
+        const b = JSON.parse(localStorage.getItem('antcombat.keys') || 'null');
+        if (b && BIND_ACTIONS.every((a) => typeof b[a.id] === 'string')) this.saved = b;
+      } catch (e) { /* private mode or junk */ }
+      this.rebuild();
+    },
+    save(b) {
+      this.saved = { ...b };
+      try { localStorage.setItem('antcombat.keys', JSON.stringify(this.saved)); } catch (e) { /* private mode */ }
+      this.rebuild();
+    },
+    // back to the default layout (the CONTROLS screen's USE DEFAULT KEYS)
+    clear() {
+      this.saved = null;
+      try { localStorage.removeItem('antcombat.keys'); } catch (e) { /* private mode */ }
+      this.rebuild();
+    },
+    get custom() { return !!this.saved; },
+    key(id) { return this.saved ? this.saved[id] : BIND_BY_ID[id].code; },
+    rebuild() { this.byPhys = {}; for (const a of BIND_ACTIONS) this.byPhys[this.key(a.id)] = a; },
+    // physical key -> the code to press, or null to ignore it
+    translate(phys, fighting) {
+      if (!this.saved) return phys;   // default layout: every original key works as itself
+      const a = this.byPhys[phys];
+      if (fighting) {
+        if (a) return a.code;
+        if (ARROWS[phys]) return BIND_BY_ID[ARROWS[phys]].code;   // arrows are standard in both modes
+        return phys === 'Escape' || phys === 'KeyP' || phys === 'KeyM' ? phys : null;
+      }
+      // menus: every key works as itself, and your movement keys also steer the menus
+      return a && a.menu ? a.menu : phys;
+    },
+  };
+  Binds.load();
+  let BINDABLE = !TOUCH && !DEMO && !params.has('selftest');   // the self-test switches it on for its binding checks
+
+  const physDown = new Map();   // physical key -> the code it pressed, so keyup releases the same one
   addEventListener('keydown', (e) => {
-    if (GAME_KEYS.has(e.code)) e.preventDefault();
-    if (!e.repeat) pressKey(e.code);
+    if (BINDABLE && game.screen === 'controls') {
+      e.preventDefault();
+      if (!e.repeat) { Sound.init(); Music.start(); game.bindKey(e.code); }
+      return;
+    }
+    const code = BINDABLE ? Binds.translate(e.code, game.screen === 'fight' && !game.paused) : e.code;
+    if (code == null) return;
+    if (GAME_KEYS.has(code) || (Binds.custom && Binds.byPhys[e.code])) e.preventDefault();
+    if (e.repeat) return;
+    physDown.set(e.code, code);
+    pressKey(code);
   });
-  addEventListener('keyup', (e) => releaseKey(e.code));
-  addEventListener('blur', () => keys.clear());
+  addEventListener('keyup', (e) => {
+    const code = physDown.has(e.code) ? physDown.get(e.code) : e.code;
+    physDown.delete(e.code);
+    releaseKey(code);
+  });
+  addEventListener('blur', () => { keys.clear(); physDown.clear(); });
 
   function tickBuffers() {
     for (const k in buffered) if (--buffered[k].t <= 0) delete buffered[k];
@@ -716,7 +813,9 @@
   };
 
   // ---------------------------------------------------------------- game
-  const ROSTER = ['ant', 'competitor1', 'competitor2', 'competitor3', 'competitor4', 'competitor5', 'competitor6', 'competitor7'];
+  const ROSTER = ['ant', 'competitor1', 'competitor2', 'competitor3', 'competitor4', 'competitor5', 'competitor6', 'competitor7',
+    'competitor8', 'competitor9'];
+  const SEL_COLS = 5;   // select screen: 2 rows of 5 cards
 
   const game = {
     screen: 'loading', t: 0,
@@ -746,6 +845,15 @@
         this.screen = params.get('screen');
         this.beginGauntlet(this.playerId);
         if (this.screen === 'disqualified') this.attempt = QUALIFY.attempts;
+        // screenshots: ?screen=controls (edit, default keys) [&ctl=capture&step=N] or &ctl=setup&step=N (N keys in)
+        if (this.screen === 'controls') {
+          this.openControls('title');
+          const c = this.ctl, step = +params.get('step') || 0;
+          if (params.get('ctl') === 'setup') {
+            c.mode = 'setup'; c.step = clamp(step, 0, BIND_ACTIONS.length - 1);
+            c.draft = {}; BIND_ACTIONS.slice(0, c.step).forEach((a) => { c.draft[a.id] = a.code; });
+          } else if (params.get('ctl')) { c.mode = params.get('ctl'); c.sel = step; }
+        }
       } else this.screen = 'title';
     },
 
@@ -766,12 +874,14 @@
       const confirm = code === 'Enter' || code === 'Space' || code === 'KeyJ';
       switch (this.screen) {
         case 'title':
+          // desktop: the default keys work right away; C opens CONTROLS to set your own
           if (confirm) { Sound.play('confirm'); this.screen = 'select'; }
+          else if (BINDABLE && code === 'KeyC') { Sound.play('select'); this.openControls('title'); }
           break;
         case 'select':
-          if (code === 'KeyA' || code === 'ArrowLeft') { this.selIndex = (this.selIndex % 4 + 3) % 4 + Math.floor(this.selIndex / 4) * 4; Sound.play('select'); }
-          if (code === 'KeyD' || code === 'ArrowRight') { this.selIndex = (this.selIndex % 4 + 1) % 4 + Math.floor(this.selIndex / 4) * 4; Sound.play('select'); }
-          if (code === 'KeyW' || code === 'ArrowUp' || code === 'KeyS' || code === 'ArrowDown') { this.selIndex = (this.selIndex + 4) % ROSTER.length; Sound.play('select'); }
+          if (code === 'KeyA' || code === 'ArrowLeft') { this.selIndex = (this.selIndex % SEL_COLS + SEL_COLS - 1) % SEL_COLS + Math.floor(this.selIndex / SEL_COLS) * SEL_COLS; Sound.play('select'); }
+          if (code === 'KeyD' || code === 'ArrowRight') { this.selIndex = (this.selIndex % SEL_COLS + 1) % SEL_COLS + Math.floor(this.selIndex / SEL_COLS) * SEL_COLS; Sound.play('select'); }
+          if (code === 'KeyW' || code === 'ArrowUp' || code === 'KeyS' || code === 'ArrowDown') { this.selIndex = (this.selIndex + SEL_COLS) % ROSTER.length; Sound.play('select'); }
           if (code === 'Escape') this.screen = 'title';
           if (confirm) {
             const id = ROSTER[this.selIndex];
@@ -793,6 +903,7 @@
         case 'fight':
           if (code === 'Escape' || code === 'KeyP') { this.paused = !this.paused; Sound.play('select'); }
           else if (this.paused && code === 'KeyQ') { this.paused = false; this.screen = 'title'; }
+          else if (this.paused && BINDABLE && code === 'KeyC') { Sound.play('select'); this.openControls('fight'); }
           break;
         case 'continue':
           if (confirm && this.t > 30) { this.continues++; Sound.play('confirm'); this.startFight(); }
@@ -802,6 +913,69 @@
           if (confirm && this.t > 60) { this.screen = 'select'; }
           break;
       }
+    },
+
+    // ---- controls screen (desktop). setup = walk through every action in order;
+    // edit = pick one to change; capture = waiting for that one's new key.
+    // `after` is where DONE goes: the title or back to the paused fight.
+    // Changing any key (or SET ALL KEYS) switches to custom; USE DEFAULT KEYS switches back.
+    openControls(after) {
+      keys.clear(); physDown.clear();
+      for (const k in buffered) delete buffered[k];
+      this.ctl = { after, mode: 'edit', step: 0, sel: 0, draft: this.currentKeys(), msg: '', msgT: 0 };
+      this.screen = 'controls'; this.t = 0;
+    },
+    currentKeys() { return Object.fromEntries(BIND_ACTIONS.map((a) => [a.id, Binds.key(a.id)])); },
+    ctlSetupAll() {
+      const c = this.ctl;
+      c.mode = 'setup'; c.step = 0; c.draft = {}; c.msg = ''; Sound.play('select');
+    },
+    ctlUseDefaults() {
+      const c = this.ctl;
+      Binds.clear(); c.draft = this.currentKeys(); c.mode = 'edit';
+      Sound.play('confirm'); this.ctlSay('Default keys restored (arrows, J K U I L O and the number pad work too).');
+    },
+    closeControls() {
+      this.screen = this.ctl.after; this.ctl = null; this.t = 0;
+    },
+    ctlSay(msg) { this.ctl.msg = msg; this.ctl.msgT = this.t; },
+    bindKey(code) {
+      const c = this.ctl, n = BIND_ACTIONS.length;
+      if (c.mode === 'edit') {
+        const col = BIND_ACTIONS.findIndex((a) => a.attack);   // first FIGHT row
+        if (code === 'Escape') { Sound.play('confirm'); this.closeControls(); }
+        else if (code === 'Enter' || code === 'NumpadEnter') { c.mode = 'capture'; c.msg = ''; Sound.play('select'); }
+        else if (code === 'KeyR' && Binds.custom) this.ctlUseDefaults();
+        else if (code === 'ArrowUp') { c.sel = (c.sel + n - 1) % n; Sound.play('select'); }
+        else if (code === 'ArrowDown') { c.sel = (c.sel + 1) % n; Sound.play('select'); }
+        else if (code === 'ArrowLeft' || code === 'ArrowRight') { c.sel = c.sel < col ? Math.min(n - 1, c.sel + col) : c.sel - col; Sound.play('select'); }
+        return;
+      }
+      const setup = c.mode === 'setup', act = BIND_ACTIONS[setup ? c.step : c.sel];
+      if (code === 'Escape') {
+        Sound.play('select');
+        if (!setup) { c.mode = 'edit'; c.msg = ''; }
+        else { c.draft = this.currentKeys(); c.mode = 'edit'; this.ctlSay('Kept your old keys'); }
+        return;
+      }
+      if (setup && code === 'Backspace') {
+        if (c.step > 0) { c.step--; delete c.draft[BIND_ACTIONS[c.step].id]; Sound.play('select'); }
+        return;
+      }
+      if (ARROWS[code]) { Sound.play('block'); this.ctlSay('The arrows always move, jump (↑) and block (↓). Pick another key.'); return; }
+      if (RESERVED.test(code)) { Sound.play('block'); this.ctlSay(`${keyName(code)} is saved for the menus. Pick another key.`); return; }
+      const other = BIND_ACTIONS.find((a) => a !== act && c.draft[a.id] === code);
+      if (setup) {
+        if (other) { Sound.play('block'); this.ctlSay(`${keyName(code)} is already ${other.label.toUpperCase()}. Pick another key.`); return; }
+        c.draft[act.id] = code; c.step++; c.msg = ''; Sound.play('select');
+        if (c.step === n) { Binds.save(c.draft); c.mode = 'edit'; c.sel = 0; Sound.play('confirm'); this.ctlSay('All set! Click any key to change it.'); }
+        return;
+      }
+      // changing one key: taking another action's key swaps the two
+      if (other) { c.draft[other.id] = c.draft[act.id]; this.ctlSay(`Swapped: ${other.label.toUpperCase()} is now ${keyName(c.draft[other.id])}`); }
+      else c.msg = '';
+      c.draft[act.id] = code;
+      Binds.save(c.draft); c.mode = 'edit'; Sound.play('confirm');
     },
 
     startFight() {
@@ -1114,6 +1288,7 @@
         case 'champion': this.drawChampion(); break;
         case 'qualifyIntro': this.drawQualifyIntro(); break;
         case 'disqualified': this.drawDisqualified(); break;
+        case 'controls': this.drawControlsScreen(); break;
       }
     },
     // a tappable pill drawn on the canvas; onTap() checks these rects first
@@ -1143,7 +1318,7 @@
       const hit = (this.taps || []).find((r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h);
       Sound.init(); Music.start();
       if (hit) { hit.fn(); return; }
-      if (this.screen === 'fight' || this.screen === 'select' || this.screen === 'continue') return;
+      if (this.screen === 'fight' || this.screen === 'select' || this.screen === 'continue' || this.screen === 'controls') return;
       pressKey('Enter'); releaseKey('Enter');
     },
     drawBackdrop(top, bottom) {
@@ -1175,7 +1350,7 @@
         text('COMBAT', x0 + wAnt, 78, 104, '#fff', 'left', '#2a0505', 14);
         text('GAUNTLET', W / 2, 166, 68, '#ffb070', 'center', '#2a0505', 10);
         if ((this.t >> 5) % 2) text(prompt('PRESS ENTER', 'TAP TO START'), W / 2, 666, 40, '#fff', 'center', '#2a0505');
-        if (!TOUCH) text('keyboard: A/D move · W jump · S block · J K U I L O attack · M music', W / 2, 704, 17, 'rgba(255,255,255,0.8)', 'center', null);
+        if (!TOUCH) this.drawTitleKeys(W / 2, 704, 17);
         this.drawMuteIcon();
         return;
       }
@@ -1187,16 +1362,23 @@
       text('COMBAT', 380, 290, 120, '#fff', 'center', '#2a0d05', 16);
       text('GAUNTLET', 380, 395, 72, '#ffb070', 'center', '#2a0d05', 10);
       if ((this.t >> 5) % 2) text(prompt('PRESS ENTER', 'TAP TO START'), 380, 560, 44, '#fff');
-      if (!TOUCH) text('keyboard: A/D move · W jump · S block · J K U I L O attack · M music', 380, 650, 20, 'rgba(255,255,255,0.8)', 'center', null);
+      if (!TOUCH) this.drawTitleKeys(380, 650, 20);
       this.drawMuteIcon();
+    },
+    // desktop title: a CONTROLS button (top left, like the speaker top right) and a one-line hint
+    drawTitleKeys(x, y, size) {
+      if (!BINDABLE) return;
+      this.tapButton('CONTROLS  (C)', 142, 48, 230, 52, () => { Sound.play('select'); this.openControls('title'); }, 'rgba(40,10,10,0.8)');
+      text(Binds.custom ? 'Playing with YOUR keys   ·   C  controls   ·   M  music' : 'Default keys   ·   C  set your own controls   ·   M  music',
+        x, y, size, 'rgba(255,255,255,0.8)', 'center', null);
     },
     drawSelect() {
       this.drawBackdrop('#1b1030', '#4a1f3a');
       text('CHOOSE YOUR FIGHTER', W / 2, 70, 58, '#ffcf5a');
       this.drawMuteIcon(W - 46, 52);
-      const cw = 270, gap = 26, x0 = (W - (cw * 4 + gap * 3)) / 2;
+      const cw = 226, gap = 20, x0 = (W - (cw * SEL_COLS + gap * (SEL_COLS - 1))) / 2;
       ROSTER.forEach((id, i) => {
-        const c = CHARACTERS[id], x = x0 + (i % 4) * (cw + gap), y = 105 + Math.floor(i / 4) * 263, sel = i === this.selIndex;
+        const c = CHARACTERS[id], x = x0 + (i % SEL_COLS) * (cw + gap), y = 105 + Math.floor(i / SEL_COLS) * 263, sel = i === this.selIndex;
         const locked = !this.unlocked.includes(id);
         ctx.fillStyle = sel ? 'rgba(255,207,90,0.18)' : 'rgba(0,0,0,0.35)';
         ctx.beginPath(); ctx.roundRect(x, y, cw, 248, 16); ctx.fill();
@@ -1220,8 +1402,9 @@
       this.drawControls(W / 2, 690);
     },
     drawControls(cx, y) {
-      // two lines: one line got too long to fit once the flips were added
-      const items = CONTROLS.map(([k, v]) => `${k} ${v}`), half = Math.ceil(items.length / 2);
+      // the player's own keys, on two lines (one line is too long)
+      const arrow = { left: ' / ←', right: ' / →', jump: ' / ↑', block: ' / ↓' };
+      const items = [...BIND_ACTIONS.map((a) => `${keyName(Binds.key(a.id))}${arrow[a.id] || ''} ${a.label}`), 'Esc Pause'], half = Math.ceil(items.length / 2);
       text(items.slice(0, half).join('   ·   '), cx, y - 10, 14, 'rgba(255,255,255,0.7)', 'center', null);
       text(items.slice(half).join('   ·   '), cx, y + 10, 14, 'rgba(255,255,255,0.7)', 'center', null);
     },
@@ -1404,16 +1587,17 @@
     drawKeyStrip() {
       const p1 = this.p1, y = 694, capH = 34;
       const held = (codes) => codes.some((c) => keys.has(c));
+      // caps show the player's keys; `codes` are what those keys press, so holding lights them
+      const k = (...ids) => ids.map((id) => keyName(Binds.key(id))).join(' ');
       const items = [
-        { k: 'A D', l: 'MOVE', codes: ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'] },
-        { k: 'W', l: 'JUMP', codes: ['KeyW', 'ArrowUp'] },
-        { k: 'S', l: 'BLOCK', codes: ['KeyS', 'ArrowDown'] },
-        { k: 'SPACE', l: 'ROLL', codes: ['Space', 'ShiftLeft'] },
-        { k: 'E Q', l: 'FLIP', codes: ['KeyE', 'KeyQ'] },
+        { k: `${k('left', 'right')} ←→`, l: 'MOVE', codes: ['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'] },
+        { k: `${k('jump')} ↑`, l: 'JUMP', codes: ['KeyW', 'ArrowUp'] },
+        { k: `${k('block')} ↓`, l: 'BLOCK', codes: ['KeyS', 'ArrowDown'] },
+        { k: k('roll'), l: 'ROLL', codes: ['Space'] },
+        { k: k('flipF', 'flipB'), l: 'FLIP', codes: ['KeyE', 'KeyQ'] },
         ...['PUNCH', 'KICK', 'UPPER', 'ROUND', 'GUN', 'SPEC'].map((l, i) => {
-          const name = ATTACK_ORDER[i], codes = Object.keys(ATTACK_KEYS).filter((c) => ATTACK_KEYS[c] === name);
-          const left = p1.cool[name] || 0;
-          return { k: String(i + 1), l: left ? `${Math.ceil(left / 60)}s` : l, codes, attack: true, off: !p1.c.moves[name] || left > 0 };
+          const name = ATTACK_ORDER[i], left = p1.cool[name] || 0;
+          return { k: k(name), l: left ? `${Math.ceil(left / 60)}s` : l, codes: [BIND_BY_ID[name].code], attack: true, off: !p1.c.moves[name] || left > 0 };
         }),
       ];
       // measure first so the whole strip can be centred
@@ -1460,9 +1644,10 @@
       ctx.fillStyle = 'rgba(20,10,24,0.92)'; ctx.strokeStyle = 'rgba(255,207,90,0.7)'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 18); ctx.fill(); ctx.stroke();
       text('CONTROLS', W / 2, py + 34, 30, '#fff');
+      const key = (id) => keyName(Binds.key(id));
       const cols = [
-        { x: px + 50, head: 'MOVE', rows: [['A D', 'Walk left / right'], ['W', 'Jump'], ['S', 'Block (hold)'], ['SPACE', 'Evade roll'], ['E', 'Front flip'], ['Q', 'Back flip']] },
-        { x: px + pw / 2 + 30, head: 'FIGHT', attack: true, rows: [['1', 'Punch (tap twice: combo)'], ['2', 'Kick (in air: dive kick)'], ['3', 'Uppercut'], ['4', 'Roundhouse'], ['5', 'Gun'], ['6', 'Special']] },
+        { x: px + 50, head: 'MOVE', rows: [[`${key('left')} ${key('right')} ←→`, 'Walk left / right'], [`${key('jump')} ↑`, 'Jump'], [`${key('block')} ↓`, 'Block (hold)'], [key('roll'), 'Evade roll'], [key('flipF'), 'Front flip'], [key('flipB'), 'Back flip']] },
+        { x: px + pw / 2 + 30, head: 'FIGHT', attack: true, rows: BIND_ACTIONS.filter((a) => a.attack).map((a) => [key(a.id), a.label]) },
       ];
       for (const col of cols) {
         text(col.head, col.x, py + 80, 20, col.attack ? '#ff8a6a' : '#9ad0ff', 'left', null);
@@ -1471,12 +1656,72 @@
           ctx.font = `${col.attack ? 22 : 17}px ${FONT}`;
           const w = Math.max(36, ctx.measureText(k).width + 18);
           this.keycap(k, col.x, y, w, 34, col.attack, false);
-          text(l, col.x + 84, y + 1, 19, '#fff', 'left', '#000', 3);
+          text(l, col.x + Math.max(84, w + 14), y + 1, 19, '#fff', 'left', '#000', 3);
         });
       }
-      this.tapButton('RESUME  (ESC)', W / 2 - 300, 600, 270, 60, () => this.onKey('Escape'));
-      this.tapButton('QUIT  (Q)', W / 2, 600, 220, 60, () => this.onKey('KeyQ'), '#3a2a30');
-      this.tapButton(`SOUND ${Sound.muted ? 'OFF' : 'ON'}  (M)`, W / 2 + 300, 600, 270, 60, () => Music.toggle(), '#3a2a30');
+      this.tapButton('RESUME  (ESC)', W / 2 - 438, 600, 262, 58, () => this.onKey('Escape'));
+      this.tapButton('CONTROLS  (C)', W / 2 - 146, 600, 262, 58, () => this.onKey('KeyC'), '#3a2a30');
+      this.tapButton(`SOUND ${Sound.muted ? 'OFF' : 'ON'}  (M)`, W / 2 + 146, 600, 262, 58, () => Music.toggle(), '#3a2a30');
+      this.tapButton('QUIT  (Q)', W / 2 + 438, 600, 262, 58, () => this.onKey('KeyQ'), '#3a2a30');
+    },
+    drawControlsScreen() {
+      const c = this.ctl, n = BIND_ACTIONS.length;
+      this.drawBackdrop('#1b1030', '#4a1f3a');
+      const setup = c.mode === 'setup', capture = c.mode === 'capture', blink = (this.t >> 4) % 2;
+      const cur = setup ? c.step : c.sel;
+      text(setup ? 'SET YOUR CONTROLS' : 'CONTROLS', W / 2, 62, 58, '#ffcf5a');
+      if (setup || capture) {
+        const act = BIND_ACTIONS[cur];
+        text(setup ? 'PRESS A KEY FOR' : 'PRESS A NEW KEY FOR', W / 2, 124, 26, '#fff', 'center', null);
+        text(act.label.toUpperCase(), W / 2, 168, 46, act.attack ? '#ff8a6a' : '#9ad0ff');
+        text(setup ? `${c.step + 1} of ${n}   ·   BACKSPACE go back   ·   ESC cancel` : 'ESC cancel', W / 2, 208, 17, 'rgba(255,255,255,0.7)', 'center', null);
+      } else {
+        // the two options: the original layout, or keys the player picked
+        const pill = (label, x, on, fn) => {
+          const w = 250, h = 50;
+          ctx.fillStyle = on ? '#b3202a' : 'rgba(40,30,45,0.9)'; ctx.strokeStyle = on ? '#ffcf5a' : 'rgba(255,255,255,0.35)'; ctx.lineWidth = on ? 4 : 2;
+          ctx.beginPath(); ctx.roundRect(x - w / 2, 128 - h / 2, w, h, h / 2); ctx.fill(); ctx.stroke();
+          text((on ? '✓ ' : '') + label, x, 130, 24, on ? '#fff' : 'rgba(255,255,255,0.7)', 'center', on ? '#2a0505' : null);
+          this.taps.push({ x: x - w / 2, y: 128 - h / 2, w, h, fn });
+        };
+        pill('DEFAULT KEYS', W / 2 - 140, !Binds.custom, () => { if (Binds.custom) this.ctlUseDefaults(); });
+        pill('MY KEYS', W / 2 + 140, Binds.custom, () => { if (!Binds.custom) this.ctlSetupAll(); });
+        text(Binds.custom ? 'Click a key to change it (or ↑ ↓ ← → and ENTER). R = back to default keys.'
+          : 'Click any key to change it, or MY KEYS to set them all. J K U I L O and the num pad also attack.',
+        W / 2, 180, 18, 'rgba(255,255,255,0.8)', 'center', null);
+        text('Arrows always work:  ← → move   ·   ↑ jump   ·   ↓ block', W / 2, 206, 18, '#9ad0ff', 'center', null);
+      }
+      if (c.msg && this.t - c.msgT < 240) text(c.msg, W / 2, 238, 22, '#ffcf5a', 'center', '#000', 3);
+
+      // two columns: MOVE on the left, FIGHT on the right; every row is clickable in edit mode
+      const px = 170, py = 262, pw = W - 340, ph = 340, rowH = 40, col = BIND_ACTIONS.findIndex((a) => a.attack);
+      ctx.fillStyle = 'rgba(20,10,24,0.92)'; ctx.strokeStyle = 'rgba(255,207,90,0.7)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 18); ctx.fill(); ctx.stroke();
+      text('MOVE', px + 40, py + 28, 20, '#9ad0ff', 'left', null);
+      text('FIGHT', px + pw / 2 + 20, py + 28, 20, '#ff8a6a', 'left', null);
+      BIND_ACTIONS.forEach((a, i) => {
+        const right = i >= col, x = right ? px + pw / 2 + 20 : px + 40, y = py + 66 + (right ? i - col : i) * rowH;
+        const rw = pw / 2 - 60, here = i === cur;
+        if (here) {
+          ctx.fillStyle = 'rgba(255,207,90,0.16)'; ctx.strokeStyle = '#ffcf5a'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.roundRect(x - 10, y - rowH / 2 + 2, rw, rowH - 4, 8); ctx.fill(); ctx.stroke();
+        }
+        const code = c.draft[a.id], waiting = here && (setup || capture);
+        const label = waiting ? (blink ? '_' : ' ') : code ? keyName(code) : '';
+        ctx.font = `${a.attack ? 22 : 17}px ${FONT}`;
+        const w = Math.max(44, ctx.measureText(label).width + 18);
+        ctx.globalAlpha = !code && !waiting ? 0.4 : 1;
+        this.keycap(label, x, y, w, 32, a.attack, waiting);
+        ctx.globalAlpha = 1;
+        text(a.label, x + Math.max(100, w + 14), y + 1, 19, '#fff', 'left', '#000', 3);
+        if (c.mode === 'edit') {
+          this.taps.push({ x: x - 10, y: y - rowH / 2, w: rw, h: rowH, fn: () => { c.sel = i; c.mode = 'capture'; c.msg = ''; Sound.play('select'); } });
+        }
+      });
+      if (c.mode === 'edit') {
+        this.tapButton('DONE  (ESC)', W / 2 - 170, 662, 300, 60, () => this.bindKey('Escape'));
+        this.tapButton('SET ALL KEYS', W / 2 + 170, 662, 300, 60, () => this.ctlSetupAll(), '#3a2a30');
+      }
     },
     // goons still waiting their turn, standing along the back of the stage
     drawBench() {
@@ -1775,12 +2020,23 @@
     {
       const orders = new Set();
       for (let k = 0; k < 6; k++) { game.beginGauntlet('competitor3'); orders.add(game.opponents.join()); }
-      const opp = game.opponents;
-      check('gauntlet = all 7 other fighters, no repeats', opp.length === 7 && new Set(opp).size === 7 && !opp.includes('competitor3'), opp.length);
+      const opp = game.opponents, n = ROSTER.length - 1;
+      check(`gauntlet = all ${n} other fighters, no repeats`, opp.length === n && new Set(opp).size === n && !opp.includes('competitor3'), opp.length);
       check('gauntlet order is randomized', orders.size > 1, `${orders.size} distinct of 6`);
-      check('each fight has an arena', game.fightStages.length === 7 && game.fightStages.every((s) => STAGES[s]), game.fightStages.join());
+      check('each fight has an arena', game.fightStages.length === n && game.fightStages.every((s) => STAGES[s]), game.fightStages.join());
       check('first 6 fights use 6 different arenas', new Set(game.fightStages.slice(0, 6)).size === 6, game.fightStages.join());
-      check('AI ramps from level 0 to 2', game.aiLevel(0) === 0 && game.aiLevel(6) === 2, `${game.aiLevel(0)}..${game.aiLevel(6)}`);
+      check('AI ramps from level 0 to 2', game.aiLevel(0) === 0 && game.aiLevel(n - 1) === 2, `${game.aiLevel(0)}..${game.aiLevel(n - 1)}`);
+      for (const id of ['competitor8', 'competitor9']) {
+        game.beginGauntlet(id); game.startFight(); fresh();
+        const seenF = new Set(), seenB = new Set();
+        pressKey('KeyD'); for (let i = 0; i < 40; i++) { run(1); seenF.add(game.p1.frame()); } releaseKey('KeyD');
+        game.p1.x = 500; game.p2.x = 900;
+        pressKey('KeyA'); for (let i = 0; i < 40; i++) { run(1); seenB.add(game.p1.frame()); } releaseKey('KeyA');
+        check(`${CHARACTERS[id].name} walks (fwd + back steps)`, seenF.size >= 3 && seenB.size >= 3, `${[...seenF].join(',')} | ${[...seenB].join(',')}`);
+      }
+      game.beginGauntlet('ant'); game.startFight();
+      check('new fighters have their art', ['competitor8', 'competitor9'].every((id) => SPRITES[id] && Object.keys(SPRITES[id]).length >= 13 &&
+        Object.values(CHARACTERS[id].moves).every((mv) => mv.frames.every(([f]) => SPRITES[id][f]))), 'STARLA, KAI');
       check('every fighter selectable', ROSTER.every((id) => game.unlocked.includes(id)), game.unlocked.length);
       game.beginGauntlet('ant'); game.startFight();
     }
@@ -1799,7 +2055,7 @@
       fresh(); game.p2.x = 700; game.p2.startMove('kick'); tap('KeyE'); run(25);
       check('attack passes under a flip', game.p1.hp === game.p1.c.hp, `hp ${game.p1.hp}`);
       fresh(); pressKey('KeyD'); run(12);
-      check('walking forward uses the guard walk', game.p1.frame().startsWith('fwd_'), game.p1.frame()); releaseKey('KeyD');
+      check('walking forward uses the sheet walk', game.p1.c.frames.walk.includes(game.p1.frame()) && !game.p1.frame().startsWith('fwd_'), game.p1.frame()); releaseKey('KeyD');
     }
 
     // brawl turning: the arrows turn the player to fight goons on either side
@@ -1823,6 +2079,57 @@
     game.phase = 'fight'; game.enemies.forEach((f) => { f.ai = still; });
     loseTry(); game.phase = 'fight'; game.enemies.forEach((f) => { f.ai = still; });
     loseTry(); check('qualify: 3 KOs -> disqualified', game.screen === 'disqualified', game.screen);
+
+    // key bindings: default keys out of the box; custom keys are an option on the
+    // CONTROLS screen, and then only the player's keys work in a fight
+    if (!TOUCH) {
+      let stash = null; try { stash = localStorage.getItem('antcombat.keys'); } catch (e) { /* private mode */ }
+      const savedBefore = Binds.saved;
+      BINDABLE = true; Binds.saved = null; Binds.rebuild();
+      const key = (code, type = 'keydown') => dispatchEvent(new KeyboardEvent(type, { code, bubbles: true, cancelable: true }));
+      game.screen = 'title'; key('Enter'); key('Enter', 'keyup');
+      check('binds: default keys, no setup: title -> select', game.screen === 'select' && !Binds.custom, game.screen);
+      game.beginGauntlet('ant'); game.startFight(); fresh();
+      key('Digit1'); run(2); key('Digit1', 'keyup');
+      check('binds: default 1 punches', game.p1.moveName === 'punch', game.p1.state);
+      fresh(); key('KeyJ'); run(2); key('KeyJ', 'keyup');
+      check('binds: default J alias still punches', game.p1.moveName === 'punch', game.p1.state);
+      game.screen = 'title'; key('KeyC');
+      check('binds: C on the title opens controls (default keys shown)', game.screen === 'controls' && game.ctl.mode === 'edit' && game.ctl.draft.punch === 'Digit1', game.screen);
+      game.ctlSetupAll();
+      key('KeyJ'); key('KeyJ', 'keyup'); key('KeyJ');
+      check('binds: a key already used is refused', game.ctl.step === 1, `step ${game.ctl.step}`);
+      key('Enter'); check('binds: reserved keys are refused', game.ctl.step === 1, `step ${game.ctl.step}`);
+      key('Backspace'); check('binds: backspace steps back', game.ctl.step === 0 && !game.ctl.draft.left, `step ${game.ctl.step}`);
+      const mine = ['KeyJ', 'KeyL', 'KeyI', 'KeyK', 'ShiftLeft', 'KeyO', 'KeyU', 'KeyF', 'KeyG', 'KeyH', 'KeyR', 'KeyT', 'KeyY'];
+      for (const c of mine) key(c);
+      check('binds: all 13 set -> saved', Binds.custom && game.ctl.mode === 'edit' && Binds.key('punch') === 'KeyF', Binds.key('punch'));
+      check('binds: fight keys translate', Binds.translate('KeyJ', true) === 'KeyA' && Binds.translate('KeyF', true) === 'Digit1', Binds.translate('KeyJ', true));
+      check('binds: old default keys do nothing in a fight', ['KeyA', 'KeyW', 'Digit1', 'Space', 'KeyE'].every((c) => Binds.translate(c, true) === null), '');
+      check('binds: arrows stay standard with custom keys', Binds.translate('ArrowLeft', true) === 'KeyA' && Binds.translate('ArrowRight', true) === 'KeyD' &&
+        Binds.translate('ArrowUp', true) === 'KeyW' && Binds.translate('ArrowDown', true) === 'KeyS', Binds.translate('ArrowUp', true));
+      check('binds: your move keys steer menus', Binds.translate('KeyJ', false) === 'ArrowLeft', Binds.translate('KeyJ', false));
+      game.ctl.sel = BIND_ACTIONS.findIndex((a) => a.id === 'punch'); key('Enter'); key('KeyJ');
+      check('binds: taking a used key swaps the two', Binds.key('punch') === 'KeyJ' && Binds.key('left') === 'KeyF', `punch ${Binds.key('punch')} left ${Binds.key('left')}`);
+      key('Escape'); check('binds: done -> back to the title', game.screen === 'title', game.screen);
+      game.beginGauntlet('ant'); game.startFight(); fresh();
+      key('KeyJ'); run(2); key('KeyJ', 'keyup');
+      check('binds: your punch key punches', game.p1.moveName === 'punch', game.p1.state);
+      fresh(); key('Digit1'); run(2); key('Digit1', 'keyup');
+      check('binds: 1 no longer punches', game.p1.state !== 'attack', game.p1.state);
+      fresh(); key('KeyL'); run(10); check('binds: your right key walks right', game.p1.x > 500, `x ${game.p1.x.toFixed(0)}`);
+      key('KeyL', 'keyup'); check('binds: releasing your key stops it', !keys.has('KeyD'), [...keys].join(','));
+      game.paused = true; key('KeyC'); check('binds: C in the pause menu opens controls', game.screen === 'controls', game.screen);
+      key('Escape'); check('binds: done returns to the paused fight', game.screen === 'fight' && game.paused, `${game.screen} paused ${game.paused}`);
+      key('KeyC'); game.ctl.sel = 0; key('Enter'); key('ArrowUp');
+      check('binds: arrows cannot be given to another move', Binds.key('left') === 'KeyF' && game.ctl.mode === 'capture', Binds.key('left'));
+      key('Escape'); key('KeyR');
+      check('binds: R -> back to the default keys', !Binds.custom && Binds.translate('Digit1', true) === 'Digit1' && Binds.translate('KeyA', true) === 'KeyA', `custom ${Binds.custom}`);
+      key('Escape');
+      game.paused = false;
+      BINDABLE = false; Binds.saved = savedBefore; Binds.rebuild(); keys.clear(); physDown.clear();
+      try { if (stash == null) localStorage.removeItem('antcombat.keys'); else localStorage.setItem('antcombat.keys', stash); } catch (e) { /* private mode */ }
+    }
 
     // music: one player on rotation, calm first, then hype, then back to calm; mute stops it
     const order = [Music.track];
