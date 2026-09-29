@@ -105,9 +105,9 @@
     // up plays the forward walk in reverse
     const spr = SPRITES[c.sprite];
     if (!c.goon) {
-      // Walking forward uses each fighter's own sheet walk (data.js `walk`). The
-      // generated guard walk (fwd_1-3) stays extracted but unused: 2026-09-28 the
-      // user wanted real walking movement for all 10, with the guard only at rest.
+      // Walking uses each fighter's stride in data.js (`STRIDE`: sheet walk + run pose;
+      // Chain and Saint stride through their generated guard walk, fwd_1-3). The guard
+      // stance is only at rest (user, 2026-09-28 / 2026-09-29).
       // Stand in the guard stance in fights (the user's template look), on
       // whichever side you face; mirrored art covers facing left
       if (spr.fwd_guard) c.frames.idle = ['fwd_guard'];
@@ -401,8 +401,8 @@
       if (this.flash > 0) this.flash--;
 
       const free = this.state === 'idle' || this.state === 'walk' || this.state === 'block';
-      // duels auto-face the one opponent; in the brawl the player turns with the
-      // arrows (manualFacing) so they can fight goons on either side
+      // AI fighters auto-face their foe; the player turns with the arrows
+      // (manualFacing) in every fight, so ←/→ always mean "face and walk that way"
       if (free && opp && !this.manualFacing) this.facing = opp.x >= this.x ? 1 : -1;
 
       switch (this.state) {
@@ -1001,6 +1001,7 @@
     startRound() {
       const oppId = this.opponents[this.stageIdx];
       this.p1 = new Fighter(this.playerId, W / 2 - 230, 1, this, 0);
+      this.p1.manualFacing = !this.ai1;   // ←/→ turn you in the duels too, same as the brawl (user, 2026-09-29)
       this.p2 = new Fighter(oppId, W / 2 + 230, -1, this, 1);
       this.p2.ai = new AI(this.aiLevel(), oppId);
       this.fighters = [this.p1, this.p2];
@@ -1861,13 +1862,15 @@
 
     // capture keeps a held button pressed when the thumb drifts off it; it can throw, and must never eat the press
     const capture = (el, e) => { try { el.setPointerCapture(e.pointerId); } catch (err) { /* keep going */ } };
-    let held = new Set(), dpadId = null, dpadDir = 0;
+    let held = new Set(), dpadId = null;
     pad.querySelectorAll('button[data-key]').forEach((b) => {
       let code = b.dataset.key;
       const down = (e) => {
         e.preventDefault(); capture(b, e); b.classList.add('on');
-        // one FLIP button: holding the d-pad away from the foe makes it a back flip
-        if (b.dataset.key === 'flip') code = game.p1 && dpadDir && dpadDir === -game.p1.facing ? 'KeyQ' : 'KeyE';
+        // one FLIP button = a front flip the way you hold (the d-pad turns you first) or face,
+        // the same as E on desktop. (It used to be a back flip when held away from the foe,
+        // but the arrows turn you in every fight now, so "away" is just the way you face.)
+        if (b.dataset.key === 'flip') code = 'KeyE';
         pressKey(code);
         navigator.vibrate?.(8);
       };
@@ -1886,7 +1889,6 @@
       for (const d of held) if (!next.has(d)) { releaseKey(DIRKEYS[d]); arrows[d].classList.remove('on'); }
       for (const d of next) if (!held.has(d)) { pressKey(DIRKEYS[d]); arrows[d].classList.add('on'); }
       held = next;
-      dpadDir = next.has('right') ? 1 : next.has('left') ? -1 : 0;
     };
     const track = (e) => {
       const r = dp.getBoundingClientRect(), rad = r.width / 2;
@@ -2002,13 +2004,19 @@
     game.phase = 'fight'; game.p2.hp = 10; game.p1.x = 500; game.p2.x = 640; tap('KeyJ'); run(12); run(240);
     check('2 round wins -> bracket stage 2', game.screen === 'bracket' && game.stageIdx === 1, `${game.screen} ${game.stageIdx}`);
 
-    // backing up uses back frames, not the forward walk
+    // duels turn like the brawl: A (away from the foe) turns you left and walks left
     fresh(); pressKey('KeyA'); run(12);
-    check('A (away from foe) backs up facing the foe', game.p1.state === 'walk' && game.p1.vx < 0 && game.p1.facing === 1,
+    check('duel: A turns and walks left', game.p1.state === 'walk' && game.p1.vx < 0 && game.p1.facing === -1,
       `${game.p1.state} vx ${game.p1.vx.toFixed(1)} facing ${game.p1.facing}`);
     const seen = new Set(); for (let i = 0; i < 40; i++) { run(1); seen.add(game.p1.frame()); }
     releaseKey('KeyA');
-    check('backing up plays the back sequence', [...seen].every((f) => game.p1.c.frames.back.includes(f)), [...seen].join(','));
+    check('duel: walking left plays the forward walk', [...seen].every((f) => game.p1.c.frames.walk.includes(f)), [...seen].join(','));
+    run(2); check('duel: no auto-turn back to the foe', game.p1.facing === -1, `facing ${game.p1.facing}`);
+    pressKey('KeyD'); run(2); releaseKey('KeyD');
+    check('duel: D turns back to the right', game.p1.facing === 1, `facing ${game.p1.facing}`);
+    // the AI opponent still auto-faces and backs up with its guarded back-step
+    fresh(); game.p1.x = 800; game.p2.x = 640; run(1);
+    check('duel: AI still auto-faces the player', game.p2.facing === 1, `facing ${game.p2.facing}`);
 
     // qualifying round
     game.beginGauntlet('ant'); game.startQualify();
@@ -2042,13 +2050,15 @@
         pressKey('KeyD'); for (let i = 0; i < 40; i++) { run(1); seenF.add(game.p1.frame()); } releaseKey('KeyD');
         game.p1.x = 500; game.p2.x = 900;
         pressKey('KeyA'); for (let i = 0; i < 40; i++) { run(1); seenB.add(game.p1.frame()); } releaseKey('KeyA');
-        check(`${CHARACTERS[id].name} walks (fwd + back steps)`, seenF.size >= 3 && seenB.size >= 3, `${[...seenF].join(',')} | ${[...seenB].join(',')}`);
+        check(`${CHARACTERS[id].name} walks both ways`, seenF.size >= 3 && seenB.size >= 3, `${[...seenF].join(',')} | ${[...seenB].join(',')}`);
       }
       game.beginGauntlet('ant'); game.startFight();
       check('new fighters have their art', ['competitor8', 'competitor9', 'competitor10'].every((id) => SPRITES[id] && Object.keys(SPRITES[id]).length >= 13 &&
         Object.values(CHARACTERS[id].moves).every((mv) => mv.frames.every(([f]) => SPRITES[id][f])) &&
         Object.values(CHARACTERS[id].frames).flat().every((f) => SPRITES[id][f])), 'STARLA, KAI, ICE COLE');
       check('every fighter selectable', ROSTER.every((id) => game.unlocked.includes(id)), game.unlocked.length);
+      const stiff = ROSTER.filter((id) => { const w = CHARACTERS[id].frames.walk; return w.includes('idle') || new Set(w).size < 3 || !w.every((f) => SPRITES[id][f]); });
+      check('every fighter strides (3+ poses, no standing frame, art exists)', !stiff.length, stiff.join(',') || 'all 11');
       game.beginGauntlet('ant'); game.startFight();
     }
 
@@ -2168,9 +2178,10 @@
       check('touch: lifting releases every direction', !['KeyA', 'KeyD', 'KeyW', 'KeyS'].some((k) => keys.has(k)), [...keys].join(',') || 'none');
       fresh(); run(2);
       const flip = document.querySelector('#touch [data-key="flip"]');
-      ptr(dp, 'pointerdown', r.left + 4, cy, 2);   // hold away from the foe on the right
+      ptr(dp, 'pointerdown', r.left + 4, cy, 2);   // hold left, away from the foe on the right
       ptr(flip, 'pointerdown', 0, 0, 3); run(2); ptr(flip, 'pointerup', 0, 0, 3); ptr(dp, 'pointerup', cx, cy, 2);
-      check('touch: FLIP + away = back flip', game.p1.state === 'flip' && game.p1.vx < 0, `${game.p1.state} vx ${game.p1.vx}`);
+      check('touch: FLIP + left = turns and flips left', game.p1.state === 'flip' && game.p1.vx < 0 && game.p1.facing === -1,
+        `${game.p1.state} vx ${game.p1.vx} facing ${game.p1.facing}`);
       fresh(); run(2);
       ptr(flip, 'pointerdown', 0, 0, 4); run(2); ptr(flip, 'pointerup', 0, 0, 4);
       check('touch: FLIP alone = front flip', game.p1.state === 'flip' && game.p1.vx > 0, `${game.p1.state} vx ${game.p1.vx}`);

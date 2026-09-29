@@ -13,13 +13,20 @@
 //   air     true = only from a jump; ends on landing
 (function () {
   const P = (dmg, stun, push, extra) => Object.assign({ dmg, stun, push }, extra || {});
+  // Walk cycle for every fighter: a real stride through the run pose. The old cycle
+  // (walk_1, idle, walk_2, idle) stood still every other frame; the user wanted all of
+  // them to move forward like Starla/Kai/Ice Cole (2026-09-29).
+  const STRIDE = ['walk_1', 'walk_2', 'run', 'walk_2'];
+  // Chain's sheet walk is shirtless and Saint has one walk frame, so they stride
+  // through their generated (armoured / robed) guard-walk steps instead
+  const GUARD_STRIDE = ['fwd_1', 'fwd_2', 'run', 'fwd_3'];
 
   const CHARACTERS = {
     ant: {
       name: 'ANT', title: 'The Cowboy', sprite: 'ant', color: '#f0a64a',
       hp: 1000, speed: 4.6, jump: 19,
       frames: {
-        idle: ['idle'], walk: ['walk_1', 'idle', 'walk_2', 'idle'], jump: ['jump_1', 'jump_2'],
+        idle: ['idle'], walk: STRIDE, jump: ['jump_1', 'jump_2'],
         block: 'block', hit: 'hit', knockdown: ['knockdown_1', 'knockdown_2'],
         getup: ['getup_1', 'getup_2'], evade: ['evade_1', 'evade_2', 'evade_3'], win: 'getup_2',
       },
@@ -72,7 +79,7 @@
       name: 'SCARLET', title: 'The Blade', sprite: 'competitor1', color: '#c8334a',
       hp: 1000, speed: 4.8, jump: 19,
       frames: {
-        idle: ['idle'], walk: ['walk_1', 'idle', 'walk_2', 'idle'], jump: ['run', 'run'],
+        idle: ['idle'], walk: STRIDE, jump: ['run', 'run'],
         block: 'getup_2', hit: 'knockdown_1', knockdown: ['knockdown_1', 'knockdown_2'],
         getup: ['getup_1', 'getup_2'], evade: ['evade_1', 'evade_2', 'evade_3'], win: 'getup_2',
       },
@@ -120,7 +127,7 @@
       name: 'FANG', title: 'The Painted Dog', sprite: 'competitor2', color: '#c88a3a',
       hp: 920, speed: 5.4, jump: 20,
       frames: {
-        idle: ['idle'], walk: ['walk_1', 'idle', 'walk_2', 'idle'], jump: ['run', 'run'],
+        idle: ['idle'], walk: STRIDE, jump: ['run', 'run'],
         block: 'getup_2', hit: 'knockdown_1', knockdown: ['knockdown_1', 'knockdown_2'],
         getup: ['getup_1', 'getup_2'], evade: ['evade_1', 'evade_2', 'evade_3'], win: 'getup_2',
       },
@@ -168,7 +175,7 @@
       name: 'HEX', title: 'The Hollow Wizard', sprite: 'competitor3', color: '#56e07a',
       hp: 900, speed: 4.0, jump: 18, teleport: true,
       frames: {
-        idle: ['idle'], walk: ['walk_1', 'idle', 'walk_2', 'idle'], jump: ['walk_2', 'walk_2'],
+        idle: ['idle'], walk: STRIDE, jump: ['walk_2', 'walk_2'],
         block: 'counter', hit: 'evade_1', knockdown: ['fall_1', 'fall_2'],
         getup: ['fall_3', 'recover'], evade: ['evade_1', 'evade_1', 'evade_1'], win: 'portal',
       },
@@ -215,7 +222,7 @@
       name: c.name, title: c.title, sprite: c.id, color: c.color,
       hp: c.hp, speed: c.speed, jump: c.jump, teleport: !!c.teleport, keepBlock: !!c.keepBlock,
       frames: {
-        idle: ['idle'], walk: c.walk || ['walk_1', 'idle', 'walk_2', 'idle'], jump: c.jumpFrames,
+        idle: ['idle'], walk: c.walk || STRIDE, jump: c.jumpFrames,
         block: c.block, hit: c.hit, knockdown: c.knockdown, getup: c.getup,
         evade: c.evade, win: c.win,
       },
@@ -277,7 +284,7 @@
       hp: 960, speed: 5.0, jump: 20,
       block: 'block', hit: 'hit', knockdown: ['hit_alt', 'hit'],
       getup: ['idle', 'block'], evade: ['jump_1', 'jump_1', 'jump_1'], win: 'weapon_4',
-      walk: ['walk_1', 'idle', 'walk_2', 'idle'], jumpFrames: ['jump_1', 'jump_1'], air: 'kick_3',
+      jumpFrames: ['jump_1', 'jump_1'], air: 'kick_3',
       punch: [['punch_1', 5], ['punch_2', 7], ['punch_3', 8]],
       kick: [['kick_1', 6], ['kick_2', 7], ['kick_3', 9]],
       heavy: [['punch_1', 7], ['punch_2', 5], ['punch_3', 14]],
@@ -302,7 +309,7 @@
       hp: 1080, speed: 4.4, jump: 18,
       block: 'block', hit: 'hit', knockdown: ['idle_alt', 'hit'],
       getup: ['idle', 'idle_alt'], evade: ['evade_1', 'evade_1', 'evade_1'], win: 'idle_alt',
-      jumpFrames: ['kick_1', 'kick_2'], air: 'kick_3',
+      walk: GUARD_STRIDE, jumpFrames: ['kick_1', 'kick_2'], air: 'kick_3',
       punch: [['punch_1', 5], ['punch_2', 7], ['punch_3', 8]],
       kick: [['kick_1', 6], ['kick_2', 7], ['kick_3', 9]],
       heavy: [['heavy_1', 7], ['heavy_2', 5], ['heavy_3', 14]],
@@ -324,7 +331,7 @@
       hp: 920, speed: 4.2, jump: 19, teleport: true,
       block: 'block', hit: 'hit', knockdown: ['recover', 'recover'],
       getup: ['getup_1', 'idle_alt'], evade: ['evade_1', 'evade_1', 'evade_1'], win: 'utility_1',
-      walk: ['walk_1', 'idle', 'walk_1', 'idle'], jumpFrames: ['walk_1', 'run'], air: 'kick_3',
+      walk: GUARD_STRIDE, jumpFrames: ['walk_1', 'run'], air: 'kick_3',
       punch: [['cast_1', 5], ['cast_2', 7], ['cast_3', 8]],
       kick: [['kick_1', 6], ['kick_2', 7], ['kick_3', 9]],
       heavy: [['cast_1', 7], ['cast_2', 5], ['cast_3', 14]],
