@@ -392,6 +392,43 @@
         cool: 180, sfx: 'heavy',
       },
     }),
+    // raw-assets/ice_cole_sprite.jpg (2026-09-29). A pure boxer: every attack is a
+    // punch. His sheet's hit reactions are cut off at the waist, so hit and
+    // knockdown come from a generated sheet (competitor10_hits).
+    competitor10: challenger({
+      id: 'competitor10', name: 'ICE COLE', title: 'The Speed Flurry', color: '#ff6f61',
+      hp: 980, speed: 5.2, jump: 18,
+      block: 'block', hit: 'hit', knockdown: ['knockdown_1', 'knockdown_2'],
+      getup: ['duck', 'guard'], evade: ['low', 'low', 'low'], win: 'win',
+      walk: ['walk_1', 'walk_2', 'walk_3', 'walk_2'],
+      jumpFrames: ['jump', 'jump'], air: 'punch_3',
+      punch: [['guard', 5], ['punch_1', 7], ['guard', 8]],          // jab
+      kick: [['guard', 6], ['punch_4', 9], ['punch_2', 7]],         // body cross
+      heavy: [['low', 8], ['attack_defend', 5], ['punch_3', 14]],   // rising cross
+      sweep: [['dodge', 7], ['punch_3', 17]],                       // slip + haymaker
+      damage: [54, 64, 104, 110, 80],
+      // (the sheet's own flurry frames overlap each other, so the flurries use the clean punch row)
+      shoot: { // speed flurry: four quick punches
+        frames: [['punch_1', 6], ['guard', 6], ['punch_4', 6], ['punch_2', 6], ['punch_3', 10]],
+        hits: [
+          { from: 3, to: 7, x: [25, 190], y: [140, 235], ...P(24, 14, 2) },
+          { from: 9, to: 13, x: [25, 190], y: [140, 235], ...P(24, 14, 2) },
+          { from: 15, to: 19, x: [25, 190], y: [140, 235], ...P(24, 14, 2) },
+          { from: 21, to: 27, x: [25, 195], y: [140, 235], ...P(38, 20, 9) },
+        ],
+        cool: 70,
+      },
+      special: { // lunging flurry that ends in a knockdown cross
+        frames: [['guard', 6], ['punch_1', 5], ['punch_4', 5], ['punch_2', 5], ['punch_3', 16]], lunge: 12,
+        hits: [
+          { from: 6, to: 11, x: [20, 200], y: [130, 240], ...P(30, 16, 2) },
+          { from: 11, to: 16, x: [20, 200], y: [130, 240], ...P(30, 16, 2) },
+          { from: 16, to: 21, x: [20, 200], y: [130, 240], ...P(30, 16, 2) },
+          { from: 21, to: 32, x: [20, 215], y: [120, 245], ...P(92, 0, 12, { kd: true }) },
+        ],
+        cool: 170, sfx: 'heavy',
+      },
+    }),
   });
 
   // ---- qualifying-round goons
@@ -461,7 +498,7 @@
   // is reshuffled for each run (see beginGauntlet in game.js). This list is
   // the pool.
   const GAUNTLET_ORDER = ['ant', 'competitor1', 'competitor2', 'competitor3',
-    'competitor4', 'competitor5', 'competitor6', 'competitor7', 'competitor8', 'competitor9'];
+    'competitor4', 'competitor5', 'competitor6', 'competitor7', 'competitor8', 'competitor9', 'competitor10'];
 
   // AI grows sharper with each gauntlet stage.
   const AI_LEVELS = [

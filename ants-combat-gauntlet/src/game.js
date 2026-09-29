@@ -814,8 +814,10 @@
 
   // ---------------------------------------------------------------- game
   const ROSTER = ['ant', 'competitor1', 'competitor2', 'competitor3', 'competitor4', 'competitor5', 'competitor6', 'competitor7',
-    'competitor8', 'competitor9'];
-  const SEL_COLS = 5;   // select screen: 2 rows of 5 cards
+    'competitor8', 'competitor9', 'competitor10'];
+  const SEL_COLS = 6;   // select screen: 2 rows of up to 6 cards (the short row is centred)
+  const SEL_ROWS = Math.ceil(ROSTER.length / SEL_COLS);
+  const selRowLen = (row) => Math.min(SEL_COLS, ROSTER.length - row * SEL_COLS);
 
   const game = {
     screen: 'loading', t: 0,
@@ -879,9 +881,16 @@
           else if (BINDABLE && code === 'KeyC') { Sound.play('select'); this.openControls('title'); }
           break;
         case 'select':
-          if (code === 'KeyA' || code === 'ArrowLeft') { this.selIndex = (this.selIndex % SEL_COLS + SEL_COLS - 1) % SEL_COLS + Math.floor(this.selIndex / SEL_COLS) * SEL_COLS; Sound.play('select'); }
-          if (code === 'KeyD' || code === 'ArrowRight') { this.selIndex = (this.selIndex % SEL_COLS + 1) % SEL_COLS + Math.floor(this.selIndex / SEL_COLS) * SEL_COLS; Sound.play('select'); }
-          if (code === 'KeyW' || code === 'ArrowUp' || code === 'KeyS' || code === 'ArrowDown') { this.selIndex = (this.selIndex + SEL_COLS) % ROSTER.length; Sound.play('select'); }
+          {
+            // rows can differ in length: left/right wrap within the row, up/down
+            // keep the column (clamped to the shorter row)
+            const row = Math.floor(this.selIndex / SEL_COLS), col = this.selIndex % SEL_COLS, len = selRowLen(row);
+            const go = (r, c) => { this.selIndex = r * SEL_COLS + Math.min(c, selRowLen(r) - 1); Sound.play('select'); };
+            if (code === 'KeyA' || code === 'ArrowLeft') go(row, (col + len - 1) % len);
+            if (code === 'KeyD' || code === 'ArrowRight') go(row, (col + 1) % len);
+            if (code === 'KeyW' || code === 'ArrowUp') go((row + SEL_ROWS - 1) % SEL_ROWS, col);
+            if (code === 'KeyS' || code === 'ArrowDown') go((row + 1) % SEL_ROWS, col);
+          }
           if (code === 'Escape') this.screen = 'title';
           if (confirm) {
             const id = ROSTER[this.selIndex];
@@ -1376,9 +1385,10 @@
       this.drawBackdrop('#1b1030', '#4a1f3a');
       text('CHOOSE YOUR FIGHTER', W / 2, 70, 58, '#ffcf5a');
       this.drawMuteIcon(W - 46, 52);
-      const cw = 226, gap = 20, x0 = (W - (cw * SEL_COLS + gap * (SEL_COLS - 1))) / 2;
+      const cw = 192, gap = 14;
       ROSTER.forEach((id, i) => {
-        const c = CHARACTERS[id], x = x0 + (i % SEL_COLS) * (cw + gap), y = 105 + Math.floor(i / SEL_COLS) * 263, sel = i === this.selIndex;
+        const row = Math.floor(i / SEL_COLS), n = selRowLen(row), x0 = (W - (cw * n + gap * (n - 1))) / 2;
+        const c = CHARACTERS[id], x = x0 + (i % SEL_COLS) * (cw + gap), y = 105 + row * 263, sel = i === this.selIndex;
         const locked = !this.unlocked.includes(id);
         ctx.fillStyle = sel ? 'rgba(255,207,90,0.18)' : 'rgba(0,0,0,0.35)';
         ctx.beginPath(); ctx.roundRect(x, y, cw, 248, 16); ctx.fill();
@@ -2026,7 +2036,7 @@
       check('each fight has an arena', game.fightStages.length === n && game.fightStages.every((s) => STAGES[s]), game.fightStages.join());
       check('first 6 fights use 6 different arenas', new Set(game.fightStages.slice(0, 6)).size === 6, game.fightStages.join());
       check('AI ramps from level 0 to 2', game.aiLevel(0) === 0 && game.aiLevel(n - 1) === 2, `${game.aiLevel(0)}..${game.aiLevel(n - 1)}`);
-      for (const id of ['competitor8', 'competitor9']) {
+      for (const id of ['competitor8', 'competitor9', 'competitor10']) {
         game.beginGauntlet(id); game.startFight(); fresh();
         const seenF = new Set(), seenB = new Set();
         pressKey('KeyD'); for (let i = 0; i < 40; i++) { run(1); seenF.add(game.p1.frame()); } releaseKey('KeyD');
@@ -2035,8 +2045,9 @@
         check(`${CHARACTERS[id].name} walks (fwd + back steps)`, seenF.size >= 3 && seenB.size >= 3, `${[...seenF].join(',')} | ${[...seenB].join(',')}`);
       }
       game.beginGauntlet('ant'); game.startFight();
-      check('new fighters have their art', ['competitor8', 'competitor9'].every((id) => SPRITES[id] && Object.keys(SPRITES[id]).length >= 13 &&
-        Object.values(CHARACTERS[id].moves).every((mv) => mv.frames.every(([f]) => SPRITES[id][f]))), 'STARLA, KAI');
+      check('new fighters have their art', ['competitor8', 'competitor9', 'competitor10'].every((id) => SPRITES[id] && Object.keys(SPRITES[id]).length >= 13 &&
+        Object.values(CHARACTERS[id].moves).every((mv) => mv.frames.every(([f]) => SPRITES[id][f])) &&
+        Object.values(CHARACTERS[id].frames).flat().every((f) => SPRITES[id][f])), 'STARLA, KAI, ICE COLE');
       check('every fighter selectable', ROSTER.every((id) => game.unlocked.includes(id)), game.unlocked.length);
       game.beginGauntlet('ant'); game.startFight();
     }
