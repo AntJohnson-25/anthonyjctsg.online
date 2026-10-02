@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel the pinch gestures and any
+   two-finger move so the page can't zoom mid-game (the double-tap zoom is
+   blocked in src/input.js). Same guard as the site's other game pages. */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault();
+  }, { passive: false });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d1520">
+<title>Bladed</title>
+<meta name="description" content="Bladed: a knives-only arena fight on a superyacht with a pirate boat lashed alongside. Team Deathmatch or Free-for-all vs bots, in your browser.">
+<link rel="icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+<canvas id="view" aria-label="Game view"></canvas>
+
+<div id="loading" class="loading">
+  <img class="logo-img" src="assets/logo-ui.png" alt="Bladed: Knives Only">
+  <div class="load-bar"><span id="loadFill"></span></div>
+  <div class="load-msg" id="loadMsg">Boarding the yacht…</div>
+</div>
+
+<!-- Title / match setup (a bot match plays behind it) -->
+<div id="menu" class="menu" hidden>
+  <div class="menu-card">
+    <img class="logo-img" src="assets/logo-ui.png" alt="Bladed: Knives Only">
+    <p class="tag">One yacht, one pirate boat, no guns. Your knife, plus two throwing knives you can pick back up.
+      Get <b>5 kills without dying</b> to call a <b class="wave-word">Rogue Wave</b> that knocks your enemies off their feet, and off the boat.</p>
+    <div class="opt">
+      <span class="opt-l">MODE</span>
+      <div class="seg" id="optMode">
+        <button type="button" data-v="tdm" class="on">TEAM DEATHMATCH<small>4 v 4 · first to 75</small></button>
+        <button type="button" data-v="ffa">FREE-FOR-ALL<small>8 players · first to 30</small></button>
+      </div>
+    </div>
+    <div class="opt">
+      <span class="opt-l">BOTS</span>
+      <div class="seg seg4" id="optDiff">
+        <button type="button" data-v="recruit">RECRUIT</button>
+        <button type="button" data-v="regular" class="on">REGULAR</button>
+        <button type="button" data-v="hardened">HARDENED</button>
+        <button type="button" data-v="veteran">VETERAN</button>
+      </div>
+    </div>
+    <button type="button" id="btnPlay" class="play">PLAY</button>
+    <div class="keys" id="keysDesk">
+      <div><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>←</kbd><kbd>→</kbd> turn · <kbd>/</kbd> spin 180° · double-tap <kbd>↑</kbd> sprint · <kbd>R-Shift</kbd> jump</div>
+      <div><kbd>Space</kbd> or <kbd>Enter</kbd> attack: stabs when they're close, throws a knife when they're farther away</div>
+      <div>Mouse works too: click to look, left click knife, right click throw · <kbd>Tab</kbd> scores · <kbd>Esc</kbd> pause</div>
+    </div>
+    <div class="keys" id="keysTouch" hidden>
+      <div>Left thumb: move (push to the edge to sprint) · right thumb: drag to look</div>
+      <div><b>KNIFE</b> stabs or lunges · <b>THROW</b> throws a knife · walk over knives to pick them up</div>
+    </div>
+  </div>
+</div>
+
+<!-- In-game HUD -->
+<div id="hud" class="hud" hidden>
+  <div class="tl">
+    <canvas id="minimap" width="220" height="70"></canvas>
+    <div class="scorebar" id="scorebar">
+      <div class="sb-row" id="sbA"><i></i><span class="nm"></span><span class="bar"><b></b></span><span class="sc"></span></div>
+      <div class="sb-row" id="sbB"><i></i><span class="nm"></span><span class="bar"><b></b></span><span class="sc"></span></div>
+      <div class="sb-time" id="sbTime">10:00</div>
+    </div>
+    <div class="streak" id="streak"></div>
+  </div>
+  <div class="killfeed" id="killfeed"></div>
+  <div class="cross" id="cross"><i></i><i></i><i></i><i></i><b></b></div>
+  <div class="hitmark" id="hitmark"></div>
+  <div class="medals" id="medals"></div>
+  <div class="popups" id="popups"></div>
+  <div class="center-msg" id="centerMsg"></div>
+  <div class="knives" id="knivesHud">
+    <div class="kslot" id="k0"></div><div class="kslot" id="k1"></div>
+    <span class="khint" id="khint">ATTACK <kbd>SPACE</kbd></span>
+  </div>
+  <div class="toast" id="toast"></div>
+  <div class="markers" id="markers"></div>
+  <div class="callout" id="callout"></div>
+  <div class="cut" id="cut" hidden><div class="cut-band"><span id="cutText"></span></div></div>
+  <div class="death" id="death" hidden>
+    <div class="death-by">KILLED BY</div>
+    <div class="death-name" id="deathName"></div>
+    <div class="death-how" id="deathHow"></div>
+    <div class="death-timer" id="deathTimer"></div>
+  </div>
+  <div class="vignette" id="vignette"></div>
+  <div class="topbtns">
+    <button type="button" id="btnScores" title="Scores (Tab)">☰</button>
+    <button type="button" id="btnPause" title="Pause (Esc)">II</button>
+  </div>
+  <div class="touch" id="touch" hidden>
+    <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
+    <button type="button" class="tb tb-knife" id="tKnife">KNIFE</button>
+    <button type="button" class="tb tb-throw" id="tThrow">THROW<small id="tCount">2</small></button>
+    <button type="button" class="tb tb-jump" id="tJump">JUMP</button>
+  </div>
+  <div class="clicklock" id="clicklock" hidden>Arrow keys to play · or click for mouse look</div>
+</div>
+
+<div id="scores" class="scores" hidden>
+  <div class="sc-panel">
+    <div class="sc-head" id="scHead"></div>
+    <table><thead><tr><th class="l">PLAYER</th><th>SCORE</th><th>KILLS</th><th>DEATHS</th><th>STREAK</th></tr></thead><tbody id="scBody"></tbody></table>
+  </div>
+</div>
+
+<div id="pause" class="overlay" hidden>
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <button type="button" id="pResume" class="big">RESUME</button>
+    <div class="row"><span>Arrow turn speed</span><input type="range" id="pTurn" min="0.4" max="2" step="0.05"></div>
+    <div class="row"><span>Mouse / touch sensitivity</span><input type="range" id="pSens" min="0.3" max="3" step="0.05"></div>
+    <div class="row"><span>Graphics</span><button type="button" id="pQuality"></button></div>
+    <div class="row"><span>Sound</span><button type="button" id="pSound"></button></div>
+    <div class="row"><span>Invert look</span><button type="button" id="pInvert"></button></div>
+    <button type="button" id="pRestart">RESTART MATCH</button>
+    <button type="button" id="pQuit">QUIT TO MENU</button>
+  </div>
+</div>
+
+<div id="final" class="overlay" hidden>
+  <div class="panel wide">
+    <h2 id="finalTitle">VICTORY</h2>
+    <div class="final-sub" id="finalSub"></div>
+    <table class="final-table"><thead><tr><th class="l">PLAYER</th><th>SCORE</th><th>K</th><th>D</th></tr></thead><tbody id="finalBody"></tbody></table>
+    <button type="button" id="fAgain" class="big">PLAY AGAIN</button>
+    <button type="button" id="fMenu">MENU</button>
+  </div>
+</div>
+
+<div id="rotate" class="rotate" hidden>
+  <div>Turn your phone sideways</div>
+  <button type="button" id="rotateOk">Play upright anyway</button>
+</div>
+
+<div id="err" class="err" hidden></div>
+
+<script>
+  window.addEventListener("error", function (e) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Error: " + e.message + " (" + (e.filename || "").split("/").pop() + ":" + e.lineno + ")";
+  });
+</script>
+<script src="vendor/three.min.js"></script>
+<script src="src/util.js?v=1"></script>
+<script src="src/map.js?v=3"></script>
+<script src="src/world.js?v=1"></script>
+<script src="src/navdata.js?v=3"></script>
+<script src="src/nav.js?v=1"></script>
+<script src="src/sim.js?v=4"></script>
+<script src="src/chars/clips.js?v=2"></script>
+<script src="src/models.js?v=5"></script>
+<script src="src/flag.js?v=1"></script>
+<script src="src/view.js?v=4"></script>
+<script src="src/audio.js?v=3"></script>
+<script src="src/input.js?v=4"></script>
+<script src="src/hud.js?v=6"></script>
+<script src="src/main.js?v=7"></script>
+</body>
+</html>
