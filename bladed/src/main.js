@@ -53,12 +53,16 @@ globalThis.HK = globalThis.HK || {};
         // deals load in the background while you play.
         Mo.prepare(function () {
           startDemo();
-          setTimeout(function () {
-            $("loading").hidden = true;
+          setLoad(1, "Ready");
+          // The landing art stays up until the player chooses to board; the
+          // demo match only starts rendering then, so the landing animates
+          // smoothly on slow laptops.
+          HK.Landing.ready(function () {
+            A.unlock();
             if (G.mode === "menu") $("menu").hidden = false;
             G.last = performance.now();
             requestAnimationFrame(loop);
-          }, 60);
+          });
         });
       }, 30);
     }, 30);

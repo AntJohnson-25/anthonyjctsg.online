@@ -43,6 +43,74 @@ kbd {
 .load-bar span { display: block; height: 100%; width: 0; background: var(--gold); transition: width 0.2s; }
 .load-msg { margin-top: 12px; color: var(--dim); letter-spacing: 0.1em; font-size: 14px; }
 
+/* ---------------------------------------------------------------- landing (key art layers)
+   The art is 1376x768. The scene covers the screen like object-fit: cover and
+   every layer is placed in percent of the full frame (assets/landing/layers.json).
+   --sw / --sh are the scene's on-screen size. */
+.landing { display: block; overflow: hidden; background: #0d1520; cursor: pointer; transition: opacity 0.6s ease; }
+.landing.out { opacity: 0; pointer-events: none; }
+.landing { --sw: max(100vw, 179.17vh); --sh: max(55.81vw, 100vh); }
+.ld-scene {
+  position: absolute; left: 50%; top: 50%; width: var(--sw); height: var(--sh);
+  transform: translate(-50%, -50%) scale(1.07); /* headroom so parallax never shows an edge */
+}
+.ld-l { position: absolute; display: block; will-change: transform; }
+.ld-bg { left: 0; top: 0; width: 100%; height: 100%; }
+.ld-flag { left: 68.169%; top: 4.297%; width: 29.578%; height: 36.589%; }
+.ld-crew { left: 24.782%; top: 37.5%; width: 75.218%; height: 62.5%; }
+.ld-glints { left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.ld-glints i {
+  position: absolute; width: 1.6%; aspect-ratio: 1; margin: -0.8% 0 0 -0.8%; opacity: 0;
+  background: radial-gradient(circle, #fff 0 8%, rgba(255, 255, 255, 0.55) 14%, transparent 42%),
+    linear-gradient(90deg, transparent 46%, #fff 50%, transparent 54%),
+    linear-gradient(0deg, transparent 46%, #fff 50%, transparent 54%);
+  mix-blend-mode: screen; animation: ld-glint 3.6s ease-in-out infinite;
+}
+@keyframes ld-glint {
+  0%, 70%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  80% { opacity: 1; transform: scale(1) rotate(45deg); }
+  90% { opacity: 0; transform: scale(0.5) rotate(90deg); }
+}
+/* Title: dead centre horizontally at its place in the art (11.2% down the
+   frame), shrunk to fit narrow phones. */
+.ld-title {
+  position: absolute; left: 50%; top: calc(50% - var(--sh) * 0.405); /* (0.121 - 0.5) x the 1.07 scale */
+  width: min(calc(var(--sw) * 0.3866 * 1.07), 92vw); margin-left: calc(min(calc(var(--sw) * 0.3866 * 1.07), 92vw) / -2);
+  will-change: transform; pointer-events: none;
+}
+.ld-title img {
+  display: block; width: 100%; height: auto; filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.45));
+  animation: ld-bob 4.5s ease-in-out infinite;
+}
+.ld-title::after { /* a light sweep across the chrome, clipped to the letters */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.75) 50%, transparent 60%) no-repeat;
+  background-size: 250% 100%; animation: ld-shine 5s ease-in-out infinite;
+  -webkit-mask: url("assets/landing/title.webp?v=1") center / 100% 100% no-repeat;
+  mask: url("assets/landing/title.webp?v=1") center / 100% 100% no-repeat;
+}
+@keyframes ld-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2%); } }
+@keyframes ld-shine { 0%, 55% { background-position: 130% 0; } 85%, 100% { background-position: -30% 0; } }
+.ld-foot {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 60px 16px max(22px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: center;
+  background: linear-gradient(transparent, rgba(5, 9, 14, 0.82) 70%);
+}
+.ld-foot .load-bar { margin-top: 0; }
+.ld-foot .load-msg { color: #d5dee6; text-shadow: 0 1px 3px #000; }
+.ld-enter {
+  padding: 14px 44px; border: 0; background: var(--pirate); color: #fff; font-size: 22px; font-weight: 700;
+  letter-spacing: 0.22em; transform: skewX(-12deg); box-shadow: 0 6px 24px rgba(255, 74, 42, 0.45);
+  animation: ld-pulse 1.6s ease-in-out infinite;
+}
+.ld-enter:hover, .ld-enter:focus-visible { background: #ff6a4d; outline: none; }
+@keyframes ld-pulse { 0%, 100% { box-shadow: 0 6px 24px rgba(255, 74, 42, 0.35); } 50% { box-shadow: 0 6px 36px rgba(255, 120, 80, 0.85); } }
+.ld-hint { margin-top: 10px; color: #c9d3db; font-size: 13px; letter-spacing: 0.14em; text-shadow: 0 1px 3px #000; }
+@media (prefers-reduced-motion: reduce) {
+  .ld-glints, .ld-title::after { display: none; }
+  .ld-title img, .ld-enter { animation: none; }
+}
+
 .menu {
   position: fixed; inset: 0; display: flex; align-items: center; padding: max(16px, env(safe-area-inset-left));
   background: linear-gradient(90deg, rgba(5, 9, 14, 0.88) 0%, rgba(5, 9, 14, 0.55) 45%, rgba(5, 9, 14, 0) 75%); z-index: 20;
