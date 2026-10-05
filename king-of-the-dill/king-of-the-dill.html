@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1d33">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='%23e4ff3a'/%3E%3C/svg%3E">
+<meta name="description" content="King of the Dill: third-person pickleball for phone and desktop: swipe to swing, singles against the computer.">
+<title>King of the Dill</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<canvas id="fx"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="score">
+    <div class="side p"><i class="srv" id="pSrv"></i><span class="nm" id="pName">YOU</span><b id="pScore">0</b></div>
+    <div id="call">0-0</div>
+    <div class="side c"><b id="cScore">0</b><span class="nm" id="cName">CPU</span><i class="srv" id="cSrv"></i></div>
+  </div>
+  <div id="rally"></div>
+  <button id="btnPause" class="hbtn" aria-label="Pause">II</button>
+  <button id="btnDepth" class="hbtn" aria-label="Move up to the net or back">TO NET</button>
+  <div id="flash"></div>
+  <div id="banner"><b></b><span></span></div>
+  <div id="prompt"></div>
+</div>
+
+<div id="title" class="panel">
+  <h1><small>KING OF THE</small>DI<span>LL</span></h1>
+  <p class="tag">Swipe to swing. Three wins to the crown.</p>
+  <div class="row picker">
+    <button id="prevChar" class="arrow" aria-label="Previous player">&lsaquo;</button>
+    <div class="who"><small>YOUR PLAYER</small><b id="charName">...</b></div>
+    <button id="nextChar" class="arrow" aria-label="Next player">&rsaquo;</button>
+  </div>
+  <button id="btnTour" class="big">TOURNAMENT<small id="tourSub">3 WINS TO THE CROWN</small></button>
+  <div class="quick">
+    <div class="row levels" id="levels">
+      <button data-level="easy">EASY</button><button data-level="medium">MEDIUM</button><button data-level="hard">HARD</button>
+    </div>
+    <button id="btnPlay" class="mid">QUICK MATCH</button>
+  </div>
+  <div class="row small">
+    <button id="btnHow">HOW TO PLAY</button>
+    <button id="btnSound">SOUND ON</button>
+  </div>
+  <p id="record" class="record"></p>
+</div>
+
+<div id="help" class="panel hidden">
+  <h2>How to play</h2>
+  <ul>
+    <li><b>You don't run, you swing.</b> Your player moves to the ball on their own.</li>
+    <li><b>Swipe up</b> to hit. Angle = aim. A faster swipe hits harder; a short, slow one drops it soft.</li>
+    <li><b>Tap</b> for a dink. <b>Swipe down</b> for a lob. High ball + hard swipe = <b>smash</b>.</li>
+    <li><b>Timing:</b> let go as the ring closes on the ball. Green = PERFECT.</li>
+    <li>A <b style="color:#ff6a5a">red</b> marker means the ball is going out: don't swing, let it bounce.</li>
+    <li><b>Rules:</b> serve crosscourt. The serve and the return must bounce. No volleys from the kitchen (the zone by the net). Only the server scores.</li>
+    <li class="keys"><b>Keyboard:</b> Space/X drive, Z dink, C lob, arrows aim and depth, Shift = power, N net/back, P pause.</li>
+  </ul>
+  <button id="btnHelpOk" class="big">GOT IT</button>
+</div>
+
+<div id="pause" class="panel hidden">
+  <h2>Paused</h2>
+  <button id="btnResume" class="big">RESUME</button>
+  <div class="row small">
+    <button id="btnPauseHow">HOW TO PLAY</button>
+    <button id="btnPauseSound">SOUND ON</button>
+  </div>
+  <button id="btnQuit" class="ghost">QUIT TO MENU</button>
+</div>
+
+<div id="result" class="panel hidden">
+  <h2 id="resTitle">YOU WIN</h2>
+  <p id="resScore" class="final">11 - 7</p>
+  <div id="resStats" class="stats"></div>
+  <button id="btnAgain" class="big">REMATCH</button>
+  <button id="btnMenu" class="ghost">MENU</button>
+</div>
+
+<div id="bracket" class="panel hidden">
+  <h2 id="brTitle">THE BRACKET</h2>
+  <div id="brGrid" class="bracket"></div>
+  <p id="brNext" class="brnext"></p>
+  <button id="btnTourPlay" class="big">PLAY</button>
+  <div class="row small">
+    <button id="btnTourQuit">ABANDON</button>
+    <button id="btnTourMenu">MENU</button>
+  </div>
+</div>
+
+<div id="champ" class="panel hidden">
+  <svg class="crown" viewBox="0 0 64 40" aria-hidden="true"><path d="M4 34 L8 8 L22 22 L32 4 L42 22 L56 8 L60 34 Z" /><rect x="4" y="34" width="56" height="5" rx="2" /><circle cx="8" cy="8" r="3.5" /><circle cx="32" cy="4" r="3.5" /><circle cx="56" cy="8" r="3.5" /></svg>
+  <h1><small>THE NEW</small>KING OF THE DI<span>LL</span></h1>
+  <p id="chName" class="chname"></p>
+  <div id="chPath" class="chpath"></div>
+  <button id="btnChampNew" class="big">NEW TOURNAMENT</button>
+  <button id="btnChampMenu" class="ghost">MENU</button>
+</div>
+
+<div id="loading"><div class="ballspin"></div><span id="loadMsg">Loading the court...</span></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
