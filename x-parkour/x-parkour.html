@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel the pinch gestures, any two-finger move and a
+   double tap's second touchend so the page can't zoom (src/main.js does the same once loaded;
+   this covers the landing screen). Same guard as the site's other game pages. */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault();
+  }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) { var n = Date.now(); if (n - last < 350) e.preventDefault(); last = n; }, { passive: false });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#120f1e">
+<title>X-Parkour</title>
+<meta name="description" content="X-Parkour: a three-way extreme parkour race with street fighting. Wall-runs, container climbs, box trucks dropping barrels, side kicks, corkscrews and flying bicycle kicks.">
+<meta property="og:title" content="X-Parkour">
+<meta property="og:description" content="A three-way extreme parkour race with street fighting. Best of 3, box trucks, barrels and jacks.">
+<meta property="og:image" content="assets/landing/land.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" as="image" href="assets/landing/land.jpg?v=1" media="(min-aspect-ratio: 1/1)">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="blackout"></div>
+
+<div id="hud">
+  <div class="stat">
+    <div id="place">1<span>ST</span></div>
+    <div class="sub"><span id="meters">0</span> m <span class="of">/ 1500</span></div>
+    <div class="sub2"><span id="series"></span><span id="jacks"></span></div>
+  </div>
+  <div id="track"><i id="mk0"></i><i id="mk1"></i><i id="mk2"></i><b></b></div>
+  <div class="btns"><button id="btn-pause" aria-label="Pause">❚❚</button><button id="btn-mute" aria-label="Sound">🔊</button></div>
+</div>
+
+<div id="banner"><small id="bn-race">RACE 1 OF 3</small><b id="bn-name"></b><em id="bn-blurb"></em></div>
+<div id="count"></div>
+<div id="toast"></div>
+<div id="hint"></div>
+
+<div id="pad">
+  <button id="b-jacks" data-act="jacks">JACKS <b id="jkn">×3</b></button>
+  <button id="b-punch" data-act="punch">PUNCH</button>
+  <button id="b-kick" data-act="kick">KICK</button>
+  <button id="b-special" data-act="special">SPECIAL<i id="spcd"></i></button>
+  <button id="b-block" data-act="block">BLOCK</button>
+</div>
+
+<div id="screen-menu" class="screen">
+  <div class="panel">
+    <h1>X-<span>PARKOUR</span></h1>
+    <p class="how" id="controls-text"></p>
+    <div class="pick-title">PICK YOUR FIGHTER</div>
+    <div class="chars" id="chars"></div>
+    <div class="vs" id="vs"></div>
+    <div class="fmt">BEST OF 3 · ROOFTOP RUN · TRUCK ROUTE · THE DECIDER</div>
+    <button class="btn" id="btn-play">START SERIES</button>
+    <div class="best" id="menu-best"></div>
+  </div>
+</div>
+
+<div id="screen-over" class="screen">
+  <div class="panel">
+    <div class="kicker" id="over-title">RESULT</div>
+    <div class="big" id="over-place">1ST</div>
+    <div class="results" id="over-rows"></div>
+    <div class="series-line" id="over-series"></div>
+    <div class="best" id="over-best"></div>
+    <button class="btn" id="btn-again">NEXT RACE</button>
+    <button class="btn alt" id="btn-menu">CHANGE FIGHTER</button>
+  </div>
+</div>
+
+<div id="screen-pause" class="screen">
+  <div class="panel">
+    <div class="kicker">PAUSED</div>
+    <button class="btn" id="btn-resume">RESUME</button>
+    <button class="btn alt" id="btn-quit">QUIT RACE</button>
+  </div>
+</div>
+
+<div id="loading"><div id="loading-text">X-PARKOUR</div></div>
+
+<div id="landing">
+  <picture class="ld-art">
+    <source media="(max-aspect-ratio: 1/1)" srcset="assets/landing/port.jpg?v=1">
+    <img src="assets/landing/land.jpg?v=1" alt="X-Parkour: three rival runners fighting and flipping down a city street">
+  </picture>
+  <div class="ld-shade"></div>
+  <div class="ld-ui">
+    <button class="ld-play" type="button">PLAY</button>
+    <div class="ld-sub">3-WAY PARKOUR RACE · STREET FIGHTING</div>
+  </div>
+</div>
+
+<script src="src/landing.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="src/clips.js"></script>
+<script src="src/roster.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/runner.js"></script>
+<script src="src/world.js"></script>
+<script src="src/traffic.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
