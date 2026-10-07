@@ -12,5 +12,6 @@ CJ.ROSTER = [
   { id: "Lola_B_Styperek", name: "LOLA" },
   { id: "Remy", name: "REMY" },
   { id: "passive_marker_man", name: "MOCAP" },
-  { id: "Y_Bot", name: "Y-BOT" }
+  { id: "Y_Bot", name: "Y-BOT" },
+  { id: "Ant", name: "ANT" }   // the user's own character (Animations-characters/ant, its pack-ant.py)
 ];

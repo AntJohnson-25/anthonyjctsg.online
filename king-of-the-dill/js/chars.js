@@ -13,7 +13,8 @@ export const TRAITS = {
   Ch08: { name: "Marcus" }, Ch15: { name: "Sarge" }, Ch17: { name: "Hardhat" }, Ch20: { name: "Crimson" },
   Ch28: { name: "Shadow" }, Ch31: { name: "Smitty" },
   Paladin_J_Nordstrom: { name: "Paladin" }, Peasant_Girl: { name: "Rosa", h: 0.94, style: "f" },
-  Ch02: { name: "Sunny", h: 0.96, style: "f" }, Ch06: { name: "Dash" }
+  Ch02: { name: "Sunny", h: 0.96, style: "f" }, Ch06: { name: "Dash" },
+  Ant: { name: "Ant" }   // the user's own character (Animations-characters/ant)
 };
 const HEIGHT_M = 1.8;
 
@@ -55,6 +56,8 @@ function prepare(id, D, clips) {
   geo.setAttribute("skinIndex", new THREE.BufferAttribute(take(Uint8Array, nv * 4), 4));
   geo.setAttribute("skinWeight", new THREE.BufferAttribute(take(Uint8Array, nv * 4), 4, true));
   geo.setIndex(new THREE.BufferAttribute(take(D.wideIndex ? Uint32Array : Uint16Array, D.index), 1));
+  // Painted characters (Ant: image-to-3D, no texture) append RGBA vertex colours after the index.
+  if (D.colors) geo.setAttribute("color", new THREE.BufferAttribute(take(Uint8Array, nv * 4), 4, true));
   let start = 0;
   D.groups.forEach((count, mi) => { geo.addGroup(start, count, mi); start += count; });
   geo.computeBoundingSphere();
@@ -67,7 +70,7 @@ function prepare(id, D, clips) {
       tx.anisotropy = 4;
       t[slot] = tx;
     }
-    const mat = new THREE.MeshStandardMaterial({ map: t.map || null, normalMap: t.normalMap || null, roughness: 0.8, metalness: 0.04 });
+    const mat = new THREE.MeshStandardMaterial({ map: t.map || null, normalMap: t.normalMap || null, roughness: 0.8, metalness: 0.04, vertexColors: !!D.colors });
     if (t.alphaMap) { mat.alphaMap = t.alphaMap; mat.alphaTest = 0.5; mat.side = THREE.DoubleSide; }
     return mat;
   });

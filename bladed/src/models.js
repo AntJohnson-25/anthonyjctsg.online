@@ -286,6 +286,8 @@ globalThis.HK = globalThis.HK || {};
     geo.setAttribute("skinIndex", new THREE.BufferAttribute(take(Uint8Array, nv * 4), 4));
     geo.setAttribute("skinWeight", new THREE.BufferAttribute(take(Uint8Array, nv * 4), 4, true));
     geo.setIndex(new THREE.BufferAttribute(take(D.wideIndex ? Uint32Array : Uint16Array, D.index), 1));
+    // Painted characters (Ant: image-to-3D, no texture) append RGBA vertex colours after the index.
+    if (D.colors) geo.setAttribute("color", new THREE.BufferAttribute(take(Uint8Array, nv * 4), 4, true));
     let start = 0;
     D.groups.forEach(function (count, m) { geo.addGroup(start, count, m); start += count; });
     geo.computeBoundingSphere();
@@ -346,7 +348,7 @@ globalThis.HK = globalThis.HK || {};
   function mxMaterials(M, tint) {
     if (!M.matCache[tint]) {
       M.matCache[tint] = M.tex.map(function (t) {
-        const m = new THREE.MeshStandardMaterial({ map: t.map || null, normalMap: t.normalMap || null, color: tint, roughness: 0.78, metalness: 0.05 });
+        const m = new THREE.MeshStandardMaterial({ map: t.map || null, normalMap: t.normalMap || null, color: tint, roughness: 0.78, metalness: 0.05, vertexColors: !!M.D.colors });
         // Hair cards, lace etc.: cut out by the alpha map, seen from both sides.
         if (t.alphaMap) { m.alphaMap = t.alphaMap; m.alphaTest = 0.5; m.side = THREE.DoubleSide; }
         return m;
@@ -696,6 +698,9 @@ globalThis.HK = globalThis.HK || {};
     if (!MX.next && !MX.loading) Mo.prepare();
     const deck = MX.deck;
     Mo.chars = sim.players.map(function (p, i) {
+      // The user's own character goes by his name: a bot dealt Ant's body is called Ant
+      // (name tag, kill feed, scoreboard). You stay "You".
+      if (deck.length && deck[i % deck.length].D.id === "Ant" && p.bot) p.name = "Ant";
       const c = deck.length ? makeMixamo(p, sim.mode, deck[i % deck.length]) : makeCharacter(p, sim.mode);
       V.scene.add(c.root);
       return c;

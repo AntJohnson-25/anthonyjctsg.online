@@ -24,10 +24,12 @@
     geo.setAttribute("skinIndex", new T.BufferAttribute(take(Uint8Array, nv * 4), 4));
     geo.setAttribute("skinWeight", new T.BufferAttribute(take(Uint8Array, nv * 4), 4, true));
     geo.setIndex(new T.BufferAttribute(take(D.wideIndex ? Uint32Array : Uint16Array, D.index), 1));
+    // Painted characters (Ant: image-to-3D, no texture) append RGBA vertex colours after the index.
+    if (D.colors) geo.setAttribute("color", new T.BufferAttribute(take(Uint8Array, nv * 4), 4, true));
     let start = 0;
     D.groups.forEach(function (count, m) { geo.addGroup(start, count, m); start += count; });
     const mats = D.materials.map(function (m) {
-      const p = { color: 0xffffff };
+      const p = { color: 0xffffff, vertexColors: !!D.colors };
       ["map", "alphaMap"].forEach(function (slot) {
         if (!m.tex[slot]) return;
         const img = new Image(), tx = new T.Texture(img);
