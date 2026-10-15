@@ -148,7 +148,8 @@ globalThis.HS = globalThis.HS || {};
       C.pos.z += -Math.cos(C.yaw) * C.speed * dt;
       Room.collide(C.pos, 0.32);
       // The walk clip's own pace (1.61 m/s on a 1.8 m body), so feet don't slide.
-      C.ant.play("walk", { fade: 0.2, rate: C.speed / 1.55 });
+      // The walk clip's own pace: about 1.6 m/s at full size for both the male and female walks.
+      C.ant.play(HS.walkOf(HS.PLAYER), { fade: 0.2, rate: C.speed / 1.55 });
     } else C.ant.play(HS.idleOf(HS.PLAYER), { fade: 0.3 });
     C.ant.root.position.copy(C.pos); C.ant.root.rotation.y = C.yaw;
     C.ant.update(dt);

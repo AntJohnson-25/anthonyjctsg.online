@@ -76,10 +76,15 @@ body.touch .keys-touch { display: block; }
 .mc.red { color: #c8202f; }
 .mc.empty { background: rgba(255, 255, 255, 0.06); border: 1px dashed rgba(255, 255, 255, 0.22); color: var(--dim); min-height: 22px; }
 
-/* The chat feed: a stream-overlay style list of plays, bids and table events,
-   newest at the bottom, each line fading away after ~10 s. No panel behind it. */
-.chat { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: 118px; width: min(360px, 46vw); max-height: 42vh; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 4px; }
-.msg { max-width: 100%; padding: 3px 10px 3px 8px; border-radius: 10px; border-left: 3px solid transparent; background: rgba(10, 12, 20, 0.34); color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.45; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.75); animation: msgLife 10s forwards; }
+/* The chat feed: a stream-overlay style list of plays, bids and table events, newest at
+   the bottom. Lines stay (players found hands hard to follow when they faded): the
+   whole game's feed scrolls, a divider marks each new hand, and it follows the newest
+   line unless you've scrolled up to read back. */
+.chat { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: 118px; width: min(360px, 46vw); max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-right: 6px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
+.chat > :first-child { margin-top: auto; }
+.chat { touch-action: pan-y; }   /* (the page is touch-action: none) */
+.msg { flex: none; max-width: 100%; padding: 3px 10px 3px 8px; border-radius: 10px; border-left: 3px solid transparent; background: rgba(10, 12, 20, 0.34); color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.45; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.75); animation: msgIn 0.3s ease-out; }
+.msg.hand-div { align-self: stretch; text-align: center; background: rgba(10, 12, 20, 0.5); border-left: 0; font-size: 12px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
 .msg.partner { border-left-color: var(--gold); background: rgba(196, 243, 91, 0.12); }
 .msg.me { border-left-color: rgba(196, 243, 91, 0.5); }
 .msg.quiet { font-size: 13.5px; }
@@ -103,7 +108,7 @@ body.touch .keys-touch { display: block; }
 .zoom-cap .say { color: var(--dim); font-weight: 500; }
 .zoom-cap i { font-style: normal; font-size: 10.5px; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
 @keyframes zoomIn { from { opacity: 0; transform: translate(-50%, -46%) scale(0.85); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
-@keyframes msgLife { 0% { opacity: 0; transform: translateY(8px); } 3% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 /* Touch: play the card lifted out of the tray. */
 .play-card { position: absolute; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 11px 22px; border-radius: 999px; background: var(--gold); color: var(--on-lime); font-weight: 900; font-size: 17px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); pointer-events: auto; display: flex; align-items: center; gap: 8px; }
 .play-card .mc { font-size: 16px; min-width: 40px; }

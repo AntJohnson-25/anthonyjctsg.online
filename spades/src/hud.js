@@ -97,20 +97,25 @@ globalThis.HS = globalThis.HS || {};
   H.cardHtml = cardHtml;
   // ------------------------------------------------------------------ the chat feed (left side)
   // Like a live-chat overlay on a stream: no panel, each card played (and each bid,
-  // trick won and table event) pops in as a line and fades away after a while.
+  // trick won and table event) pops in as a line. Lines stay for the whole game
+  // (Spades feedback 2026-10-15: hands were hard to follow when they faded); the feed
+  // scrolls, and keeps to the newest line unless you've scrolled up to read back.
   // The card that led a trick is tagged, our side's names are lime (your partner's
   // line carries a lime edge), the other team's lilac.
-  const CHAT_LIFE = 10000, CHAT_MAX = 8;
+  const CHAT_MAX = 250;
   H.chat = function (html, cls) {
     const box = $("chat");
+    const atEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
     const el = document.createElement("div");
     el.className = "msg" + (cls ? " " + cls : "");
     el.innerHTML = html;
     box.appendChild(el);
     while (box.children.length > CHAT_MAX) box.removeChild(box.firstChild);
-    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, CHAT_LIFE);
+    if (atEnd) box.scrollTop = box.scrollHeight;
     return el;
   };
+  // A divider at the start of each hand ("Hand 3").
+  H.chatHand = function (n) { H.chat(esc(t("hand", n)), "hand-div"); };
   H.clearChat = function () { $("chat").innerHTML = ""; };
   function role(s, seat) { return seat < 0 ? (s % 2 ? "them" : "us") : s === seat ? "me" : s === (seat + 2) % 4 ? "partner" : "them"; }
   function who(st, s, seat) {

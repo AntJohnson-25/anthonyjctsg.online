@@ -381,11 +381,12 @@ globalThis.HS = globalThis.HS || {};
       const yaw = Math.atan2(dir.dot(f.right), dir.dot(f.fwd));
       rotWorld(head, new THREE.Vector3(0, 1, 0), -U.clamp(yaw, -0.8, 0.8) * 0.6);
     }
-    // Our own head: hidden (the camera is in it). Its position gives the eye.
+    // Our own head: hidden once the camera is in it (not before: while the camera glides in
+    // from behind as we sit down we'd see our own body headless). Its position gives the eye.
     if (a.me) {
       const head = e.rig[HEAD];
       head.getWorldPosition(a.eye);
-      head.scale.setScalar(0.001);
+      if (HS.View.camera.position.distanceTo(a.eye) < 0.35) head.scale.setScalar(0.001);
       const f = HS.Cards.seatFrame(a.s);
       a.eye.y += 0.075 * a.scale * (e.height / 1.6);
       a.eye.addScaledVector(f.fwd, 0.06);

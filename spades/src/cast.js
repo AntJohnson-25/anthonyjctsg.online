@@ -18,7 +18,9 @@ globalThis.HS = globalThis.HS || {};
     Ch46: { name: "Mika", h: 1.6, f: 1 }, Lola_B_Styperek: { name: "Lola", h: 1.68, f: 1 }, Remy: { name: "Remy", h: 1.8 }
   };
   HS.heightOf = function (id) { return (HS.CAST[id] && HS.CAST[id].h) || 1.75; };
+  // The women (f: 1) move with the Female Basic Locomotion pack's idle and walk, the men with the Male pack's.
   HS.idleOf = function (id) { return HS.CAST[id] && HS.CAST[id].f ? "idle_f" : "idle"; };
+  HS.walkOf = function (id) { return HS.CAST[id] && HS.CAST[id].f ? "walk_f" : "walk"; };
   // You: Ant unless you pick someone else on the character select. Whoever you pick
   // leaves their seat (or the fire pit, or the bar) and Ant takes it.
   HS.PLAYER = "Ant";
@@ -40,6 +42,6 @@ globalThis.HS = globalThis.HS || {};
   // Everyone else on the terrace: at the fire pit (Room.LOUNGE spots) and the bar (Room.BAR).
   HS.EXTRAS = [
     { id: "Ch06", at: "lounge", i: 0 }, { id: "Ch31", at: "lounge", i: 3 },
-    { id: "Ch17", at: "bar", i: 0, clip: "idle" }, { id: "Ch15", at: "bar", i: 1, clip: "idle" }
+    { id: "Ch17", at: "bar", i: 0 }, { id: "Ch15", at: "bar", i: 1 }   // standing: HS.idleOf picks the clip
   ];
 })(globalThis.HS);

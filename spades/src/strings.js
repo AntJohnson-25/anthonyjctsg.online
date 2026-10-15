@@ -9,7 +9,7 @@ globalThis.HS = globalThis.HS || {};
     enter: "Enter the villa", startPlay: "Play",
     selStep: "Step 1 · your player", selTitle: "Choose your player",
     selSub: "Pick who you are at the villa. Whoever you pick, Ant takes their seat.",
-    random: "🎲 Random", fromWR: "From Wealth Runner 2", fromYou: "That's you",
+    random: "🎲 Random",
     walkKeysDesk: "WASD or arrows to walk · Shift to walk faster · drag to look around · E to sit down at a table",
     walkKeysTouch: "Left thumb to walk · drag to look around · tap Sit down at a table",
     walkHint: "Walk up to a table's empty chair to play · WASD to walk · drag to look · P settings",

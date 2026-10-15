@@ -81,7 +81,9 @@ globalThis.HS = globalThis.HS || {};
     seats.forEach(function (s, i) { if (s.botName) N.t.seats[i].botName = s.botName; });
     T.start(N.t, N.now());
     N.lastQ = 0; N.sentHand = {}; N.sentV = 0; N.beatAt = 0;
-    adopt(T.publicState(N.t));
+    // (ours = true: this machine runs the table, so hostFlush below hands over the new
+    // events. Without it the opening deal was queued twice: two "Hand 1" lines, two shuffles.)
+    adopt(T.publicState(N.t), true);
     hostFlush(true);
     return N.t;
   };

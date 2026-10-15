@@ -86,6 +86,7 @@ globalThis.HS = globalThis.HS || {};
   function showLanding() {
     G.mode = "landing";
     $("landing").hidden = false;
+    new Image().src = "art/key_notitle.jpg";   // the select screen's art, ready before Play
     H.show(false);
     A.music("menu");
   }
@@ -118,8 +119,7 @@ globalThis.HS = globalThis.HS || {};
     G.char = id;
     $("selGrid").querySelectorAll(".sel-c").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-id") === id); });
     $("selHeroImg").src = G.pics[id] || "";
-    $("selHeroName").textContent = HS.CAST[id].name;
-    $("selHeroFrom").textContent = id === "Ant" ? t("fromYou") : /^runner_/.test(id) ? t("fromWR") : "";
+    $("selHeroName").textContent = HS.CAST[id].name;   // just the name (user: don't say which game they're from)
     try { localStorage.setItem("villaspades.char", id); } catch (e) { /* ignore */ }
   }
   function seg(id, value, on) {
@@ -230,7 +230,7 @@ globalThis.HS = globalThis.HS || {};
     const cap = function (x) { return x.charAt(0).toUpperCase() + x.slice(1); };
     const auto = G.prefs.reactAuto;
     switch (e.type) {
-      case "deal": A.deal(); G.looked = false; G.nPlay = 0; G.lastPlay = null; break;
+      case "deal": A.deal(); G.looked = false; G.nPlay = 0; G.lastPlay = null; H.chatHand(st.hn); break;
       case "bid": if (e.seat !== me) A.chip(); H.chatBid(st, me, e.seat, e.bid); break;
       case "play":
         if (e.seat !== me) A.card(false);
