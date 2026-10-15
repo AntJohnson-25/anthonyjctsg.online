@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel double-tap zoom and pinch (as on the arcade's other games). */
+(function () {
+  var last = 0;
+  document.addEventListener("touchend", function (e) { var now = Date.now(); if (now - last < 350) e.preventDefault(); last = now; }, { passive: false });
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+  document.addEventListener("touchmove", function (e) { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="theme-color" content="#2a1c2a">
+<title>Spades</title>
+<meta name="description" content="Spades: partnership Spades at a seaside villa at sunset. Walk the terrace as Ant and sit down at one of four tables, from Rookie to Shark.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<canvas id="view" aria-label="The villa terrace"></canvas>
+
+<div id="loading" class="loading">
+  <img class="seal" src="assets/ctsg-seal.png" alt="CTSG"><div class="logo"><span class="sp">&#9824;</span> <b>SPADES</b></div>
+  <div class="load-bar"><span id="loadFill"></span></div>
+  <div class="load-msg" id="loadMsg">&hellip;</div>
+</div>
+
+<!-- The cover: the key art full screen (the tall version on phones held upright). -->
+<div id="landing" class="landing" hidden>
+  <div class="landing-foot">
+    <p class="landing-tag" data-t="tag"></p>
+    <button type="button" id="btnStart" class="play big-play" data-t="startPlay"></button>
+    <button type="button" id="btnRules" class="ghost small-ghost" data-t="rules"></button>
+  </div>
+</div>
+
+<!-- Character select over the art (as in Wealth Runner 2). -->
+<div id="title" class="select" hidden>
+  <div class="sel-card">
+    <div class="sel-step" data-t="selStep"></div>
+    <h1 class="sel-h" data-t="selTitle"></h1>
+    <p class="sel-sub" data-t="selSub"></p>
+    <div class="sel-body">
+      <div class="sel-hero"><img id="selHeroImg" alt=""><div class="sel-hero-name" id="selHeroName"></div><div class="sel-hero-from" id="selHeroFrom"></div></div>
+      <div class="sel-grid" id="selGrid"></div>
+    </div>
+    <div class="opts" id="opts">
+      <div class="opt"><span class="opt-l" data-t="timer"></span><div class="seg" id="optTimer"><button type="button" data-v="0" data-t="off"></button><button type="button" data-v="20">20 s</button><button type="button" data-v="30">30 s</button><button type="button" data-v="60">60 s</button></div></div>
+      <div class="opt"><span class="opt-l" data-t="gameTo"></span><div class="seg" id="optTarget"><button type="button" data-v="500">500</button><button type="button" data-v="300">300</button></div></div>
+      <div class="opt"><span class="opt-l" data-t="blindNil"></span><div class="seg" id="optBlind"><button type="button" data-v="1" data-t="on"></button><button type="button" data-v="0" data-t="off"></button></div></div>
+      <div class="opt"><span class="opt-l"><span data-t="chaos"></span><small data-t="chaosHelp"></small></span><div class="seg" id="optChaos"><button type="button" data-v="0" data-t="off"></button><button type="button" data-v="1" data-t="on"></button></div></div>
+    </div>
+    <div class="menu-btns">
+      <button type="button" id="btnRandom" class="ghost" data-t="random"></button>
+      <button type="button" id="btnEnter" class="play" data-t="enter"></button>
+    </div>
+    <div class="keys keys-desk" data-t="walkKeysDesk"></div>
+    <div class="keys keys-touch" data-t="walkKeysTouch"></div>
+  </div>
+</div>
+
+<div id="walkHud" class="walk-hud" hidden>
+  <div class="walk-hint keys-desk" data-t="walkHint"></div>
+  <div class="walk-hint keys-touch" data-t="walkHintTouch"></div>
+  <button type="button" id="btnWalkSettings" class="round" title="Settings (P)">&#9881;</button>
+</div>
+<div id="prompt" class="prompt" hidden></div>
+<div id="stick" class="stick" hidden><div id="stickKnob" class="stick-knob"></div></div>
+
+<div id="hud" class="hud" hidden>
+  <div id="scores" class="scores"></div>
+  <div id="status" class="status"><svg class="ring" viewBox="0 0 36 36" id="ring"><circle cx="18" cy="18" r="15.5" class="ring-bg"></circle><circle cx="18" cy="18" r="15.5" class="ring-fg" id="ringFg"></circle><text x="18" y="22.5" id="ringTxt"></text></svg><span id="statusTxt"></span></div>
+  <div id="chat" class="chat" aria-live="polite"></div>
+  <div id="tags" class="tags"></div>
+  <div id="bidPanel" class="bid-panel" hidden>
+    <div class="bid-title" data-t="bidTitle"></div>
+    <div class="bid-sub" id="bidSub"></div>
+    <div class="bid-grid" id="bidGrid"></div>
+    <div class="bid-blind" id="bidBlind" hidden>
+      <p data-t="bidBlindHelp"></p>
+      <button type="button" id="btnBlind" class="chip blind" data-t="bidBlind"></button>
+      <button type="button" id="btnLook" class="ghost" data-t="bidLook"></button>
+    </div>
+  </div>
+  <button type="button" id="btnPlayCard" class="play-card" hidden></button>
+  <div id="zoom" class="zoom" hidden><canvas id="zoomCard" width="200" height="280"></canvas><div id="zoomCap" class="zoom-cap"></div></div>
+  <div class="corner">
+    <button type="button" id="btnZoom" class="round" title="Zoom in on the last card played (Z)">&#128269;</button>
+    <button type="button" id="btnReact" class="round" title="Reactions (R)">&#9786;</button>
+    <button type="button" id="btnHelp" class="round" title="Rules (H)">?</button>
+    <button type="button" id="btnSettings" class="round" title="Settings (P)">&#9881;</button>
+    <button type="button" id="btnLeave" class="round leave" title="Leave the table (L)">&#8682;</button>
+  </div>
+  <div id="wheel" class="wheel" hidden></div>
+  <div id="lookPad" class="look-pad">
+    <button type="button" data-q="left" title="Look left (2)">&#8678;</button>
+    <button type="button" data-q="partner" title="Look at your partner (1)">&#8679;</button>
+    <button type="button" data-q="hand" title="Back to your hand (Space)">&#9675;</button>
+    <button type="button" data-q="right" title="Look right (3)">&#8680;</button>
+  </div>
+  <div id="coach" class="coach" hidden><div class="coach-step" id="coachStep"></div><div id="coachText"></div><div class="coach-btns"><button type="button" id="coachNext" data-t="next"></button><button type="button" id="coachSkip" class="ghost" data-t="skip"></button></div></div>
+</div>
+
+<div id="summary" class="overlay soft" hidden><div class="panel" id="sumBody"></div></div>
+<div id="final" class="overlay" hidden><div class="panel wide" id="finalBody"></div></div>
+<div id="scoreSheet" class="overlay soft" hidden><div class="panel" id="sheetBody"></div></div>
+
+<div id="settings" class="overlay" hidden>
+  <div class="panel">
+    <h2 data-t="settings"></h2>
+    <div class="row"><span data-t="music"></span><input type="range" id="sMusic" min="0" max="1" step="0.05"></div>
+    <div class="row"><span data-t="sound"></span><button type="button" id="sSound"></button></div>
+    <div class="row"><span data-t="reactAuto"></span><button type="button" id="sReact"></button></div>
+    <div class="row"><span data-t="assist"></span><button type="button" id="sAssist"></button></div>
+    <div class="row"><span data-t="zoomAuto"></span><button type="button" id="sZoom"></button></div>
+    <div class="row"><span data-t="tags"></span><button type="button" id="sTags"></button></div>
+    <div class="row"><span data-t="graphics"></span><button type="button" id="sQuality"></button></div>
+    <div class="row"><span data-t="sens"></span><input type="range" id="sSens" min="0.3" max="2.5" step="0.1"></div>
+    <button type="button" id="sClose" class="big" data-t="resume"></button>
+  </div>
+</div>
+<div id="rulesBox" class="overlay" hidden><div class="panel wide rules"><h2 data-t="rules"></h2><div id="rulesBody"></div><button type="button" id="rulesClose" class="big" data-t="close"></button></div></div>
+
+<div id="rotate" class="rotate" hidden><div data-t="rotate"></div><button type="button" id="rotateOk" data-t="rotateOk"></button></div>
+<div id="err" class="err" hidden></div>
+
+<script>
+  window.addEventListener("error", function (e) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Error: " + e.message + " (" + (e.filename || "").split("/").pop() + ":" + e.lineno + ")";
+  });
+</script>
+<script>
+/* The game's scripts, in order. They download in parallel and each one is retried if
+   the network drops it; then they run in this order. The characters (chars/*.js) load
+   after these, from src/body.js. */
+(function () {
+  var FILES = ["vendor/three.min.js", "src/util.js?v=1", "src/strings.js?v=1", "src/rules.js?v=1", "src/bot.js?v=1",
+    "src/table.js?v=1", "src/net.js?v=1", "src/build.js?v=1", "src/cast.js?v=1", "src/clips.js?v=1", "src/body.js?v=1",
+    "src/ocean.js?v=1", "src/villa.js?v=1", "src/view.js?v=1", "src/cards.js?v=1", "src/seats.js?v=1", "src/crowd.js?v=1", "src/portraits.js?v=1",
+    "src/audio.js?v=1", "src/hud.js?v=1", "src/tutorial.js?v=1", "src/main.js?v=1"];
+  function fail(src) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Couldn't download " + src.split("?")[0] + ". Check your connection and reload.";
+  }
+  if (location.protocol === "file:") {
+    FILES.forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
+    return;
+  }
+  function get(src, attempt) {
+    var url = attempt ? src + (src.indexOf("?") < 0 ? "?" : "&") + "retry=" + attempt : src;
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).catch(function () {
+      if (attempt >= 4) { fail(src); throw new Error("gave up on " + src); }
+      return new Promise(function (ok) { setTimeout(ok, 400 * (attempt + 1)); }).then(function () { return get(src, attempt + 1); });
+    });
+  }
+  Promise.all(FILES.map(function (src) { return get(src, 0); })).then(function (texts) {
+    texts.forEach(function (text, i) {
+      var s = document.createElement("script");
+      s.textContent = text + "\n//# sourceURL=" + new URL(FILES[i], location.href).href;
+      document.body.appendChild(s);
+    });
+  }, function () { /* fail() already said which file */ });
+})();
+</script>
+</body>
+</html>
