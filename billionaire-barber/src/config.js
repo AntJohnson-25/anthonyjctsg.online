@@ -16,8 +16,10 @@ const ASSETS = {
      made (Source/barber-3d-prompts.md); until they land, stand-ins from the cast play them in the
      shop (see src/cast.js, HS.BARBERS). */
   portraits: {
-    male:   'Barbers/male_forward_facing.png',
-    female: 'Barbers/female_forward_facing.png'
+    // renders of the in-game barbers (HS.BARBERS), by tools/select-portraits.js; re-render them
+    // when the barbers change
+    male:   'Barbers/game_male.png',
+    female: 'Barbers/game_female.png'
   },
 
   // Exteriors appear ONLY as photo attachments inside realtor threads

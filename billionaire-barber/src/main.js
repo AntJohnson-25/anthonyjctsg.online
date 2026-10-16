@@ -209,7 +209,7 @@ const Game = (function () {
         setTimeout(function () { landing.hidden = true; }, 450);
       });
     };
-    art.src = 'art/key_title.jpg?v=2';
+    art.src = 'art/key_title.jpg?v=3';
 
     // Character selection
     document.querySelectorAll('.char-card').forEach(function (card) {

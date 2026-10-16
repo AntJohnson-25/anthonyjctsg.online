@@ -186,6 +186,7 @@ kbd {
   color: var(--navy);
 }
 .game-title span { color: var(--red); letter-spacing: .06em; }
+.game-title .seq { color: var(--gold-500); font-size: 1.15em; letter-spacing: 0; text-shadow: 0 3px 0 #2a1f06; }
 
 .game-sub {
   font-family: var(--display);
@@ -275,13 +276,13 @@ kbd {
   position: fixed; inset: 0; z-index: 950;
   /* cover = always fills the screen; anchored to the top so any crop eats the bottom of the art
      (behind the PLAY button), never the title */
-  background: #07060a url("art/key_title.jpg?v=2") center top / cover no-repeat;
+  background: #07060a url("art/key_title.jpg?v=3") center top / cover no-repeat;
   display: grid; align-items: end; justify-items: center;
   transition: opacity .45s var(--ease-out), transform .45s var(--ease-out);
 }
 .landing[hidden] { display: none; }
 .landing.leaving { opacity: 0; transform: scale(1.04); pointer-events: none; }
-@media (max-aspect-ratio: 3/4) { .landing { background-image: url("art/key_portrait.jpg?v=2"); } }
+@media (max-aspect-ratio: 3/4) { .landing { background-image: url("art/key_portrait.jpg?v=3"); } }
 .landing-foot {
   width: 100%; display: grid; justify-items: center; gap: 12px;
   padding: 60px 16px calc(28px + env(safe-area-inset-bottom));
@@ -295,7 +296,7 @@ kbd {
 .landing .btn.large { min-width: 220px; font-size: 17px; letter-spacing: .3em; }
 
 #start-screen.art { color: var(--text); }
-#start-screen.art .start-bg { background: #07060a url("art/key_notitle.jpg?v=2") center / cover no-repeat; }
+#start-screen.art .start-bg { background: #07060a url("art/key_notitle.jpg?v=3") center / cover no-repeat; }
 #start-screen.art .start-bg::after { display: none; }
 #start-screen.art .start-vignette { box-shadow: none; background: radial-gradient(90% 80% at 50% 55%, rgba(5,4,3,.35), rgba(5,4,3,.82)); }
 #start-screen.art .start-inner {
