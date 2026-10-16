@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel double-tap zoom and pinch (as on the arcade's other games). */
+(function () {
+  var last = 0;
+  document.addEventListener("touchend", function (e) { var now = Date.now(); if (now - last < 350) e.preventDefault(); last = now; }, { passive: false });
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+  document.addEventListener("touchmove", function (e) { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="theme-color" content="#100c0a">
+<title>Billionaire Barber</title>
+<meta name="description" content="Billionaire Barber: walk the floor of your own 3D barbershop, cut hair, build a clientele and buy your way from a rented chair to a flagship. Cut hair. Build wealth. Own the city.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<!-- ============================================================
+     LANDING: the key art full screen (the tall version on phones held
+     upright), shown only once art/key_title.jpg exists (main.js).
+     ============================================================ -->
+<div id="landing" class="landing" hidden>
+  <div class="landing-foot">
+    <p class="landing-tag">Cut hair. Build wealth. Own the city.</p>
+    <button type="button" class="btn primary large" id="btn-play">PLAY</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     START SCREEN + CHARACTER SELECTION (§28)
+     ============================================================ -->
+<div id="start-screen">
+  <div class="start-bg"></div>
+  <div class="start-vignette"></div>
+
+  <div class="start-inner">
+    <header class="start-head">
+      <div class="start-pole" aria-hidden="true"><i></i></div>
+      <h1 class="game-title">BILLIONAIRE<span>BARBER</span></h1>
+      <p class="game-sub">Cut Hair. Build Wealth. Own the City.</p>
+    </header>
+
+    <div class="char-select">
+      <h2 class="select-label">SELECT YOUR BARBER</h2>
+      <div class="char-grid">
+        <button class="char-card" data-char="male">
+          <div class="char-frame"><img alt="Male barber"></div>
+          <span class="char-name">THE BARBER</span>
+          <span class="char-role">Male</span>
+        </button>
+        <button class="char-card" data-char="female">
+          <div class="char-frame"><img alt="Female barber"></div>
+          <span class="char-name">THE BARBER</span>
+          <span class="char-role">Female</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="start-actions">
+      <button class="btn primary large" id="btn-new" disabled>NEW GAME</button>
+      <button class="btn ghost large" id="btn-continue" style="display:none">CONTINUE</button>
+    </div>
+
+    <div class="loader"><div class="load-track"><i id="load-bar"></i></div><span>Loading the shop…</span></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     GAME
+     ============================================================ -->
+<div id="game">
+
+  <!-- ---------- HUD (§21) ---------- -->
+  <header id="hud">
+    <div class="hud-left">
+      <div class="cash-block">
+        <span class="cash-label">CASH ON HAND</span>
+        <span class="cash-value" id="hud-cash">$0</span>
+      </div>
+      <div class="networth-block">
+        <span class="nw-label">NET WORTH</span>
+        <span class="nw-value" id="hud-networth">$0</span>
+      </div>
+    </div>
+
+    <div class="hud-center">
+      <div class="week-block">
+        <span class="week-value" id="hud-week">WK 1</span>
+        <span class="level-pill" id="hud-level">LVL 1</span>
+      </div>
+      <div class="week-track"><i id="week-progress"></i></div>
+      <div class="active-events" id="active-events"></div>
+    </div>
+
+    <div class="hud-right">
+      <div class="stat"><span class="stat-label">REVENUE</span><span class="stat-value good" id="hud-revenue">$0</span></div>
+      <div class="stat"><span class="stat-label">EXPENSES</span><span class="stat-value bad" id="hud-expenses">$0</span></div>
+      <div class="stat"><span class="stat-label">PROFIT</span><span class="stat-value" id="hud-profit">$0</span></div>
+      <div class="stat rep">
+        <span class="stat-label">REPUTATION <b id="hud-rep-val">0</b></span>
+        <span class="rep-track"><i id="hud-rep-bar"></i></span>
+      </div>
+      <div class="stat"><span class="stat-label">FOLLOWERS</span><span class="stat-value" id="hud-followers">0</span></div>
+      <div class="stat"><span class="stat-label">SHOPS</span><span class="stat-value" id="hud-properties">0</span></div>
+    </div>
+  </header>
+
+  <!-- ---------- GAME WORLD: the 3D shop (src/shop3d.js, src/world.js) ---------- -->
+  <main id="stage">
+    <canvas id="view" aria-label="The barbershop"></canvas>
+    <div class="layer" id="actors"></div>
+    <div class="layer" id="particles"></div>
+    <div class="layer" id="floaters"></div>
+
+    <!-- In-world overlays -->
+    <button type="button" id="interact" class="interact" hidden></button>
+    <button type="button" id="btn-view" class="view-btn" title="Overview (V)">&#128065;</button>
+    <div class="controls-hint" aria-hidden="true">
+      <span class="hint-desk"><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> walk · <kbd>Shift</kbd> faster · drag to look · <kbd>E</kbd> cut at the gold mark · <kbd>V</kbd> overview</span>
+      <span class="hint-touch">Left thumb walks · drag to look · tap CUT at the gold mark</span>
+    </div>
+    <div id="cut-progress"></div>
+    <div id="event-card" class="event-card"></div>
+    <div id="milestone"></div>
+  </main>
+
+  <!-- ---------- STYLE PICKER (§7) ---------- -->
+  <div id="style-picker">
+    <div class="picker-inner">
+      <div class="style-request" id="style-request"></div>
+      <div class="style-cards" id="style-cards"></div>
+      <p class="picker-hint">Match the request for a safe cut — or gamble on a different style. Keys <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></p>
+    </div>
+  </div>
+
+  <!-- ---------- DOCK ---------- -->
+  <nav id="dock">
+    <button class="dock-btn" data-panel="business"><span class="dock-ico">📊</span><span>BUSINESS</span></button>
+    <button class="dock-btn" data-panel="portfolio"><span class="dock-ico">🏢</span><span>PORTFOLIO</span></button>
+    <button class="dock-btn" id="btn-break" title="Take a break"><span class="dock-ico">☕</span><span>BREAK (<span id="break-count">4</span>)</span></button>
+    <button class="dock-btn icon" id="btn-pause" title="Pause">❚❚</button>
+    <button class="dock-btn icon" id="btn-save" title="Save">💾</button>
+    <button class="dock-btn icon" id="btn-reset" title="Reset">↺</button>
+  </nav>
+
+  <!-- ---------- PANELS ---------- -->
+  <aside class="panel" id="panel-business">
+    <header class="panel-head"><h3>BUSINESS DECISIONS</h3><button class="panel-close">✕</button></header>
+    <div class="panel-body"></div>
+  </aside>
+
+  <aside class="panel" id="panel-portfolio">
+    <header class="panel-head"><h3>PROPERTY PORTFOLIO</h3><button class="panel-close">✕</button></header>
+    <div class="panel-body"></div>
+  </aside>
+
+  <!-- ---------- OVERLAYS ---------- -->
+  <div id="toasts"></div>
+  <div id="settlement"></div>
+  <div id="endgame"></div>
+  <div id="failure"></div>
+
+  <!-- ---------- PHONE / MESSAGE THREAD (§17) ---------- -->
+  <div id="phone" aria-hidden="true">
+    <div class="phone-scrim"></div>
+    <div class="phone-device">
+      <div class="phone-notch"></div>
+      <div class="phone-status"><span>●●●●</span><span class="sig">▮▮▮</span></div>
+      <div class="phone-header" id="phone-header"></div>
+      <div class="phone-thread" id="phone-thread"></div>
+      <div class="phone-actions" id="phone-actions"></div>
+      <div class="phone-home"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="err" class="err" hidden></div>
+<script>
+  window.addEventListener("error", function (e) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Error: " + e.message + " (" + (e.filename || "").split("/").pop() + ":" + e.lineno + ")";
+  });
+</script>
+<script>
+/* The game's scripts, in order. They download in parallel and each one is retried if the network
+   drops it; then they run in this order. The characters (chars/*.js) load after these, from
+   src/body.js. */
+(function () {
+  var FILES = ["vendor/three.min.js", "src/config.js?v=1", "src/state.js?v=1", "src/cast.js?v=1", "src/clips.js?v=1",
+    "src/body.js?v=1", "src/shop3d.js?v=1", "src/view3d.js?v=1", "src/input.js?v=1", "src/world.js?v=1",
+    "src/economy.js?v=1", "src/messages.js?v=1", "src/ui.js?v=1", "src/main.js?v=1"];
+  function fail(src) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Couldn't download " + src.split("?")[0] + ". Check your connection and reload.";
+  }
+  if (location.protocol === "file:") {
+    FILES.forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
+    return;
+  }
+  function get(src, attempt) {
+    var url = attempt ? src + (src.indexOf("?") < 0 ? "?" : "&") + "retry=" + attempt : src;
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).catch(function () {
+      if (attempt >= 4) { fail(src); throw new Error("gave up on " + src); }
+      return new Promise(function (ok) { setTimeout(ok, 400 * (attempt + 1)); }).then(function () { return get(src, attempt + 1); });
+    });
+  }
+  Promise.all(FILES.map(function (src) { return get(src, 0); })).then(function (texts) {
+    texts.forEach(function (text, i) {
+      var s = document.createElement("script");
+      s.textContent = text + "\n//# sourceURL=" + new URL(FILES[i], location.href).href;
+      document.body.appendChild(s);
+    });
+  }, function () { /* fail() already said which file */ });
+})();
+</script>
+</body>
+</html>
