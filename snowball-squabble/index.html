@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script>
+// iPhone Safari ignores user-scalable=no: no double-tap zoom or pinch (same guard as the other games on the arcade).
+(function () {
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0b1e36">
+<title>Snowball Squabble: Free Team Snowball Fight Game | AnthonyJCTSG Games</title>
+<meta name="description" content="Snowball Squabble is a free third-person team snowball fight in your browser. Pick from 30 fighters, hide behind snow mounds and ice castles, pack snowballs and be the last team standing. Desktop or phone, no download.">
+<link rel="canonical" href="https://anthonyjctsg.online/snowball-squabble/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Snowball Squabble: free team snowball fight game">
+<meta property="og:description" content="Third-person team snowball fight: 30 fighters, ice castles, snow mounds. Free in your browser, desktop or phone.">
+<meta property="og:url" content="https://anthonyjctsg.online/snowball-squabble/">
+<meta property="og:image" content="https://anthonyjctsg.online/snowballsquabble_thumbnail.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://anthonyjctsg.online/snowballsquabble_thumbnail.jpg">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="scorebar">
+    <div class="team blue"><span class="pips" id="pipsBlue"></span><b id="scBlue">0</b></div>
+    <div id="roundLbl">ROUND 1</div>
+    <div class="team red"><b id="scRed">0</b><span class="pips" id="pipsRed"></span></div>
+  </div>
+  <div id="feed"></div>
+  <div id="big"></div>
+  <div id="sub"></div>
+  <div id="cross"><i></i></div>
+  <div id="chargeWrap"><div id="chargeFill"></div></div>
+  <div id="ammoBox">
+    <div id="ammo"></div>
+    <div id="ammoHint"></div>
+    <div id="packWrap"><div id="packFill"></div></div>
+  </div>
+  <div id="keys">LMB hold + release: throw &nbsp;·&nbsp; R hold: pack snow &nbsp;·&nbsp; C: crouch &nbsp;·&nbsp; Q / Space: roll &nbsp;·&nbsp; E: build mound</div>
+  <div id="outBanner" class="hidden"><b>YOU'RE OUT</b><span id="specName"></span></div>
+  <div id="flash"></div>
+  <div id="splats"></div>
+  <div id="slowNote"></div>
+</div>
+
+<div id="touchUI">
+  <div id="stickBase"><i id="stickKnob"></i></div>
+  <button id="tbPause" aria-label="Pause">❚❚</button>
+  <button id="tbBuild" class="tb small">BUILD</button>
+  <button id="tbCrouch" class="tb">CROUCH</button>
+  <button id="tbRoll" class="tb">ROLL</button>
+  <button id="tbPack" class="tb">PACK</button>
+  <button id="tbThrow" class="tb big">THROW</button>
+</div>
+<div id="rotate"><div>Turn your phone sideways<br><small>Snowball Squabble plays in landscape</small></div></div>
+
+<div id="menu" class="screen">
+  <h1 class="sr">Snowball Squabble</h1>
+  <p class="tagline">Third-person snow warfare &nbsp;·&nbsp; two teams, one hit and you're out</p>
+  <div class="menubar">
+    <div id="settings" class="pop">
+      <div class="pop-title">Settings &amp; controls</div>
+      <div class="opts">
+        <label>Your name <input id="optName" maxlength="12" placeholder="(fighter's name)"></label>
+        <label>Look speed <input id="optSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></label>
+        <label>Sound <input id="optVol" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+        <label>Music <input id="optMusic" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+      </div>
+      <div id="touchNote" class="note hidden">Phone: play in landscape. Left thumb moves, drag the right side to look. Hold THROW (slide to aim) and let go to throw.</div>
+      <ul class="controls kb">
+        <li><kbd>W A S D</kbd> move &nbsp; <kbd>Shift</kbd> sprint &nbsp; <kbd>C</kbd> crouch</li>
+        <li><kbd>Mouse</kbd> aim &nbsp; <b>hold</b> <kbd>Left click</kbd> to wind up, <b>release</b> to throw</li>
+        <li><kbd>R</kbd> hold to pack more snowballs &nbsp; <kbd>E</kbd> build a mound (4 snowballs)</li>
+        <li><kbd>Q</kbd> / <kbd>Space</kbd> dive roll: low enough to duck under throws</li>
+      </ul>
+    </div>
+    <div class="fields">
+      <label>Fighter <select id="optChar"></select></label>
+      <label>Team size
+        <select id="optSize"><option value="3">3 v 3</option><option value="4" selected>4 v 4</option><option value="5">5 v 5</option></select></label>
+      <label>Opponents
+        <select id="optDiff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option></select></label>
+      <label>First to
+        <select id="optRounds"><option value="2">2 rounds</option><option value="3" selected>3 rounds</option><option value="5">5 rounds</option></select></label>
+    </div>
+    <button id="startBtn" class="big-btn" disabled>Loading…</button>
+    <button id="gearBtn" class="gear" aria-label="Settings and controls" aria-expanded="false">⚙</button>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel small">
+    <h2>Paused</h2>
+    <button id="resumeBtn" class="big-btn">Click to resume</button>
+    <button id="quitBtn" class="ghost-btn">Quit to menu</button>
+  </div>
+</div>
+
+<div id="over" class="screen hidden">
+  <div class="panel small">
+    <div class="kicker" id="overKicker"></div>
+    <h2 id="overTitle"></h2>
+    <p id="overScore" class="lead"></p>
+    <button id="againBtn" class="big-btn">Play again</button>
+    <button id="menuBtn" class="ghost-btn">Menu</button>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="src/sim.js?v=1"></script>
+<script src="src/chars/roster.js?v=1"></script>
+<script src="src/chars/clips.js?v=1"></script>
+<script src="src/body.js?v=1"></script>
+<script src="src/world.js?v=1"></script>
+<script src="src/fx.js?v=1"></script>
+<script src="src/view.js?v=1"></script>
+<script src="src/input.js?v=1"></script>
+<script src="music/tracks.js?v=1"></script>
+<script src="src/audio.js?v=1"></script>
+<script src="src/hud.js?v=1"></script>
+<script src="src/main.js?v=1"></script>
+</body>
+</html>
