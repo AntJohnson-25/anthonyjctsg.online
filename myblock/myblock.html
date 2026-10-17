@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14110e">
+<title>My Block</title>
+<meta name="description" content="My Block: a third-person street war. Lead Alex's crew block by block and take the city back.">
+<meta property="og:title" content="My Block">
+<meta property="og:description" content="A third-person street war: pack the duffles, get them home, take the block.">
+<meta property="og:image" content="https://anthonyjctsg.online/myblock_thumbnail.jpg">
+<link rel="stylesheet" href="style.css?v=15">
+</head>
+<body>
+<canvas id="view" aria-label="Game view"></canvas>
+
+<div id="loading" class="loading">
+  <div class="logo"><span>MY</span><b>BLOCK</b></div>
+  <div class="load-bar"><span id="loadFill"></span></div>
+  <div class="load-msg" id="loadMsg">…</div>
+</div>
+
+<!-- The cover: the title art with a PLAY button, shown once per visit before the setup screen -->
+<div id="landing" class="landing" hidden>
+  <button type="button" id="btnLanding" class="landing-play" data-t="landingPlay"></button>
+</div>
+
+<!-- Title / battle setup (a bots-only battle plays behind it) -->
+<div id="menu" class="menu" hidden>
+  <div class="menu-card">
+    <div class="logo"><span>MY</span><b>BLOCK</b></div>
+    <p class="tag" data-t="tag"></p>
+    <div class="opt">
+      <span class="opt-l" data-t="mode"></span>
+      <div class="seg seg2" id="optMode">
+        <button type="button" data-v="tdm"><span data-t="tdm"></span><small data-t="tdmSub"></small></button>
+        <button type="button" data-v="turf"><span data-t="turf"></span><small data-t="turfSub"></small></button>
+      </div>
+    </div>
+    <div class="opt">
+      <span class="opt-l" data-t="bots"></span>
+      <div class="seg seg4" id="optDiff">
+        <button type="button" data-v="recruit" data-t="recruit"></button>
+        <button type="button" data-v="regular" data-t="regular"></button>
+        <button type="button" data-v="hardened" data-t="hardened"></button>
+        <button type="button" data-v="veteran" data-t="veteran"></button>
+      </div>
+    </div>
+    <div class="opt">
+      <span class="opt-l" data-t="seats"></span>
+      <div class="seg seg2 small" id="optSeats">
+        <button type="button" data-v="8">8</button>
+        <button type="button" data-v="12">12</button>
+      </div>
+    </div>
+    <div class="opt">
+      <span class="opt-l" data-t="dead"></span>
+      <div class="seg seg2" id="optDead">
+        <button type="button" data-v="on"><span data-t="deadOn"></span><small data-t="deadOnSub"></small></button>
+        <button type="button" data-v="off"><span data-t="deadOff"></span><small data-t="deadOffSub"></small></button>
+      </div>
+    </div>
+    <button type="button" id="btnPlay" class="play" data-t="play"></button>
+    <button type="button" id="btnControls" class="controls-btn" data-t="controls"></button>
+    <div class="keys" id="keysTouch" hidden><div data-t="touchKeys"></div></div>
+    <div class="keys" id="keysDesk">
+      <div data-t="keys1"></div>
+      <div data-t="keys2"></div>
+      <div data-t="keys3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- In-game HUD -->
+<div id="hud" class="hud" hidden>
+  <div class="tl">
+    <div class="scorebox">
+      <div class="sb-mode" id="sbMode"></div>
+      <div id="sbRows"></div>
+      <div class="sb-time" id="sbTime">10:00</div>
+    </div>
+    <div class="terms" id="terms" hidden></div>
+    <canvas id="minimap" width="184" height="146"></canvas>
+  </div>
+  <div class="killfeed" id="killfeed"></div>
+  <div class="cross" id="cross"><i></i><i></i><i></i><i></i><b></b></div>
+  <div class="hitmark" id="hitmark"></div>
+  <div class="use-hint" id="useHint" hidden></div>
+  <div class="dmg" id="dmg"></div>
+  <div class="medals" id="medals"></div>
+  <div class="popups" id="popups"></div>
+  <div class="callout" id="callout"></div>
+  <div class="center-msg" id="centerMsg"></div>
+  <div class="toast" id="toast"></div>
+  <div class="bl">
+    <div class="vital hp"><span class="lbl">+</span><div class="vbar"><b id="hpBar"></b></div><span class="num" id="hpNum">100</span></div>
+    <div class="vital ar"><span class="lbl">◆</span><div class="vbar"><b id="arBar"></b></div><span class="num" id="arNum">0</span></div>
+  </div>
+  <div class="br">
+    <div class="weapon">
+      <div class="w-name" id="wName"></div>
+      <div class="w-ammo"><span id="wMag">30</span><small id="wRes">/ 90</small></div>
+      <div class="w-alt" id="wAlt"></div>
+    </div>
+    <div class="slots" id="wSlots"></div>
+  </div>
+  <div class="scope" id="scope" hidden><div class="scope-ring"></div></div>
+  <!-- Weapon wheel (hold F): every gun round a see-through ring; point the mouse at one, let go to take it. -->
+  <div class="wheel" id="wheel" hidden>
+    <div class="wheel-ring"></div>
+    <div class="wheel-center"><b id="wheelName"></b><small id="wheelAmmo"></small></div>
+  </div>
+  <div class="killcam" id="killcam" hidden>
+    <div class="kc-bar kc-top"></div><div class="kc-bar kc-bot"></div>
+    <div class="kc-head"><i></i><span data-t="killcam"></span></div>
+    <div class="kc-info"><span id="kcName"></span><small id="kcWhat"></small></div>
+    <div class="kc-skip" data-t="killcamSkip"></div>
+  </div>
+  <div class="death" id="death" hidden>
+    <div class="death-by" data-t="killedBy"></div>
+    <div class="death-name" id="deathName"></div>
+    <div class="death-how" id="deathHow"></div>
+    <div class="death-timer" id="deathTimer"></div>
+  </div>
+  <div class="vignette" id="vignette"></div>
+  <div class="topbtns">
+    <button type="button" id="btnScores" title="Scores (Tab)">☰</button>
+    <button type="button" id="btnPause" title="Settings (P)">⚙</button>
+  </div>
+  <div class="clicklock" id="clicklock" hidden data-t="clickLook"></div>
+  <!-- Touch: a floating stick under the left thumb, drag anywhere else to look;
+       FIRE also looks while you drag it. -->
+  <div class="touch" id="touch" hidden>
+    <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
+    <button type="button" class="tb tb-fire" id="tFire" data-t="tFire"></button>
+    <button type="button" class="tb tb-alt" id="tAim" data-t="tAim"></button>
+    <button type="button" class="tb tb-jump" id="tJump" data-t="tJump"></button>
+    <button type="button" class="tb tb-reload" id="tReload" data-t="tReload"></button>
+    <button type="button" class="tb tb-swap" id="tSwap" data-t="tSwap"></button>
+    <button type="button" class="tb tb-grap" id="tNade" data-t="tNade"></button>
+    <button type="button" class="tb tb-chop" id="tMelee" data-t="tMelee"></button>
+    <button type="button" class="tb tb-dart" id="tThrow" data-t="tThrow"></button>
+    <button type="button" class="tb tb-crouch" id="tCrouch" data-t="tCrouch"></button>
+    <button type="button" class="tb tb-roll" id="tRoll" data-t="tRoll"></button>
+    <button type="button" class="tb tb-use" id="tUse" data-t="tUse" hidden></button>
+  </div>
+</div>
+
+<div id="scores" class="scores" hidden>
+  <div class="sc-panel">
+    <div class="sc-head" id="scHead"></div>
+    <table><thead><tr><th class="l" data-t="player"></th><th data-t="score"></th><th data-t="kills"></th><th data-t="deaths"></th><th>+</th></tr></thead><tbody id="scBody"></tbody></table>
+  </div>
+</div>
+
+<div id="pause" class="overlay" hidden>
+  <div class="panel">
+    <h2 data-t="settings"></h2>
+    <button type="button" id="pResume" class="big" data-t="resume"></button>
+    <div class="row"><span data-t="music"></span><input type="range" id="pMusic" min="0" max="1" step="0.05"></div>
+    <div class="row"><span data-t="sfx"></span><input type="range" id="pSfx" min="0" max="1" step="0.05"></div>
+    <div class="row"><span data-t="sens"></span><input type="range" id="pSens" min="0.3" max="3" step="0.05"></div>
+    <div class="row"><span data-t="turn"></span><input type="range" id="pTurn" min="0.4" max="2" step="0.05"></div>
+    <div class="row"><span data-t="graphics"></span><button type="button" id="pQuality"></button></div>
+    <div class="row"><span data-t="sound"></span><button type="button" id="pSound"></button></div>
+    <div class="row"><span data-t="invert"></span><button type="button" id="pInvert"></button></div>
+    <div class="row"><span data-t="outlines"></span><button type="button" id="pOutline"></button></div>
+    <div class="row"><span data-t="killcamSetting"></span><button type="button" id="pKillcam"></button></div>
+    <button type="button" id="pControls" data-t="controls"></button>
+    <button type="button" id="pQuit" data-t="quit"></button>
+  </div>
+</div>
+
+<div id="final" class="overlay" hidden>
+  <div class="panel wide">
+    <h2 id="finalTitle"></h2>
+    <div class="final-sub" id="finalSub"></div>
+    <table class="final-table"><thead><tr><th class="l" data-t="player"></th><th data-t="score"></th><th data-t="kills"></th><th data-t="deaths"></th></tr></thead><tbody id="finalBody"></tbody></table>
+    <button type="button" id="fAgain" class="big" data-t="again"></button>
+    <button type="button" id="fMenu" data-t="menu"></button>
+  </div>
+</div>
+
+<!-- Controls: keyboard + mouse and touch, from SP.CONTROLS (strings.js); opens from the setup screen and the pause menu -->
+<div id="controls" class="overlay controls" hidden>
+  <div class="panel wide ctl">
+    <h2 data-t="controls"></h2>
+    <div class="ctl-tabs" id="ctlTabs">
+      <button type="button" data-v="kb" data-t="ctlKeys"></button>
+      <button type="button" data-v="touch" data-t="ctlTouch"></button>
+    </div>
+    <div class="ctl-body" id="ctlBody"></div>
+    <button type="button" id="ctlBack" class="big" data-t="back"></button>
+  </div>
+</div>
+
+<div id="rotate" class="rotate" hidden>
+  <div data-t="rotate"></div>
+  <button type="button" id="rotateOk" data-t="rotateOk"></button>
+</div>
+
+<div id="err" class="err" hidden></div>
+
+<script>
+  window.addEventListener("error", function (e) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Error: " + e.message + " (" + (e.filename || "").split("/").pop() + ":" + e.lineno + ")";
+  });
+</script>
+<script>
+/* The game's scripts, in order. They download in parallel and each one is
+   retried if the network drops it; then they run in this order (from Bladed). */
+(function () {
+  var FILES = ["vendor/three.min.js", "src/util.js?v=9", "src/strings.js?v=9", "src/map.js?v=9",
+    "src/world.js?v=9", "src/navdata.js?v=9", "src/nav.js?v=9", "src/weapons.js?v=9", "src/sim.js?v=9",
+    "src/chars/clips.js?v=9", "src/chars/roster.js?v=9", "src/chars/alex.js?v=9", "src/chars/Ch15.js?v=9", "src/chars/Ch35.js?v=9",
+    "src/chars/Warzombie_F_Pedroso.js?v=9", "src/chars/Zombiegirl_W_Kurniawan.js?v=9",
+    "src/chars/Girlscout_T_Masuyama.js?v=9", "src/chars/Whiteclown_N_Hallin.js?v=9", "src/chars/Pumpkinhulk_L_Shaw.js?v=9",
+    "src/logo.js?v=9", "src/models.js?v=9", "src/view.js?v=9", "src/audio.js?v=9", "src/input.js?v=9", "src/hud.js?v=9", "src/killcam.js?v=9", "src/main.js?v=9"];
+  function fail(src) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Couldn't download " + src.split("?")[0] + ". Check your connection and reload.";
+  }
+  if (location.protocol === "file:") {
+    FILES.forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
+    return;
+  }
+  function get(src, attempt) {
+    var url = attempt ? src + (src.indexOf("?") < 0 ? "?" : "&") + "retry=" + attempt : src;
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).catch(function () {
+      if (attempt >= 4) { fail(src); throw new Error("gave up on " + src); }
+      return new Promise(function (ok) { setTimeout(ok, 400 * (attempt + 1)); }).then(function () { return get(src, attempt + 1); });
+    });
+  }
+  Promise.all(FILES.map(function (src) { return get(src, 0); })).then(function (texts) {
+    texts.forEach(function (text, i) {
+      var s = document.createElement("script");
+      s.textContent = text + "\n//# sourceURL=" + new URL(FILES[i], location.href).href;
+      document.body.appendChild(s);
+    });
+  }, function () { /* fail() already said which file */ });
+})();
+</script>
+</body>
+</html>
