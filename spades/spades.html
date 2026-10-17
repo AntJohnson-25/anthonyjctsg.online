@@ -17,7 +17,7 @@
 <meta name="description" content="Spades: partnership Spades at a seaside villa at sunset. Walk the terrace as Ant and sit down at one of four tables, from Rookie to Shark.">
 <link rel="icon" href="data:,">
 <link rel="preload" as="image" href="art/key_title.jpg">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 <canvas id="view" aria-label="The villa terrace"></canvas>
@@ -86,6 +86,7 @@
     </div>
   </div>
   <button type="button" id="btnPlayCard" class="play-card" hidden></button>
+  <div id="hand" class="hand" aria-label="Your hand"></div>
   <div id="zoom" class="zoom" hidden><canvas id="zoomCard" width="200" height="280"></canvas><div id="zoomCap" class="zoom-cap"></div></div>
   <div class="corner">
     <button type="button" id="btnZoom" class="round" title="Zoom in on the last card played (Z)">&#128269;</button>
@@ -98,7 +99,7 @@
   <div id="lookPad" class="look-pad">
     <button type="button" data-q="left" title="Look left (2)">&#8678;</button>
     <button type="button" data-q="partner" title="Look at your partner (1)">&#8679;</button>
-    <button type="button" data-q="hand" title="Back to your hand (Space)">&#9675;</button>
+    <button type="button" data-q="hand" title="Back to the table (Space)">&#9675;</button>
     <button type="button" data-q="right" title="Look right (3)">&#8680;</button>
   </div>
   <div id="coach" class="coach" hidden><div class="coach-step" id="coachStep"></div><div id="coachText"></div><div class="coach-btns"><button type="button" id="coachNext" data-t="next"></button><button type="button" id="coachSkip" class="ghost" data-t="skip"></button></div></div>
@@ -119,12 +120,12 @@
     <div class="row"><span data-t="tags"></span><button type="button" id="sTags"></button></div>
     <div class="row"><span data-t="graphics"></span><button type="button" id="sQuality"></button></div>
     <div class="row"><span data-t="sens"></span><input type="range" id="sSens" min="0.3" max="2.5" step="0.1"></div>
+    <div class="menu-btns"><button type="button" id="sRules" class="ghost" data-t="rules"></button><button type="button" id="sLeave" class="ghost" data-t="leaveTable"></button></div>
     <button type="button" id="sClose" class="big" data-t="resume"></button>
   </div>
 </div>
 <div id="rulesBox" class="overlay" hidden><div class="panel wide rules"><h2 data-t="rules"></h2><div id="rulesBody"></div><button type="button" id="rulesClose" class="big" data-t="close"></button></div></div>
 
-<div id="rotate" class="rotate" hidden><div data-t="rotate"></div><button type="button" id="rotateOk" data-t="rotateOk"></button></div>
 <div id="err" class="err" hidden></div>
 
 <script>
@@ -139,10 +140,10 @@
    the network drops it; then they run in this order. The characters (chars/*.js) load
    after these, from src/body.js. */
 (function () {
-  var FILES = ["vendor/three.min.js", "src/util.js?v=1", "src/strings.js?v=1", "src/rules.js?v=1", "src/bot.js?v=1",
+  var FILES = ["vendor/three.min.js", "src/util.js?v=1", "src/strings.js?v=2", "src/rules.js?v=1", "src/bot.js?v=1",
     "src/table.js?v=1", "src/net.js?v=1", "src/build.js?v=1", "src/cast.js?v=1", "src/clips.js?v=1", "src/body.js?v=1",
-    "src/ocean.js?v=1", "src/villa.js?v=1", "src/view.js?v=1", "src/cards.js?v=1", "src/seats.js?v=1", "src/crowd.js?v=1", "src/portraits.js?v=1",
-    "src/audio.js?v=1", "src/hud.js?v=1", "src/tutorial.js?v=1", "src/main.js?v=1"];
+    "src/ocean.js?v=1", "src/villa.js?v=1", "src/view.js?v=1", "src/cards.js?v=2", "src/seats.js?v=1", "src/crowd.js?v=1", "src/portraits.js?v=1",
+    "src/audio.js?v=1", "src/hud.js?v=2", "src/tutorial.js?v=1", "src/main.js?v=2"];
   function fail(src) {
     var el = document.getElementById("err");
     el.hidden = false;

@@ -155,7 +155,49 @@ globalThis.HS = globalThis.HS || {};
     H.chat("&#9733; " + who(st, w, seat) + " <span class='say'>" + esc(w === seat ? t("chatTookYou") : t("chatTook")) + "</span>", "sys " + role(w, seat));
   };
 
-  // Touch: "Play 5♦" for the card lifted out of the tray (dimmed if it can't be played now).
+  // ------------------------------------------------------------------ your hand (the strip along the bottom)
+  // Always on screen, wherever you look (Spades feedback 2026-10-16: on a phone you had
+  // to look down at the tray to see your cards). Drawn with the deck's own art, each
+  // face made once. main.js handles the taps and the hover.
+  const faces = {};
+  function face(c) {   // c = -1: the back
+    if (!faces[c]) {
+      const cv = HS.Build.canvas(200, 280), g = cv.getContext("2d");
+      if (c < 0) HS.Cards.drawBackTo(g, 0, 0); else HS.Cards.drawCardTo(g, c, 0, 0);
+      faces[c] = cv.toDataURL();
+    }
+    return faces[c];
+  }
+  // o: { cards (in order), legal, assist, picked, hover, faceDown, turn (ours to play) }
+  H.hand = function (o) {
+    const box = $("hand");
+    const key = o.cards.join(",") + (o.faceDown ? "b" : "");
+    if (key !== H.last.hand) {
+      H.last.hand = key; H.last.handState = "";
+      box.innerHTML = "";
+      o.cards.forEach(function (c) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "hc";
+        b.setAttribute("data-c", c);
+        b.setAttribute("aria-label", o.faceDown ? "?" : R.RANKS[R.rank(c)] + R.SUITS[R.suit(c)]);
+        b.style.backgroundImage = "url(" + face(o.faceDown ? -1 : c) + ")";
+        box.appendChild(b);
+      });
+      box.style.setProperty("--n", Math.max(1, o.cards.length));
+    }
+    const dim = o.assist && o.legal.length ? o.legal : null;
+    const state = [o.picked, o.hover, o.turn ? 1 : 0, dim ? dim.join(".") : ""].join("|");
+    if (state === H.last.handState) return;
+    H.last.handState = state;
+    box.classList.toggle("turn", !!o.turn);
+    box.querySelectorAll(".hc").forEach(function (b) {
+      const c = +b.getAttribute("data-c");
+      b.classList.toggle("up", c === o.picked || c === o.hover);
+      b.classList.toggle("dim", !!dim && dim.indexOf(c) < 0);
+    });
+  };
+
+  // Touch: "Play 5♦" for the card lifted out of your hand (dimmed if it can't be played now).
   H.playButton = function (c, legal) {
     const b = $("btnPlayCard");
     b.hidden = c < 0;

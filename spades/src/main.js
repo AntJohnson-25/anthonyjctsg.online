@@ -216,7 +216,7 @@ globalThis.HS = globalThis.HS || {};
   function tryPlay(c) {
     if (c < 0 || !Net.myTurn() || Net.st.ph !== "play") return false;
     if (Net.legal().indexOf(c) < 0) { A.tick(); return false; }
-    if (Net.play(c)) { A.card(true); G.picked = -1; Cards.picked = -1; Tut.signal("play"); return true; }
+    if (Net.play(c)) { A.card(true); G.picked = -1; Tut.signal("play"); return true; }
     return false;
   }
   function onReact(r) { if (Net.react(r)) Tut.signal("react"); }
@@ -290,7 +290,7 @@ globalThis.HS = globalThis.HS || {};
     frame(dt);
     View.render();
   }
-  const _focus = new THREE.Vector3();
+  const _focus = new THREE.Vector3(), _launch = new THREE.Vector3();
   function clampCam(p) {
     // Scene -> villa coordinates, keep inside the terrace (not in the villa, not over the sea), back.
     const o = Room.world.position;
@@ -331,8 +331,10 @@ globalThis.HS = globalThis.HS || {};
     const myTurn = playing && Net.myTurn();
     const legal = myTurn && st.ph === "play" ? Net.legal() : [];
     const faceDown = playing && st.ph === "bid" && st.bl[seat] && st.o.blind && st.bids[seat] === null && !G.looked;
-    Cards.hover = G.hover; Cards.picked = G.picked;
-    Cards.update({ st: st, hand: hand, seat: seat, eye: Seats.eye, legal: legal, assist: G.prefs.assist, faceDown: faceDown, dt: dt });
+    // A card we play rises from just under the camera, where the hand strip is.
+    const launch = playing ? _launch.set(0, -0.13, -0.32).applyQuaternion(View.camera.quaternion).add(View.camera.position) : null;
+    Cards.update({ st: st, hand: hand, seat: seat, eye: Seats.eye, launch: launch, dt: dt });
+    if (playing) H.hand({ cards: hand.slice(0, Cards.mineDealt), legal: legal, assist: G.prefs.assist, picked: G.picked, hover: G.hover, faceDown: faceDown, turn: myTurn && st.ph === "play" });
     if (LINEUP) View.update({ mode: "walk", focus: _focus.set(G.lineupX || 0, 1.2, 9), dt: dt, t: G.t });
     else View.update({ mode: playing ? "seat" : "walk", seat: seat, eye: Seats.eye, dt: dt, t: G.t, focus: Crowd.focus(_focus), clamp: clampCam });
     Room.update(dt, G.t, G.mode === "play" && G.table >= 0 ? Room.TABLES[G.table] : Crowd.pos);
@@ -400,12 +402,8 @@ globalThis.HS = globalThis.HS || {};
         try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ok */ }
         return;
       }
-      // At the table: a finger on the tray picks by left/right position (cards are thin on a
-      // phone) and sliding along it changes which card is lifted (Hop Spades af347cb).
-      const ndc = View.ndc(e.clientX, e.clientY);
-      const c = G.mode !== "play" ? -1 : touch ? Cards.pickNear(ndc, View.camera, Net.seat) : Cards.pick(ndc, View.camera);
-      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, card: c, button: e.button, touch: touch, slide: G.mode === "play" && touch && c >= 0, was: G.picked };
-      if (drag.slide && G.picked !== c) { G.picked = c; A.flick(); }
+      // Anywhere else: drag to look around (your cards are the strip along the bottom).
+      drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, button: e.button };
       try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ok */ }
     });
     cv.addEventListener("pointermove", function (e) {
@@ -415,39 +413,62 @@ globalThis.HS = globalThis.HS || {};
         $("stickKnob").style.transform = "translate(" + (G.stick.x * 38) + "px," + (G.stick.z * 38) + "px)";
         return;
       }
-      if (drag && e.pointerId === drag.id && drag.slide) {
-        drag.moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
-        drag.x = e.clientX; drag.y = e.clientY;
-        const c = Cards.pickNear(View.ndc(e.clientX, e.clientY), View.camera, Net.seat);
-        if (c >= 0 && c !== G.picked) { G.picked = c; A.flick(); }
-        return;
-      }
       if (drag && e.pointerId === drag.id) {
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         drag.moved += Math.abs(dx) + Math.abs(dy);
         if (G.mode === "walk" || G.mode === "title") View.walkLook(dx, dy);
-        else if (G.mode === "play" && (drag.moved > 6 || drag.card < 0 || drag.button === 2)) { View.look(dx, dy); Tut.signal("look", Math.abs(dx) + Math.abs(dy)); }
+        else if (G.mode === "play") { View.look(dx, dy); Tut.signal("look", Math.abs(dx) + Math.abs(dy)); }
         drag.x = e.clientX; drag.y = e.clientY;
-      } else if (G.mode === "play" && e.pointerType !== "touch") {
-        const c = Cards.pick(View.ndc(e.clientX, e.clientY), View.camera);
-        if (c !== G.hover && c >= 0) A.flick();
-        G.hover = c;
-        cv.style.cursor = c >= 0 ? (Net.legal().indexOf(c) >= 0 ? "pointer" : "not-allowed") : "grab";
       }
     });
     const up = function (e) {
       if (stick && e.pointerId === stick.id) { stick = null; G.stick.x = G.stick.z = 0; $("stick").hidden = true; $("stickKnob").style.transform = ""; return; }
       if (!drag || e.pointerId !== drag.id) return;
       const d = drag; drag = null;
-      // Touch on the tray: a still tap on the card that was already lifted plays it;
-      // anything else just leaves the chosen card lifted (the Play button plays it too).
-      if (d.slide) { if (d.moved < 10 && d.card === d.was) tryPlay(d.card); return; }
-      if (G.mode !== "play" || d.moved > 8 || d.button === 2) return;
-      if (d.card < 0) { G.picked = -1; return; }
-      tryPlay(d.card);
+      // A still tap on the table puts a lifted card back down.
+      if (G.mode === "play" && d.moved < 8 && d.button !== 2) G.picked = -1;
     };
     cv.addEventListener("pointerup", up);
     cv.addEventListener("pointercancel", up);
+    // Your hand, the strip along the bottom. A finger: tap a card (or slide along the
+    // strip) to lift it, then tap it again or press Play. A mouse: hover lifts, click plays.
+    const dock = $("hand");
+    let hd = null;
+    const cardAt = function (x, y) {
+      const el = document.elementFromPoint(x, y), b = el && el.closest ? el.closest(".hc") : null;
+      return b && dock.contains(b) ? +b.getAttribute("data-c") : -1;
+    };
+    dock.addEventListener("pointerdown", function (e) {
+      A.unlock();
+      const c = cardAt(e.clientX, e.clientY);
+      if (c < 0 || G.mode !== "play") return;
+      e.preventDefault();
+      hd = { id: e.pointerId, c: c, was: G.picked, moved: 0, x: e.clientX, y: e.clientY, touch: e.pointerType !== "mouse" };
+      if (hd.touch && G.picked !== c) { G.picked = c; A.flick(); }
+      try { dock.setPointerCapture(e.pointerId); } catch (err) { /* ok */ }
+    });
+    dock.addEventListener("pointermove", function (e) {
+      if (hd && e.pointerId === hd.id) {
+        hd.moved += Math.abs(e.clientX - hd.x) + Math.abs(e.clientY - hd.y);
+        hd.x = e.clientX; hd.y = e.clientY;
+        const c = cardAt(e.clientX, e.clientY);
+        if (hd.touch && c >= 0 && c !== G.picked) { G.picked = c; A.flick(); }
+      } else if (e.pointerType === "mouse" && G.mode === "play") {
+        const c = cardAt(e.clientX, e.clientY);
+        if (c !== G.hover && c >= 0) A.flick();
+        G.hover = c;
+      }
+    });
+    const dockUp = function (e) {
+      if (!hd || e.pointerId !== hd.id) return;
+      const d = hd; hd = null;
+      if (e.type === "pointercancel" || d.moved > 12) return;
+      // A finger plays the card that was already lifted; a click plays straight away.
+      if (!d.touch || d.c === d.was) tryPlay(d.c);
+    };
+    dock.addEventListener("pointerup", dockUp);
+    dock.addEventListener("pointercancel", dockUp);
+    dock.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && !hd) G.hover = -1; });
     window.addEventListener("keydown", function (e) {
       const k = e.key.toLowerCase();
       if (k === "escape") { closeOverlays(); return; }
@@ -506,9 +527,9 @@ globalThis.HS = globalThis.HS || {};
       G.prefs.quality = order[(order.indexOf(cur) + 1) % 3];
       View.setQuality(G.prefs.quality); syncSettings(); savePrefs();
     };
-    $("rotateOk").onclick = function () { G.rotateOk = true; checkRotate(); };
-    window.addEventListener("resize", checkRotate);
-    checkRotate();
+    // The settings sheet doubles as the menu on a phone (only ☺ and ⚙ stay on screen there).
+    $("sRules").onclick = function () { toggleSettings(); toggle("rulesBox"); };
+    $("sLeave").onclick = function () { toggleSettings(); leave(); };
     syncSettings();
   }
   function closeOverlays() { ["settings", "rulesBox"].forEach(function (id) { $(id).hidden = true; }); H.wheel(false); }
@@ -537,8 +558,8 @@ globalThis.HS = globalThis.HS || {};
     $("sTags").textContent = G.prefs.tags ? t("on") : t("off");
     $("sZoom").textContent = G.prefs.zoomAuto ? t("on") : t("off");
     $("sQuality").textContent = t(View.quality || "high");
+    $("sLeave").hidden = G.mode !== "play";
   }
-  function checkRotate() { $("rotate").hidden = !(document.body.classList.contains("touch") && window.innerHeight > window.innerWidth * 1.1 && !G.rotateOk); }
 
   // ------------------------------------------------------------------ debug, the cast line-up, test hooks
   function startDebug() {

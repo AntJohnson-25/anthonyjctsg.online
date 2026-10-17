@@ -25,7 +25,7 @@ globalThis.HS = globalThis.HS || {};
     gameTo: "Game to", chaos: "Chaos bots", chaosHelp: "Bots sometimes cut their own partner, just for the drama.",
     blindNil: "Blind nil", hostPicks: "You're the host: pick the options and press Play for everyone.", waitHost: "Waiting for the host to start the game…",
     seatsNote: "{0} at the table, {1} bots fill the other seats.", soloNote: "You and your partner against two bots, three bots in all.",
-    keysDesk: "Drag to look around · hover a card in your tray to lift it, click to play · 1 2 3 look at partner, left, right · Space back to your hand · Z zoom in on the last card · R reactions · H rules · P settings",
+    keysDesk: "Drag to look around · your cards are along the bottom: hover one to lift it, click to play · 1 2 3 look at partner, left, right · Space back to the table · Z zoom in on the last card · R reactions · H rules · P settings",
     keysTouch: "Drag to look around · tap a card to lift it, tap again to play",
     boot1: "Opening the villa…", boot2: "Hanging the lights…", boot3: "Your friends are arriving…", ready: "Ready",
     // Status line.
@@ -62,7 +62,6 @@ globalThis.HS = globalThis.HS || {};
     // Settings.
     music: "Music", sound: "Sound", graphics: "Graphics", high: "High", medium: "Medium", low: "Low", assist: "Glow legal cards", reactAuto: "Table reactions", tags: "Name tags",
     resume: "Back to the table", sens: "Look speed",
-    rotate: "Turn your phone sideways for the best view.", rotateOk: "Play anyway",
     close: "Close", next: "Next", skip: "Skip tutorial", done: "Done"
   };
   // The rules sheet (H). Short sections, the standard game.
@@ -73,14 +72,14 @@ globalThis.HS = globalThis.HS || {};
     ["Spades", "Spades are trumps. You can't <b>lead</b> a spade until one has been played on another suit (spades are “broken”), unless you have nothing but spades."],
     ["Scoring", "Make your bid: 10 points per trick bid, +1 for each extra trick (a <b>bag</b>). Miss it (you're <b>set</b>): −10 per trick bid. Every 10 bags costs 100 points. Tricks a nil bidder takes count as bags for the team."],
     ["Cutting your partner", "Trumping a trick your partner was already winning, or leaving your nil partner to take a trick you could have covered. The table notices: your partner reacts and a tag shows over your seat. Cover them well and you get a nod instead."],
-    ["Controls", "Drag to look around. Hover a card in your tray to lift it and click to play it (on a phone: slide along the tray to lift one, then tap it again or press Play). <b>1 2 3</b> look at your partner, left, right; <b>4</b> the trick; <b>Space</b> back to your hand. <b>Z</b> (or 🔍, or tapping a card in the feed) zooms in on the last card played. <b>R</b> reactions, <b>Tab</b> scores, <b>H</b> rules, <b>P</b> settings, <b>L</b> leave the table."],
+    ["Controls", "Your cards are along the bottom of the screen. Hover one to lift it and click to play it (on a phone: tap or slide along them to lift one, then tap it again or press Play). Drag the table to look around. <b>1 2 3</b> look at your partner, left, right; <b>4</b> the trick; <b>Space</b> back to the table. <b>Z</b> (or 🔍, or tapping a card in the feed) zooms in on the last card played. <b>R</b> reactions, <b>Tab</b> scores, <b>H</b> rules, <b>P</b> settings, <b>L</b> leave the table. On a phone, Rules and Leave are in ⚙."],
     ["The villa", "Walk with <b>WASD</b> or the arrow keys (on a phone, your left thumb), drag to look around. Each table has its own crew and level: <b>Rookie</b>, <b>Regular</b>, <b>Sharp</b> and <b>Shark</b>. Walk up to the empty chair and press <b>E</b> to sit down. Your wins at each table are kept on this device."]
   ];
   // The tutorial: a guided hand against three bots. Each step waits for something to happen.
   const TUTORIAL = [
     { id: "look", text: "Welcome to the villa. You're sitting at the Rookie table: <b>drag</b> to look around. Your <b>partner</b> sits straight across from you; the other two are your opponents.", wait: "look" },
-    { id: "keys", text: "Press <b>1</b>, <b>2</b> or <b>3</b> to glance at your partner, the player on your left, or on your right. <b>Space</b> brings you back to your cards.", wait: "next" },
-    { id: "hand", text: "These are your 13 cards, standing in your tray and sorted by suit. <b>Spades</b> beat every other suit, so count them.", wait: "next" },
+    { id: "keys", text: "Press <b>1</b>, <b>2</b> or <b>3</b> to glance at your partner, the player on your left, or on your right. <b>Space</b> brings you back to the table.", wait: "next" },
+    { id: "hand", text: "Your 13 cards are along the bottom of the screen, sorted by suit. They stay there wherever you look. <b>Spades</b> beat every other suit, so count them.", wait: "next" },
     { id: "bid", text: "Time to <b>bid</b>: how many tricks do you think you'll win? Aces, kings and lots of spades win tricks. The suggestion is a good start.", wait: "bid" },
     { id: "follow", text: "Play goes clockwise. <b>Follow suit</b> if you can: the glowing cards are the ones you're allowed to play. Click one to play it.", wait: "play" },
     { id: "trick", text: "The highest card of the suit led takes the trick, unless someone trumps it with a spade. Keep playing: watch who wins each one.", wait: "tricks3" },
