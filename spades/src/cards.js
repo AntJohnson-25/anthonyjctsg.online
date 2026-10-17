@@ -10,7 +10,7 @@ globalThis.HS = globalThis.HS || {};
   "use strict";
   const THREE = globalThis.THREE;
   const R = HS.Rules, U = HS.U, Room = HS.Room;
-  const C = { cards: [], dealT: 99, hn: -1, lastTrick: null };
+  const C = { cards: [], hover: -1, picked: -1, dealT: 99, hn: -1, lastTrick: null };
   const CW = 0.08, CH = 0.112, RAD = 0.007;           // a little bigger than a poker card: easier to read
   const CELL_W = 200, CELL_H = 280, COLS = 14, ROWS = 4;
   const RED = "#c8202a", BLACK = "#16161c";
@@ -263,9 +263,9 @@ globalThis.HS = globalThis.HS || {};
   // to right as the owner sees it, each card a hair nearer the owner than the one
   // to its left so the left strip (with the corner index) of every card shows.
   // Faces the owner (+Z face toward the seat), leaning back toward the middle.
-  // `lift` raises it out of the tray toward the owner.
+  // `lift` raises it out of the tray toward the owner (hover / picked).
   const _tq = new THREE.Quaternion(), _up = new THREE.Vector3();
-  function traySpot(s, i, n, lift, out, q) {
+  function traySpot(s, i, n, lift, out, q, faceDown) {
     const f = seatFrame(s), L = Room.TRAY_LEAN;
     const span = Room.TRAY_W - 0.04 - CW, step = n > 1 ? Math.min(0.07, span / (n - 1)) : 0;
     const x = (i - (n - 1) / 2) * step;
@@ -274,15 +274,16 @@ globalThis.HS = globalThis.HS || {};
       .addScaledVector(f.right, x).addScaledVector(f.fwd, -(Room.TRAY_GROOVE + i * 0.0014))
       .addScaledVector(_up, CH / 2 + 0.002 + (lift || 0)).addScaledVector(f.fwd, -(lift || 0) * 0.45);
     q.setFromEuler(_e.set(0, f.yaw, 0)).multiply(_tq.setFromAxisAngle(_up.set(1, 0, 0), -L));
+    // Not looked at yet (deciding on blind nil): the backs face us.
+    if (faceDown) q.multiply(_tq.setFromAxisAngle(UP, Math.PI));
   }
   C.traySpot = traySpot;
 
   // ------------------------------------------------------------------ per frame
-  // V: { st, hand, seat (ours, or -1 watching), eye (Vector3), legal: [cards], dt, now,
-  //      launch: where a card we play starts from (just under the camera), or null }
-  // Our own hand isn't drawn in the tray: it's the strip along the bottom of the screen
-  // (hud.js), so it's in view wherever you look (Spades feedback 2026-10-16). C.mineDealt
-  // says how many of our cards the deal has reached, for that strip.
+  // V: { st, hand, seat (ours, or -1 watching), eye (Vector3), legal: [cards], assist, faceDown, dt, now }
+  // Our hand also shows as the strip along the bottom of the screen (hud.js), so it's in
+  // view wherever you look (Spades feedback 2026-10-16). C.mineDealt says how many of our
+  // cards the deal has reached, for that strip.
   C.mineDealt = 0;
   C.update = function (V) {
     const st = V.st, dt = V.dt;
@@ -306,15 +307,26 @@ globalThis.HS = globalThis.HS || {};
     C.cards.forEach(function (k) {
       const c = k.c, was = k.loc;
       if (handIdx[c] !== undefined) {
-        // In our hand: not drawn (the strip shows it), but kept at its tray spot.
+        const i = handIdx[c];
+        if (was === "hidden") {
+          // Dealt to us: from the deck, in dealing order.
+          const order = i;
+          k.pos.copy(deckP); k.q.copy(deckQ);
+          k.delay = dealing ? ((order * 4 + (me - st.d + 3) % 4) * 0.05 - C.dealT) : 0;
+          k.mesh.visible = false;
+        }
         k.loc = "mine";
-        traySpot(me, handIdx[c], nMine, 0, k.pos, k.q);
-        k.mesh.visible = false;
-        return;
+        // The card lifted in the strip (hud.js) lifts here too.
+        const lift = c === C.picked ? 0.05 : c === C.hover ? 0.032 : 0;
+        k.lift += (lift - k.lift) * Math.min(1, dt * 14);
+        traySpot(me, i, nMine, k.lift, k.tp, k.tq, V.faceDown);
+        k.speed = 10;
+        // Legal cards bright, the rest dimmed (a setting can turn this off).
+        const dim = V.legal && V.legal.length && V.legal.indexOf(c) < 0 && V.assist;
+        k.mesh.material.color.setScalar(dim ? 0.5 : 1);
+        k.mesh.material.emissiveIntensity = c === C.hover && !dim ? 0.32 : dim ? 0.05 : 0.16;
       } else if (inTrick[c]) {
         const t = inTrick[c];
-        // Ours, just played: it rises from the bottom of the screen, where the strip is.
-        if (was === "mine" && V.launch) k.pos.copy(V.launch);
         if (was === "hidden") {
           // Someone else's card: it comes from their tray.
           traySpot(t.seat, 6, 13, 0.04, k.pos, k.q);

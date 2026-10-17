@@ -84,7 +84,6 @@ body.touch #btnZoom, body.touch #btnHelp, body.touch #btnLeave, body.touch .look
 .status.no-timer .ring { display: none; }
 .status.no-timer { padding-left: 16px; }
 .hud:has(#bidPanel:not([hidden])) .status { display: none; }
-.hud:has(.bid-panel:not([hidden])) .chat { bottom: calc(var(--dock) + 84px); }
 /* The Play button says it's your turn: the status steps aside for it. */
 .hud:has(#btnPlayCard:not([hidden])) .status { display: none; }
 /* A little playing card (HUD). */
@@ -96,7 +95,8 @@ body.touch #btnZoom, body.touch #btnHelp, body.touch #btnLeave, body.touch .look
    the bottom. Lines stay (players found hands hard to follow when they faded): the
    whole game's feed scrolls, a divider marks each new hand, and it follows the newest
    line unless you've scrolled up to read back. */
-.chat { position: absolute; left: max(12px, env(safe-area-inset-left)); bottom: calc(var(--dock) + 4px); width: min(360px, 46vw); max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-right: 6px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
+/* Top left (user ask 2026-10-16). */
+.chat { position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); width: min(360px, 46vw); max-height: 36vh; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-right: 6px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.28) transparent; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 18px); mask-image: linear-gradient(to bottom, transparent 0, #000 18px); }
 .chat > :first-child { margin-top: auto; }
 .chat { touch-action: pan-y; }   /* (the page is touch-action: none) */
 .msg { flex: none; max-width: 100%; padding: 3px 10px 3px 8px; border-radius: 10px; border-left: 3px solid transparent; background: rgba(10, 12, 20, 0.34); color: var(--text); font-size: 15px; font-weight: 600; line-height: 1.45; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.75); animation: msgIn 0.3s ease-out; }
@@ -221,7 +221,7 @@ body.touch .look-pad button { width: 46px; height: 46px; }
   .team .sc { font-size: 16px; min-width: 30px; }
   .team .sub { font-size: 10px; }
   .scores .meta { display: none; }
-  .chat { max-height: 40vh; width: min(320px, 44vw); gap: 3px; }
+  .chat { top: max(6px, env(safe-area-inset-top)); max-height: 40vh; width: min(320px, 44vw); gap: 3px; }
   .msg { font-size: 12.5px; padding: 2px 8px 2px 6px; }
   .msg.quiet { font-size: 11.5px; }
   .msg .mc { font-size: 12px; min-width: 28px; }
@@ -229,9 +229,8 @@ body.touch .look-pad button { width: 46px; height: 46px; }
   .status { font-size: 13px; padding: 5px 12px 5px 7px; }
   .ring { width: 24px; height: 24px; }
   .bid-panel { padding: 4px 8px 6px; width: min(640px, 66vw); }
-  /* While the bid strip is up: the feed steps up out of its way, the look buttons hide. */
+  /* While the bid strip is up, the look buttons hide. */
   .hud:has(.bid-panel:not([hidden])) .look-pad { display: none; }
-  .hud:has(.bid-panel:not([hidden])) .chat { bottom: calc(var(--dock) + 66px); max-height: 26vh; }
   .look-pad { bottom: calc(max(6px, env(safe-area-inset-bottom)) + 46px); }
   .bid-title { font-size: 13px; } .bid-sub { font-size: 11.5px; }
   .bid-grid { gap: 3px; margin-top: 4px; }
@@ -264,7 +263,7 @@ body.touch .look-pad button { width: 46px; height: 46px; }
   .menu { justify-content: center; background: rgba(7, 11, 30, 0.6); }
 }
 /* A phone held upright (Spades feedback 2026-10-16: "too convoluted"). From the top: the
-   scores in one slim bar, the table, a short feed (left) with ☺ ⚙ (right), the status
+   scores in one slim bar, a short feed (top left), the table, ☺ ⚙ (right), the status
    or the bid strip, and your hand across the bottom. */
 @media (max-aspect-ratio: 4/5) {
   .hud { --cw: min(18vw, 88px); --hw: calc(100vw - 16px); }
@@ -275,16 +274,17 @@ body.touch .look-pad button { width: 46px; height: 46px; }
   .team .tn span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .scores .meta { display: none; }
   .corner { flex-direction: column; bottom: calc(var(--dock) + 52px); }
-  .chat { bottom: calc(var(--dock) + 52px); width: min(300px, 70vw); max-height: 15vh; gap: 3px; }
+  /* Narrow enough to clear your partner's name tag (the lime edge marks their lines, so the PARTNER pill goes). */
+  .chat { left: 8px; top: calc(max(8px, env(safe-area-inset-top)) + 50px); width: min(250px, 41vw); max-height: 14vh; gap: 3px; }
+  .msg .tagp { display: none; }
   .msg { font-size: 12.5px; padding: 2px 8px 2px 6px; }
   .msg.quiet { font-size: 11.5px; }
   .msg .mc { font-size: 12px; min-width: 28px; }
   .msg.hand-div { font-size: 10.5px; }
   .bid-panel { width: calc(100vw - 16px); }
-  .hud:has(.bid-panel:not([hidden])) .chat, .hud:has(.bid-panel:not([hidden])) .corner { bottom: calc(var(--dock) + 150px); }
-  .hud:has(.bid-panel:not([hidden])) .chat { max-height: 12vh; }
+  .hud:has(.bid-panel:not([hidden])) .corner { bottom: calc(var(--dock) + 150px); }
   .wheel { bottom: calc(var(--dock) + 52px); right: 66px; }
-  .coach { left: 8px; right: 8px; width: auto; top: 64px; }
+  .coach { left: 8px; right: 8px; width: auto; top: 30%; }
 }
 
 /* ---------- the villa: walking, the table prompt, the stick ---------- */

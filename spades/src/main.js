@@ -290,7 +290,7 @@ globalThis.HS = globalThis.HS || {};
     frame(dt);
     View.render();
   }
-  const _focus = new THREE.Vector3(), _launch = new THREE.Vector3();
+  const _focus = new THREE.Vector3();
   function clampCam(p) {
     // Scene -> villa coordinates, keep inside the terrace (not in the villa, not over the sea), back.
     const o = Room.world.position;
@@ -331,9 +331,8 @@ globalThis.HS = globalThis.HS || {};
     const myTurn = playing && Net.myTurn();
     const legal = myTurn && st.ph === "play" ? Net.legal() : [];
     const faceDown = playing && st.ph === "bid" && st.bl[seat] && st.o.blind && st.bids[seat] === null && !G.looked;
-    // A card we play rises from just under the camera, where the hand strip is.
-    const launch = playing ? _launch.set(0, -0.13, -0.32).applyQuaternion(View.camera.quaternion).add(View.camera.position) : null;
-    Cards.update({ st: st, hand: hand, seat: seat, eye: Seats.eye, launch: launch, dt: dt });
+    Cards.hover = G.hover; Cards.picked = G.picked;
+    Cards.update({ st: st, hand: hand, seat: seat, eye: Seats.eye, legal: legal, assist: G.prefs.assist, faceDown: faceDown, dt: dt });
     if (playing) H.hand({ cards: hand.slice(0, Cards.mineDealt), legal: legal, assist: G.prefs.assist, picked: G.picked, hover: G.hover, faceDown: faceDown, turn: myTurn && st.ph === "play" });
     if (LINEUP) View.update({ mode: "walk", focus: _focus.set(G.lineupX || 0, 1.2, 9), dt: dt, t: G.t });
     else View.update({ mode: playing ? "seat" : "walk", seat: seat, eye: Seats.eye, dt: dt, t: G.t, focus: Crowd.focus(_focus), clamp: clampCam });
