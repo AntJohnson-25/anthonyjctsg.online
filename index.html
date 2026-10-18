@@ -623,6 +623,14 @@
             transform: translateX(-50%);
         }
 
+        /* the stack runs top to bottom, so the dots stand in a column at the side */
+        .carousel.is-vertical .carousel-dots {
+            right: 1rem;
+            top: 50%;
+            flex-direction: column;
+            transform: translateY(-50%);
+        }
+
         .carousel-dots button {
             width: 10px;
             height: 10px;
@@ -2053,8 +2061,10 @@
     <script src="ctsg-data.js"></script>
     <script src="halloween.js?v=1"></script>
     <script>
-        // Game carousel: one horizontal row of cards. Desktop: the mouse wheel
-        // over the carousel slides the row one card at a time; past the first/
+        // Game carousel: one vertical stack of cards, the selected one in the
+        // middle and its neighbours dimmed above and below (the user picked this
+        // over the old horizontal row, 2026-10-18). Desktop: the mouse wheel
+        // over the carousel moves the stack one card at a time; past the first/
         // last card the page scrolls as normal, so the clips below stay
         // reachable. Phones: swipe left/right.
         // Clicking or tapping a card launches that game. Arrow keys + Enter work
@@ -2121,21 +2131,18 @@
             });
 
             function layout() {
-                // Cards line up in one horizontal row everywhere (the user
-                // didn't want a vertical stack). `wide` = desktop: the mouse
-                // wheel slides the row and more neighbours are visible.
+                // Cards stack top to bottom everywhere. `wide` = desktop: the
+                // mouse wheel moves the stack.
                 wide = !phone.matches;
-                root.classList.add('is-horizontal');
+                root.classList.add('is-vertical');
                 hint.innerHTML = wide ? 'Scroll to browse &middot; Click to play' : 'Swipe to browse &middot; Tap to play';
                 var r = root.getBoundingClientRect();
                 var barH = 84;   // name line + reactions line under the art
-                // Desktop: ~21% of the width so all five games sit in one row.
-                // Phone: ~74%, so the neighbours just peek at the edges.
-                // (The carousel shares the screen with the side panel on desktop,
-                // so a narrower row gets bigger cards and fewer neighbours.)
+                // The selected card takes ~60% of the height, so the cards above
+                // and below peek in at the top and bottom edges.
                 cardW = wide
-                    ? Math.min(400, r.width * (r.width < 1100 ? 0.27 : 0.195), (r.height * 0.72 - barH) * 1.6)
-                    : Math.min(520, r.width * 0.74, (r.height * 0.8 - barH) * 1.6);
+                    ? Math.min(460, r.width * 0.56, (r.height * 0.6 - barH) * 1.6)
+                    : Math.min(520, r.width * 0.8, (r.height * 0.6 - barH) * 1.6);
                 cardW = Math.max(200, cardW);
                 cardH = cardW / 1.6 + barH;
                 root.style.setProperty('--card-w', cardW + 'px');
@@ -2143,8 +2150,8 @@
             }
 
             function render() {
-                var step = wide ? cardW * 1.0 : cardW * 0.92;
-                var reach = wide ? 4 : 1;   // how many neighbours stay visible each side
+                var step = cardH * 0.96;   // neighbours (scaled 0.82) clear the selected card
+                var reach = 2;   // how many neighbours stay visible above and below
                 all.forEach(function (card) {
                     var i = cards.indexOf(card);
                     if (i < 0) {   // filtered out: parked in the middle, invisible
@@ -2155,8 +2162,8 @@
                         return;
                     }
                     var d = i - active, a = Math.abs(d);
-                    card.style.transform = 'translate(-50%, -50%) translateX(' + (d * step) + 'px) scale(' + (a ? (wide ? 0.86 : 0.82) : 1) + ')';
-                    card.style.opacity = a === 0 ? 1 : a === 1 ? 0.8 : a <= reach ? 0.55 : 0;
+                    card.style.transform = 'translate(-50%, -50%) translateY(' + (d * step) + 'px) scale(' + (a ? 0.82 : 1) + ')';
+                    card.style.opacity = a === 0 ? 1 : a === 1 ? 0.7 : a <= reach ? 0.3 : 0;
                     card.style.zIndex = 10 - a;
                     card.style.pointerEvents = a > reach ? 'none' : '';
                     card.classList.toggle('is-active', a === 0);
