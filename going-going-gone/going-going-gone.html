@@ -321,7 +321,7 @@ const { Bat } = __pb.req("js/gear.js");
 const { Picker, rememberPlayer } = __pb.req("js/select.js");
 const { BallFX, Flags } = __pb.req("js/fx.js");
 const { assetURL } = __pb.req("js/assets.js");
-const { unlockAudio, toggleMute, sfx, machineHum } = __pb.req("js/audio.js");
+const { unlockAudio, toggleMute, sfx, machineHum, musicEl } = __pb.req("js/audio.js");
 
 const Q = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -1142,7 +1142,7 @@ window.BC = {
   step: (n, dt, noRender) => { for (let i = 0; i < n; i++) step(dt || 1 / 60); if (!noRender) renderer.render(scene, camera); },
   info: { HIT, MISS, D_HIT, ROOT, CONTACT, START },
   cam: (p, l) => { PLAY_CAM.pos.fromArray(p); if (l) PLAY_CAM.look.fromArray(l); camera.position.copy(PLAY_CAM.pos); look.copy(PLAY_CAM.look); },
-  R, P,
+  R, P, musicEl,
   ch, bat, clipPose, qT, hT   // grip checks (Work/grip.js)
 };
 
@@ -2433,23 +2433,49 @@ function unlockAudio() {
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     startMusic();
   }
-  if (ctx.state === "suspended") ctx.resume();
+  // iPhone parks the context as "interrupted" after a call, lock screen or app switch.
+  if (ctx.state !== "running") ctx.resume();
+  keepMusic();   // every tap is a user gesture, so a paused track can always start again here
 }
 
-// The soundtrack ("Bleacher Seats"): a looping file, routed through the context so the volume works
-// on iPhone (it ignores <audio>.volume) and the M / mute button silences it with everything else.
-const MUSIC_VOL = 0.4;
+// The soundtrack ("Bleacher Seats"), quiet under the game, looping for as long as the page is open.
+// Routed through the context so the volume works on iPhone (it ignores <audio>.volume) and the M / mute
+// button silences it with everything else. It used to stop after a while on iPhone: the element wasn't
+// referenced anywhere, and Safari doesn't loop an embedded data: URL reliably. So the data: URL becomes
+// a Blob URL, the element is kept in `music`, and anything that pauses it (iOS interruptions) restarts it.
+const MUSIC_VOL = 0.25;
+let music = null;
+// Synchronous on purpose: iPhone only lets play() start inside the tap that called unlockAudio.
 function startMusic() {
   try {
-    const el = new Audio(assetURL("audio/bleacher_seats.mp3"));
-    el.loop = true;
+    let src = assetURL("audio/bleacher_seats.mp3");
+    if (src.startsWith("data:")) {
+      const bin = atob(src.slice(src.indexOf(",") + 1)), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      src = URL.createObjectURL(new Blob([bytes], { type: "audio/mpeg" }));
+    }
+    music = new Audio(src);
+    music.loop = true;
     const g = ctx.createGain();
     g.gain.value = MUSIC_VOL;
-    ctx.createMediaElementSource(el).connect(g);
+    ctx.createMediaElementSource(music).connect(g);
     g.connect(master);
-    el.play().catch(() => {});
+    music.addEventListener("ended", keepMusic);   // in case loop is ignored
+    music.addEventListener("pause", () => setTimeout(keepMusic, 500));
+    keepMusic();
   } catch (e) { /* no music is better than no game */ }
 }
+const musicEl = () => music;   // test hook
+function keepMusic() {
+  if (!music || document.hidden || !music.paused) return;
+  if (music.ended) music.currentTime = 0;
+  music.play().catch(() => {});
+}
+document.addEventListener("visibilitychange", () => {
+  if (!ctx || document.hidden) return;
+  if (ctx.state !== "running") ctx.resume();
+  keepMusic();
+});
 function toggleMute() {
   muted = !muted;
   if (master) master.gain.value = muted ? 0 : 0.55;
@@ -2527,7 +2553,7 @@ function machineHum(on) {
   }
 }
 
-return { unlockAudio, toggleMute, sfx, machineHum };
+return { unlockAudio, musicEl, toggleMute, sfx, machineHum };
 };
 __pb.req('js/main.js').catch(function (e) { console.error(e); var m = document.getElementById('ld-msg'); if (m) m.textContent = 'Could not start: ' + e.message; });
 })();
