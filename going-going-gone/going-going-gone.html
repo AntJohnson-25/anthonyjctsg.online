@@ -1010,8 +1010,8 @@ function buildLevels() {
   $("levels").innerHTML = LEVELS.map((L, i) => `<button class="lv${i === level ? " on" : ""}" data-i="${i}"><b>${L.name}</b><span>${L.mph} mph${L.mix.length ? " + off-speed" : ""}</span><em>${save.best[i] ? "best " + save.best[i] : ""}</em></button>`).join("");
   $("levels").querySelectorAll(".lv").forEach((b) => b.addEventListener("click", () => { unlockAudio(); pickLevel(+b.dataset.i); }));
 }
-// iPhone Safari ignores user-scalable=no: stop double-tap zoom on the controls.
-document.addEventListener("touchend", (e) => { if (e.target.closest("button")) e.preventDefault(); }, { passive: false });
+// Double-tap zoom on the controls is stopped by touch-action: manipulation in the CSS. Don't
+// preventDefault touchend on buttons here: on phones that cancels the click, so no menu button works.
 
 // ---- frame ---------------------------------------------------------------------------------------------
 let shake = 0;
