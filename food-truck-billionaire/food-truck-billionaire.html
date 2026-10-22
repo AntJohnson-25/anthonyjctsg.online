@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel double-tap zoom and pinch (as on the arcade's other games). */
+(function () {
+  var last = 0;
+  document.addEventListener("touchend", function (e) { var now = Date.now(); if (now - last < 350) e.preventDefault(); last = now; }, { passive: false });
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+  document.addEventListener("touchmove", function (e) { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="theme-color" content="#0B0E12">
+<title>Food Truck Billionaire</title>
+<meta name="description" content="Food Truck Billionaire: work a hot dog cart on a 3D city corner, buy your first food truck, cook the line yourself and turn one truck into a billion-dollar empire.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<div id="app">
+  <div id="viewport"></div>
+
+  <div id="hud">
+    <!-- top bar -->
+    <div id="topbar">
+      <div id="clock" class="panel">
+        <svg id="dayring" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,.1)"></circle>
+          <circle id="dayarc" cx="20" cy="20" r="16" stroke="#F5D97A" stroke-dasharray="100.5" stroke-dashoffset="100.5"></circle>
+        </svg>
+        <div>
+          <div class="day">DAY <span id="dayNum">1</span></div>
+          <div class="time" id="clockTime">8:00 AM</div>
+          <div class="date" id="clockDate">January 1, Year 1</div>
+        </div>
+      </div>
+      <div id="stats" class="panel"></div>
+      <div id="speedbox" class="panel">
+        <button class="sp" data-s="0">❚❚</button>
+        <button class="sp on" data-s="1">1×</button>
+        <button class="sp" data-s="2">2×</button>
+        <button class="sp" data-s="4">4×</button>
+      </div>
+    </div>
+
+    <!-- left rail -->
+    <div id="rail" class="panel">
+      <button class="tool" data-panel="finance" data-tip="Finances">📊</button>
+      <button class="tool" data-panel="market"  data-tip="Commodity market">📈</button>
+      <button class="tool" data-panel="trucks"  data-tip="My trucks">🚚</button>
+      <button class="tool" data-panel="staff"   data-tip="Staff">👥</button>
+      <button class="tool" data-panel="upgrade" data-tip="Upgrades">🔧</button>
+      <button class="tool" data-panel="menu"    data-tip="Menu &amp; pricing">🍔</button>
+      <button class="tool" data-panel="park"    data-tip="Park ownership"><span class="dot"></span>🏙️</button>
+      <button class="tool" data-open="phone"    data-tip="Social media">📱</button>
+      <button class="tool" data-open="fairs"    data-tip="Fairs &amp; events">🎪</button>
+      <button class="tool" data-open="regulars" data-tip="Regulars">💬</button>
+      <button class="tool" data-panel="empire"  data-tip="Expansion">🌎</button>
+      <button class="tool" data-panel="settings" data-tip="Save / settings">⚙️</button>
+    </div>
+
+    <div id="notes"></div>
+
+    <div id="inspect" class="panel"></div>
+
+    <div id="dock" class="panel">
+      <button class="dockbtn hot" id="btnKitchen">Enter kitchen</button>
+      <button class="dockbtn" id="btnPark">Park view</button>
+      <button class="dockbtn" id="btnSound">🔊</button>
+    </div>
+
+    <div id="banner"><div class="b1"></div><div class="b2"></div></div>
+  </div>
+
+  <!-- kitchen: the order rail over the inside of your 3D truck -->
+  <div id="kitchen">
+    <div id="rail-bar"></div>
+    <div id="chits"></div>
+    <div id="stations"></div>
+    <div id="khelp"><span class="desk"><kbd>←↑↓→</kbd> walk the line · <kbd>E</kbd> cook / hand over · drag to look · <kbd>V</kbd> park</span><span class="touch">thumb on the left to walk · tap the prompt to cook</span></div>
+    <div id="kstats" class="panel"></div>
+    <button id="kexit" class="dockbtn">Back to park</button>
+  </div>
+
+  <!-- food cart prologue: before you ever own a truck (the street is 3D, behind this) -->
+  <div id="cart">
+    <div id="cartwrap">
+      <div id="carttop"></div>
+      <div id="cartqueue"></div>
+      <div id="cartstagewrap"></div>
+      <div id="cartorder"></div>
+    </div>
+    <div id="carthotspots"></div>
+    <div id="cartstreak"></div>
+    <div id="cartserved"></div>
+  </div>
+
+  <!-- modal -->
+  <div id="veil"><div class="sheet panel" id="sheet"></div></div>
+
+  <!-- start screen -->
+  <div id="start">
+    <div id="selveil"></div>
+    <div class="logo" role="img" aria-label="Food Truck Billionaire">
+      <div class="lk lk-food"><span class="tl">F</span><span class="tl">O</span><span class="tl">O</span><span class="tl">D</span></div>
+      <div class="lk lk-truck"><span class="tl w">T</span><span class="tl">R</span><span class="tl w">U</span><span class="tl">C</span><span class="tl w">K</span></div>
+      <div class="lk lk-bill"><span class="tl">B</span><span class="tl">I</span><span class="tl">L</span><span class="tl">L</span><span class="tl">I</span><span class="tl">O</span><span class="tl">N</span><span class="tl">A</span><span class="tl">I</span><span class="tl">R</span><span class="tl">E</span></div>
+    </div>
+    <div class="sub">One truck · one park · one billion</div>
+    <div class="steps" id="startSteps"></div>
+  </div>
+
+  <!-- landing: the key art full screen (the tall version on phones held upright), then PLAY -->
+  <div id="landing">
+    <div class="landing-foot">
+      <p class="landing-tag">From a hot dog cart to a billion</p>
+      <button type="button" class="btn primary" id="btnPlay">PLAY</button>
+    </div>
+  </div>
+</div>
+<div id="err" hidden></div>
+
+<script>
+/* The game's scripts, in order. They download in parallel and each one is retried if the network
+   drops it; then they run in this order. The characters (chars/*.js) load after these, from
+   src/body.js. */
+(function () {
+  var FILES = ["vendor/three.min.js", "src/cast.js?v=1", "src/clips.js?v=1", "src/body.js?v=1", "src/input.js?v=1",
+    "src/people.js?v=1", "src/truck3d.js?v=1", "src/crew.js?v=1", "src/cart3d.js?v=1", "src/game.js?v=1"];
+  function fail(src) {
+    var el = document.getElementById("err");
+    el.hidden = false;
+    el.textContent = "Couldn't download " + src.split("?")[0] + ". Check your connection and reload.";
+  }
+  if (location.protocol === "file:") {
+    FILES.forEach(function (src) { document.write('<script src="' + src + '"><\/script>'); });
+    return;
+  }
+  function get(src, attempt) {
+    var url = attempt ? src + (src.indexOf("?") < 0 ? "?" : "&") + "retry=" + attempt : src;
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.text();
+    }).catch(function () {
+      if (attempt >= 4) { fail(src); throw new Error("gave up on " + src); }
+      return new Promise(function (ok) { setTimeout(ok, 400 * (attempt + 1)); }).then(function () { return get(src, attempt + 1); });
+    });
+  }
+  Promise.all(FILES.map(function (src) { return get(src, 0); })).then(function (texts) {
+    texts.forEach(function (text, i) {
+      var s = document.createElement("script");
+      s.textContent = text + "\n//# sourceURL=" + new URL(FILES[i], location.href).href;
+      document.body.appendChild(s);
+    });
+  }, function () { /* fail() already said which file */ });
+})();
+</script>
+</body>
+</html>

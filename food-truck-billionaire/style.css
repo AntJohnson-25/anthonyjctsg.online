@@ -1,0 +1,553 @@
+/* ============================================================
+   BILLIONAIRE FOOD TRUCK — design tokens
+   Palette: "midnight service window"
+   --ink       #0B0E12  deep kitchen night
+   --slate     #141922  panel body
+   --steel     #1F2733  raised surface / brushed steel
+   --chit      #F5D97A  order-ticket amber (signature)
+   --grease    #E8663C  burner orange
+   --mint      #4FD1A5  profit / positive
+   --blood     #FF5A5A  loss / warning
+   --paper     #E7E9EE  primary text
+   Signature element: the ORDER RAIL — real paper chits that clip
+   onto a steel rail across the top of the kitchen view.
+   ============================================================ */
+:root{
+  --ink:#0B0E12; --slate:#141922; --steel:#1F2733; --steel2:#2A3442;
+  --chit:#F5D97A; --grease:#E8663C; --mint:#4FD1A5; --blood:#FF5A5A;
+  --paper:#E7E9EE; --dim:#8A93A3; --line:rgba(255,255,255,.09);
+  --glass:rgba(20,25,34,.82);
+  --disp:'Bricolage Grotesque','Archivo',system-ui,sans-serif;
+  --ui:'Archivo',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--ink);color:var(--paper);font-family:var(--ui);
+  -webkit-font-smoothing:antialiased;overscroll-behavior:none;touch-action:manipulation}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+canvas{display:block}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--steel2);border-radius:8px}
+::-webkit-scrollbar-track{background:transparent}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ---------- layout ---------- */
+#app{position:fixed;inset:0}
+#viewport{position:absolute;inset:0;touch-action:none}
+/* shown in place of the park when the device refuses a WebGL context */
+.glfail{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;
+  align-items:center;justify-content:center;text-align:center;padding:0 28px;
+  font-size:13px;line-height:1.6;color:var(--dim)}
+.glfail b{display:block;font-family:var(--disp);font-size:19px;color:var(--paper)}
+#hud{position:absolute;inset:0;pointer-events:none}
+#hud > *{pointer-events:auto}
+
+/* ---------- shared panel ---------- */
+.panel{background:var(--glass);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:0 18px 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06)}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
+
+/* ---------- top bar ---------- */
+#topbar{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+#clock{padding:10px 16px;display:flex;gap:14px;align-items:center;min-width:190px}
+#clock .day{font-family:var(--disp);font-size:26px;line-height:.95;letter-spacing:-.02em}
+#clock .time{font-family:var(--mono);font-size:13px;color:var(--chit)}
+#clock .date{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;color:var(--dim);margin-top:1px}
+#dayring{width:40px;height:40px;flex:0 0 40px;transform:rotate(-90deg)}
+#dayring circle{fill:none;stroke-width:4;stroke-linecap:round}
+
+#stats{flex:1;display:flex;gap:2px;padding:8px 6px;overflow-x:auto;scrollbar-width:none}
+#stats::-webkit-scrollbar{display:none}
+.stat{padding:2px 14px;min-width:104px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:none}
+.stat .v{font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:-.02em;white-space:nowrap}
+.stat .v.pos{color:var(--mint)} .stat .v.neg{color:var(--blood)}
+.stat .v.flash{animation:flash .5s ease}
+@keyframes flash{0%{transform:translateY(-3px);filter:brightness(2)}100%{transform:none}}
+
+#speedbox{display:flex;align-items:center;padding:6px;gap:4px}
+.sp{width:34px;height:32px;border-radius:9px;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--dim)}
+.sp:hover{background:var(--steel)}
+.sp.on{background:var(--chit);color:#231d07}
+
+/* ---------- left tool rail ---------- */
+#rail{position:absolute;left:12px;top:96px;display:flex;flex-direction:column;gap:6px;padding:8px}
+.tool{width:46px;height:46px;border-radius:11px;display:grid;place-items:center;font-size:19px;position:relative;
+  transition:background .15s,transform .15s}
+.tool:hover{background:var(--steel);transform:translateX(2px)}
+.tool.on{background:var(--grease)}
+.tool[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:54px;top:50%;transform:translateY(-50%);
+  background:var(--steel);border:1px solid var(--line);padding:5px 10px;border-radius:8px;font-size:11px;
+  white-space:nowrap;font-family:var(--mono);letter-spacing:.04em;z-index:5}
+.tool .dot{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:var(--blood);display:none}
+.tool.alert .dot{display:block;animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+/* ---------- notifications ---------- */
+#notes{position:absolute;right:12px;top:96px;width:298px;display:flex;flex-direction:column;gap:8px}
+.note{padding:11px 13px;border-left:3px solid var(--chit);border-radius:10px;background:var(--glass);
+  backdrop-filter:blur(14px);border-top:1px solid var(--line);border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line);animation:slidein .38s cubic-bezier(.2,.9,.3,1.3)}
+.note.good{border-left-color:var(--mint)} .note.bad{border-left-color:var(--blood)}
+.note.money{border-left-color:var(--grease)}
+.note h4{font-size:12.5px;font-weight:800;letter-spacing:-.01em;margin-bottom:2px}
+.note p{font-size:11.5px;color:var(--dim);line-height:1.4}
+.note.out{animation:slideout .3s forwards}
+@keyframes slidein{from{transform:translateX(40px);opacity:0}}
+@keyframes slideout{to{transform:translateX(40px);opacity:0;height:0;padding:0;margin:0}}
+
+/* ---------- bottom dock ---------- */
+#dock{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;padding:8px;align-items:center}
+.dockbtn{padding:10px 18px;border-radius:11px;font-size:12.5px;font-weight:700;letter-spacing:.02em;
+  background:var(--steel);border:1px solid var(--line);transition:.15s}
+.dockbtn:hover{background:var(--steel2);transform:translateY(-2px)}
+.dockbtn.hot{background:var(--grease);border-color:transparent;box-shadow:0 6px 20px rgba(232,102,60,.4)}
+.dockbtn.hot:hover{background:#f2764d}
+.dockbtn:disabled{opacity:.35;cursor:default;transform:none}
+
+/* ---------- generic modal ---------- */
+#veil{position:absolute;inset:0;background:rgba(5,7,10,.72);backdrop-filter:blur(6px);display:none;
+  align-items:center;justify-content:center;padding:24px;z-index:80}
+#veil.open{display:flex}
+.sheet{width:min(880px,100%);max-height:88vh;overflow:auto;padding:26px 28px;animation:pop .3s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pop{from{transform:scale(.94) translateY(14px);opacity:0}}
+.sheet h2{font-family:var(--disp);font-size:30px;letter-spacing:-.03em;line-height:1;margin-bottom:4px}
+.sheet h3{font-family:var(--disp);font-size:17px;letter-spacing:-.02em;margin:18px 0 8px}
+.sheet p{font-size:13px;color:var(--dim);line-height:1.55}
+.close{position:sticky;float:right;top:0;font-size:20px;color:var(--dim);width:32px;height:32px;border-radius:9px}
+.close:hover{background:var(--steel);color:var(--paper)}
+
+/* ---------- cards & tables ---------- */
+.grid{display:grid;gap:10px;margin-top:12px}
+.card{background:var(--steel);border:1px solid var(--line);border-radius:12px;padding:14px;transition:.15s}
+.card.sel{border-color:var(--chit);box-shadow:0 0 0 1px var(--chit) inset}
+.card.pick{cursor:pointer} .card.pick:hover{background:var(--steel2);transform:translateY(-2px)}
+.card h4{font-size:14px;font-weight:800;letter-spacing:-.01em;margin-bottom:3px}
+.kv{display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+.kv:last-child{border:none}
+.kv span:first-child{color:var(--dim)}
+.kv span:last-child{font-family:var(--mono);font-weight:500}
+.bar{height:6px;border-radius:4px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:6px}
+.bar > i{display:block;height:100%;background:var(--chit);border-radius:4px;transition:width .3s}
+.tag{display:inline-block;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 7px;border-radius:5px;background:rgba(255,255,255,.08);color:var(--dim)}
+.tag.mine{background:rgba(79,209,165,.16);color:var(--mint)}
+.tag.hot{background:rgba(232,102,60,.18);color:var(--grease)}
+.btn{padding:9px 16px;border-radius:10px;font-size:12px;font-weight:700;background:var(--steel2);
+  border:1px solid var(--line);transition:.15s;margin-top:8px}
+.btn:hover{background:#38455a}
+.btn.primary{background:var(--chit);color:#221c06;border-color:transparent}
+.btn.primary:hover{background:#ffe89a}
+.btn.danger{background:rgba(255,90,90,.15);color:var(--blood)}
+.btn:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- SIGNATURE: the order rail ---------- */
+#kitchen{position:absolute;inset:0;display:none;z-index:20;pointer-events:none}
+#kitchen.open{display:block}
+
+#rail-bar{position:absolute;top:0;left:0;right:0;height:8px;
+  background:linear-gradient(180deg,#6f7a89,#39424f);box-shadow:0 3px 12px rgba(0,0,0,.6)}
+#chits{position:absolute;top:8px;left:0;right:0;height:210px;display:flex;gap:10px;padding:0 14px;
+  overflow-x:auto;overflow-y:hidden;align-items:flex-start;pointer-events:auto;scrollbar-width:none}
+#chits::-webkit-scrollbar{display:none}
+.chit{flex:0 0 168px;background:linear-gradient(175deg,#FFF6D8,#F0DFA6);color:#2A2313;border-radius:0 0 4px 4px;
+  padding:9px 10px 11px;box-shadow:0 10px 24px rgba(0,0,0,.5);transform-origin:top center;
+  animation:drop .4s cubic-bezier(.3,1.4,.5,1);position:relative}
+.chit::before{content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+  width:26px;height:12px;border-radius:3px;background:linear-gradient(180deg,#c9d2dd,#8c97a5);box-shadow:0 2px 4px rgba(0,0,0,.5)}
+@keyframes drop{from{transform:translateY(-140px) rotate(-6deg)}}
+.chit.done{filter:saturate(.5) brightness(1.06)}
+.chit.leaving{animation:chitout .35s forwards}
+@keyframes chitout{to{transform:translateY(-160px) rotate(8deg);opacity:0}}
+.chit .top{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1.5px dashed #b6a86e;padding-bottom:5px;margin-bottom:6px}
+.chit .who{font-size:10px;font-weight:900;letter-spacing:.04em;text-transform:uppercase}
+.chit .amt{font-family:var(--mono);font-size:11px;font-weight:600}
+.chit .it{display:flex;justify-content:space-between;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;padding:4px 5px;border-radius:5px;margin-bottom:3px;
+  background:rgba(0,0,0,.05);cursor:pointer;transition:.12s}
+.chit .it:hover{background:rgba(232,102,60,.24)}
+.chit .it.cooking{background:rgba(232,102,60,.3);cursor:default}
+.chit .it.ready{background:rgba(79,150,110,.28);color:#1d4634;cursor:default}
+.chit .it .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chit .pbar{height:3px;background:rgba(0,0,0,.14);border-radius:3px;margin-top:5px;overflow:hidden}
+.chit .pbar > i{display:block;height:100%;background:#C0392B;transition:width .18s linear}
+.chit .pbar > i.ok{background:#3f8f5f}
+.chit .serve{width:100%;margin-top:6px;padding:6px;border-radius:6px;background:#2A2313;color:#FFE9A8;
+  font-size:10px;font-weight:900;letter-spacing:.12em}
+.chit .serve:hover{background:#463a20}
+
+#stations{position:absolute;bottom:96px;left:50%;transform:translateX(-50%);display:flex;gap:12px;pointer-events:auto}
+.station{width:132px;padding:11px;border-radius:12px;background:var(--glass);border:1px solid var(--line);
+  backdrop-filter:blur(14px);text-align:center}
+.station .ic{font-size:22px;filter:grayscale(1) opacity(.45);transition:.2s}
+.station.busy .ic{filter:none;animation:sizzle .5s infinite alternate}
+@keyframes sizzle{to{transform:translateY(-2px) scale(1.06)}}
+.station .nm{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--dim);margin:3px 0 6px}
+.station .job{font-size:10.5px;font-weight:700;height:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#kexit{position:absolute;bottom:calc(26px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);pointer-events:auto}
+#kstats{position:absolute;right:12px;bottom:96px;width:210px;padding:12px;pointer-events:auto}
+
+/* ---------- FOOD CART PROLOGUE ---------- */
+/* the cart owns the screen, but toasts and banners still need to reach over it */
+body.cartmode #topbar,body.cartmode #rail,body.cartmode #dock,body.cartmode #inspect{display:none}
+body.cartmode #notes,body.cartmode #banner{z-index:70}
+#cart{position:absolute;inset:0;z-index:55;display:none;overflow:hidden;user-select:none;background:#0b0e12}
+#cart.open{display:flex;flex-direction:column}
+#cartwrap{position:relative;flex:1;display:flex;flex-direction:column;gap:8px;min-height:0;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+
+#carttop{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+#carttop .cbox{background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);
+  border-radius:11px;padding:8px 13px;min-width:88px}
+#carttop .cbox .eyebrow{margin-bottom:2px}
+#carttop .cbox b{font-family:var(--disp);font-size:19px;letter-spacing:-.02em;display:block;line-height:1.1}
+#cartclock i{display:block;height:4px;border-radius:3px;background:var(--chit);margin-top:5px;transition:width .2s linear}
+
+/* the line waiting at the cart */
+#cartqueue{display:flex;gap:8px;align-items:flex-end;min-height:86px;padding:0 2px}
+.cust{width:clamp(44px,13.5vw,74px);flex:0 0 clamp(44px,13.5vw,74px);text-align:center;
+  animation:custin .34s cubic-bezier(.3,1.3,.5,1)}
+@keyframes custin{from{transform:translateX(40px);opacity:0}}
+.cust.go{animation:custout .3s forwards}
+@keyframes custout{to{transform:translateY(-24px);opacity:0}}
+.cust .face{width:clamp(28px,8.2vw,44px);height:clamp(28px,8.2vw,44px);border-radius:50%;overflow:hidden;margin:0 auto;
+  background:var(--steel);filter:drop-shadow(0 3px 6px rgba(0,0,0,.6))}
+.cust .face img{width:100%;height:100%;object-fit:cover;object-position:center 28%;display:block}
+.cust .who{font-family:var(--mono);font-size:8.5px;letter-spacing:.06em;color:var(--dim);
+  margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cust .pat{height:4px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:4px;overflow:hidden}
+.cust .pat > i{display:block;height:100%;background:#3f8f5f;transition:width .2s linear}
+.cust .pat > i.warn{background:var(--chit)} .cust .pat > i.bad{background:var(--blood)}
+.cust.now{transform:scale(1.14);transform-origin:bottom center}
+.cust.now .face{width:clamp(34px,10.4vw,56px);height:clamp(34px,10.4vw,56px)}
+.cust.now .who{color:var(--paper);font-weight:700}
+
+/* the order you are actively building — a single slim strip, not a stacked
+   panel: it has to stay readable at a glance without stealing height from the
+   counter photo above it */
+#cartorder{flex:0 0 auto;display:flex;flex-direction:row;align-items:center;gap:10px;
+  background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);
+  border-radius:11px;padding:5px 12px;height:46px;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none}
+#cartorder::-webkit-scrollbar{display:none}
+#cartorder .hdr{flex:0 0 auto;display:flex;align-items:baseline;gap:9px;margin:0;
+  padding-right:11px;border-right:1px solid var(--line)}
+#cartorder .hdr h4{font-family:var(--disp);font-size:15px;letter-spacing:-.02em;line-height:1}
+#cartorder .hdr .amt{font-family:var(--mono);font-size:11.5px;color:var(--chit)}
+#cartorder .none{color:var(--dim);font-size:12px;padding:0;white-space:nowrap}
+.oi{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:8px;
+  background:rgba(0,0,0,.26);margin-bottom:6px;position:relative;overflow:hidden}
+#cartorder .oi{flex:0 0 auto;margin:0}
+#cartorder .oi .em{font-size:15px}
+#cartorder .oi .nm{flex:0 0 auto;font-size:12px}
+#cartorder .oi .ct{font-size:11px}
+.oi > .fill{position:absolute;left:0;top:0;bottom:0;background:rgba(232,102,60,.34);
+  transition:width .09s linear;z-index:0}
+.oi > *{position:relative;z-index:1}
+.oi .em{font-size:20px}
+.oi .nm{flex:1;font-size:13px;font-weight:700}
+.oi .ct{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.oi.done{background:rgba(79,150,110,.28)} .oi.done .ct{color:var(--mint)}
+
+@keyframes wrongsh{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+#cartstreak{position:absolute;right:10px;top:50%;transform:translateY(-50%);text-align:right;
+  pointer-events:none;opacity:0;transition:opacity .2s;z-index:2}
+#cartstreak.on{opacity:1}
+#cartstreak b{font-family:var(--disp);font-size:40px;letter-spacing:-.04em;color:var(--grease);
+  display:block;line-height:.9;text-shadow:0 4px 24px rgba(232,102,60,.6)}
+#cartstreak span{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--dim)}
+
+/* floating +$ and judgement text */
+.cfloat{position:absolute;pointer-events:none;font-family:var(--disp);font-size:22px;
+  letter-spacing:-.02em;animation:cfl 1s forwards;z-index:8}
+@keyframes cfl{to{transform:translateY(-58px);opacity:0}}
+
+@media (max-width:820px){
+  #cartqueue{min-height:78px}
+  #cartstreak b{font-size:30px}
+  #carttop .cbox{padding:6px 10px;min-width:72px} #carttop .cbox b{font-size:16px}
+  .hotspot .tag{font-size:8px;padding:2px 5px}
+  #cartorder{height:42px;padding:4px 9px;gap:8px}
+  #cartorder .hdr h4{font-size:13px} #cartorder .oi{padding:4px 8px}
+  #cartbleed{filter:blur(30px) saturate(1.2) brightness(.52)}}
+
+/* ---------- start screen ---------- */
+/* ---------- start screen ----------
+   The title is a tile lockup, not a font trick: FOOD as menu-board discs,
+   TRUCK as steel keys on wheels, BILLIONAIRE as a row of awning stalls.
+   Everything scales off --s so the whole thing is one knob wide. */
+#start{position:absolute;inset:0;z-index:60;--s:min(30px,calc((100vw - 52px)/29));
+  background:radial-gradient(1100px 720px at 50% 34%,#2C0F08,#160604 72%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow:auto}
+#start.compact{--s:min(15px,calc((100vw - 52px)/45))}
+/* warm bokeh, no extra DOM */
+#start::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(circle 3px at 18% 79%,rgba(214,110,45,.5),transparent),
+    radial-gradient(circle 4px at 76% 8%,rgba(214,110,45,.42),transparent),
+    radial-gradient(circle 3px at 50% 9%,rgba(232,172,72,.38),transparent),
+    radial-gradient(circle 5px at 88% 61%,rgba(214,110,45,.26),transparent),
+    radial-gradient(circle 3px at 21% 62%,rgba(232,172,72,.3),transparent),
+    radial-gradient(circle 4px at 8% 34%,rgba(214,110,45,.22),transparent)}
+
+#start .logo{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;
+  font-family:var(--disp);text-align:center}
+.lk{display:flex;align-items:flex-end;justify-content:center}
+.lk-food{gap:calc(var(--s)*.47)}
+.lk-truck{gap:calc(var(--s)*.7);margin-top:calc(var(--s)*.5)}
+.lk-bill{gap:calc(var(--s)*.17);margin-top:calc(var(--s)*1.65)}
+.tl{display:grid;place-items:center;font-weight:800;line-height:1;flex:0 0 auto}
+
+/* FOOD - menu-board discs */
+.lk-food .tl{width:calc(var(--s)*3.9);height:calc(var(--s)*3.9);border-radius:50%;
+  font-size:calc(var(--s)*1.95)}
+.lk-food .tl:nth-child(1){background:#D4551F;color:#FFF4E3}
+.lk-food .tl:nth-child(2){background:#F8CE4B;color:#6B3410}
+.lk-food .tl:nth-child(3){background:#F5C63F;color:#6B3410}
+.lk-food .tl:nth-child(4){background:#C8501B;color:#FFF8EC}
+
+/* TRUCK - steel keys, wheels under T U K */
+.lk-truck .tl{width:calc(var(--s)*3.1);height:calc(var(--s)*3.3);
+  border-radius:calc(var(--s)*.4);font-size:calc(var(--s)*1.65);position:relative}
+.lk-truck .tl.w::after{content:'';position:absolute;left:50%;margin-left:calc(var(--s)*-.26);
+  bottom:calc(var(--s)*-.78);width:calc(var(--s)*.52);height:calc(var(--s)*.52);
+  border-radius:50%;background:#6E7883}
+.lk-truck .tl:nth-child(1){background:#7C8894;color:#1C2128}
+.lk-truck .tl:nth-child(2){background:#9AA4AF;color:#1C2128}
+.lk-truck .tl:nth-child(3){background:#39424E;color:#C9D2DA}
+.lk-truck .tl:nth-child(4){background:#9AA4AF;color:#1C2128}
+.lk-truck .tl:nth-child(5){background:#7C8894;color:#1C2128}
+
+/* BILLIONAIRE - a row of stalls, each under its own awning. The uneven
+   heights are deliberate: a street of them, not a printed word. */
+.lk-bill .tl{width:calc(var(--s)*2.45);background:#3E8E52;color:#EDF7EE;
+  font-size:calc(var(--s)*1.4);position:relative;overflow:hidden;
+  border-radius:calc(var(--s)*.2) calc(var(--s)*.2) calc(var(--s)*.08) calc(var(--s)*.08);
+  padding-top:calc(var(--s)*.55)}
+.lk-bill .tl::before{content:'';position:absolute;top:0;left:0;right:0;height:calc(var(--s)*.26);background:#D2521E}
+.lk-bill .tl:nth-child(even){background:#46985A}
+.lk-bill .tl:nth-child(1){height:calc(var(--s)*3.55)}
+.lk-bill .tl:nth-child(2){height:calc(var(--s)*3.95);margin-bottom:calc(var(--s)*.1)}
+.lk-bill .tl:nth-child(3){height:calc(var(--s)*3.8);margin-bottom:calc(var(--s)*.04)}
+.lk-bill .tl:nth-child(4){height:calc(var(--s)*3.9);margin-bottom:calc(var(--s)*.12)}
+.lk-bill .tl:nth-child(5){height:calc(var(--s)*3.75)}
+.lk-bill .tl:nth-child(6){height:calc(var(--s)*3.95);margin-bottom:calc(var(--s)*.1)}
+.lk-bill .tl:nth-child(7){height:calc(var(--s)*3.6)}
+.lk-bill .tl:nth-child(8){height:calc(var(--s)*3.85);margin-bottom:calc(var(--s)*.08)}
+.lk-bill .tl:nth-child(9){height:calc(var(--s)*3.7);margin-bottom:calc(var(--s)*.03)}
+.lk-bill .tl:nth-child(10){height:calc(var(--s)*3.88);margin-bottom:calc(var(--s)*.09)}
+.lk-bill .tl:nth-child(11){height:calc(var(--s)*3.72)}
+
+#start .sub{position:relative;z-index:1;font-family:var(--mono);
+  font-size:calc(var(--s)*.42);letter-spacing:.16em;text-transform:uppercase;
+  color:#F0B94A;border:2px solid #C98B2E;border-radius:999px;
+  padding:.9em 1.7em;margin:calc(var(--s)*1.1) 0 0}
+#start .steps{width:min(940px,100%);position:relative;z-index:1;margin-top:30px}
+
+/* the three ways in - buttons, not paragraphs */
+#start .startrow{display:flex;gap:13px;flex-wrap:wrap;justify-content:center}
+.startbtn{position:relative;min-width:168px;padding:17px 24px 15px;border-radius:12px;
+  background:#24100B;border:1px solid rgba(255,255,255,.09);overflow:hidden;text-align:center;
+  transition:transform .16s,background .16s,border-color .16s}
+.startbtn > i{position:absolute;top:0;left:0;right:0;height:6px}
+.startbtn b{display:block;font-family:var(--disp);font-size:17px;letter-spacing:-.01em;color:#F3ECE4}
+.startbtn span{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.08em;
+  color:#A98D7D;margin-top:6px}
+.startbtn:hover{transform:translateY(-3px);background:#2F160E}
+.startbtn.go > i{background:#3E8E52} .startbtn.new > i{background:#D2521E} .startbtn.how > i{background:#7C8894}
+.startbtn.go:hover{border-color:#3E8E52} .startbtn.new:hover{border-color:#D2521E} .startbtn.how:hover{border-color:#7C8894}
+.stepwrap{display:none} .stepwrap.on{display:block;animation:pop .35s cubic-bezier(.2,.9,.3,1.2)}
+#selveil{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity 1.1s ease;
+  background:radial-gradient(900px 600px at 50% 40%,rgba(22,6,4,.55),rgba(22,6,4,.94) 75%)}
+#selveil.on{opacity:1}
+/* cuisine cards carry their own truck shot */
+.card.pick .shot{height:118px;border-radius:9px;margin:-4px -4px 10px;background-size:cover;
+  background-position:center;filter:saturate(.85) brightness(.8);transition:.2s}
+.card.pick:hover .shot{filter:none}
+#start h3{font-family:var(--disp);font-size:20px;letter-spacing:-.02em;margin-bottom:2px}
+.diffdot{display:inline-flex;gap:3px;align-items:center;margin-top:6px}
+.diffdot i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.16)}
+.diffdot i.on{background:var(--grease)}
+
+/* ---------- toast / big banner ---------- */
+#banner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:45;
+  pointer-events:none;display:none}
+#banner.show{display:block;animation:pop .45s cubic-bezier(.2,.9,.3,1.3)}
+#banner .b1{font-family:var(--disp);font-size:clamp(30px,6vw,64px);letter-spacing:-.04em;line-height:.95;
+  text-shadow:0 8px 40px rgba(0,0,0,.9)}
+#banner .b2{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--chit);margin-top:8px}
+
+/* ---------- charts ---------- */
+canvas.chart{width:100%;height:150px;display:block;border-radius:10px;background:rgba(0,0,0,.22);margin-top:8px}
+
+/* ---------- inspector ---------- */
+#inspect{position:absolute;right:12px;bottom:14px;width:288px;padding:16px;display:none}
+#inspect.open{display:block;animation:slidein .28s}
+
+/* ---------- mobile ---------- */
+@media (max-width:820px){
+  #notes{width:200px;top:auto;bottom:120px}
+  #inspect{left:12px;right:12px;width:auto;bottom:78px}
+  #rail{top:auto;bottom:78px;flex-direction:row;left:12px}
+  .tool{width:40px;height:40px}
+  #stats{max-width:100%}
+  #dock{bottom:8px;flex-wrap:wrap;justify-content:center;max-width:96vw}
+  #stations{bottom:150px;transform:translateX(-50%) scale(.86)}
+  #kstats{display:none}
+}
+
+/* The phone blocks live at the end on purpose: media queries carry no extra
+   specificity, so an equal-specificity base rule further down the sheet wins
+   regardless of the query. Sitting above the start-screen and HUD rules these
+   overrides were dead. Broader queries (820px) must stay above narrower ones. */
+/* ---------- phones ---------- */
+@media (max-width:520px){
+  #cartqueue{gap:5px}
+  #start{padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+  #start .steps{margin-top:22px}
+  #start .startrow{flex-direction:column;width:100%}
+  .startbtn{width:100%;min-width:0;padding:15px 18px 14px}
+  /* six stat boxes will not sit on one row; give the truck fund its own */
+  #carttop .cbox{flex:1 1 28%;min-width:0;padding:5px 8px}
+  #carttop .cbox b{font-size:14px}
+  #carttop .cbox[style]{flex:1 1 100%!important;min-width:0!important}
+  #veil{padding:10px}
+  .sheet{padding:18px 15px;max-height:92vh}
+  .sheet h2{font-size:23px}
+  .close{width:38px;height:38px}
+  .dockbtn{padding:12px 15px}
+  #stations{transform:translateX(-50%) scale(.7);bottom:118px}
+  .station{width:120px}
+}
+
+/* ---------- landscape phones: height is the scarce axis ---------- */
+@media (max-height:520px){
+  #cartqueue{min-height:62px}
+  #cartorder{height:38px}
+  #carttop .cbox{padding:4px 9px} #carttop .cbox b{font-size:14px}
+  #cartstreak b{font-size:24px}
+  #stations{bottom:96px;transform:translateX(-50%) scale(.72)}
+  #chits{height:150px}
+}
+
+/* ============================================================
+   3D (2026-10-22): every screen is a live 3D scene now. The panels
+   below float over it instead of over photographs.
+   ============================================================ */
+
+/* the kitchen is the inside of your truck: the rail floats over it, the
+   station tiles are the real stations, and you walk the line */
+#stations,#kart{display:none}
+#chits{height:180px}
+#khelp{position:absolute;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--paper);white-space:nowrap;
+  background:rgba(11,14,18,.55);border:1px solid var(--line);backdrop-filter:blur(10px);padding:6px 12px;border-radius:9px}
+#khelp kbd,.interact kbd{font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:5px;
+  border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08)}
+#khelp .touch{display:none}
+@media (pointer:coarse){ #khelp .touch{display:inline} #khelp .desk{display:none} }
+body.inkitchen #dock{display:none}
+body.inkitchen #inspect{display:none}
+/* in the kitchen the rail hangs under the clock (the money is on the Live service card) */
+body.inkitchen #rail,body.inkitchen #stats{display:none}
+body.inkitchen #topbar{justify-content:space-between}
+body.inkitchen #rail-bar{top:84px}
+body.inkitchen #chits{top:92px}
+@media (max-width:520px){ body.inkitchen #speedbox{display:none} body.inkitchen #chits{height:150px} .chit{flex-basis:150px} }
+
+/* what E does here (src/crew.js) */
+.interact{position:absolute;left:50%;bottom:calc(128px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  z-index:25;pointer-events:auto;padding:11px 18px;border-radius:12px;font-weight:800;font-size:14px;letter-spacing:.01em;
+  background:var(--chit);color:#231d07;box-shadow:0 10px 30px rgba(0,0,0,.45);white-space:nowrap;
+  animation:interactIn .3s cubic-bezier(.2,.9,.3,1.3) both}
+.interact kbd{border-color:rgba(0,0,0,.3);background:rgba(0,0,0,.12);color:#231d07}
+.interact span{font-weight:600;opacity:.75}
+.interact[hidden]{display:none}
+@keyframes interactIn{from{opacity:0;transform:translate(-50%,12px) scale(.92)}}
+
+/* the thumb wheel, only in the kitchen and only on touch screens */
+.stick-zone{position:absolute;left:0;top:200px;bottom:0;width:40%;z-index:2;display:none;touch-action:none}
+@media (pointer:coarse){ body.inkitchen .stick-zone{display:block} }
+.stick{position:fixed;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.35);background:rgba(0,0,0,.18);z-index:640;pointer-events:none}
+.stick[hidden]{display:none}
+.stick-knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.55)}
+
+/* the cart: the street corner shows through; only the panels take the mouse */
+#cart{background:transparent;pointer-events:none}
+#cartwrap{pointer-events:none}
+#carttop,#cartqueue,#cartorder{pointer-events:auto}
+#cartstagewrap{flex:1;min-height:0}
+#cartqueue{align-self:flex-start;background:rgba(11,14,18,.42);border:1px solid var(--line);border-radius:12px;
+  padding:6px 8px;backdrop-filter:blur(8px);min-height:0}
+.cust .face{display:grid;place-items:center;background:rgba(255,255,255,.9);font-size:clamp(18px,5vw,28px);line-height:1}
+.cust.now .face{font-size:clamp(22px,6.4vw,34px)}
+#carthotspots{position:absolute;inset:0;pointer-events:none;z-index:3}
+/* the item buttons ride on the real compartments (Cart3D.placeHotspots sets left/top) */
+.hotspot{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 11px 6px;border-radius:14px;
+  background:rgba(11,14,18,.72);border:2px solid rgba(255,255,255,.18);backdrop-filter:blur(8px);
+  transition:border-color .12s,background .12s,transform .07s;-webkit-tap-highlight-color:transparent;
+  min-width:64px}
+.hotspot::after{content:'';position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:6px solid transparent;
+  border-top-color:rgba(11,14,18,.72)}
+.hotspot .tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--paper);white-space:nowrap}
+.hotspot:hover{background:rgba(31,39,51,.85)}
+.hotspot:active,.hotspot.hit{transform:translate(-50%,-100%) scale(.93);background:rgba(232,102,60,.55)}
+.hotspot.want{border-color:var(--chit);box-shadow:0 0 0 1px var(--chit) inset,0 0 26px rgba(245,217,122,.45)}
+.hotspot.wrong{animation:wrongsh2 .28s;border-color:var(--blood)}
+@keyframes wrongsh2{25%{transform:translate(calc(-50% - 5px),-100%)}75%{transform:translate(calc(-50% + 5px),-100%)}}
+#cartstreak{z-index:4}
+.cfloat{text-shadow:0 3px 14px rgba(0,0,0,.8)}
+@media (max-width:520px){ .hotspot{min-width:54px;padding:6px 8px 5px} .hotspot .tag{font-size:10px} }
+
+/* the start screen: the cart corner turns slowly behind the menu */
+#start{background:radial-gradient(1100px 720px at 50% 34%,rgba(44,15,8,.28),rgba(22,6,4,.66) 78%)}
+#selveil{display:none}
+body:not(.inpark) #hud{visibility:hidden}
+body.cartmode #hud{visibility:visible}
+#start.compact{background:rgba(18,6,4,.84)}
+
+/* character select: Wealth Runner 2's four runners */
+.charrow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;max-width:760px;margin:0 auto}
+.charpick{display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 8px 12px;border-radius:14px;
+  background:rgba(36,16,11,.82);border:2px solid rgba(255,255,255,.1);transition:transform .15s,border-color .15s,background .15s}
+.charpick:hover{transform:translateY(-3px);background:rgba(47,22,14,.9)}
+.charpick.sel{border-color:#F5D97A;box-shadow:0 0 0 1px #F5D97A inset,0 10px 30px rgba(245,217,122,.25)}
+.charpick b{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#F3ECE4}
+.charimg{display:block;width:100%;aspect-ratio:300/420;border-radius:10px;background:radial-gradient(circle at 50% 35%,rgba(232,172,72,.35),rgba(0,0,0,0) 70%) center/contain no-repeat;
+  background-size:contain;position:relative}
+.charimg:not(.ok) i{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;border-radius:50%;
+  border:3px solid rgba(255,255,255,.18);border-top-color:#F5D97A;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (max-width:520px){ .charrow{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px} }
+
+/* key art (Work/art, Gemini, 2026-10-22): a landing with the titled cover and PLAY, then the menu,
+   character select, truck and space picks over the untitled collage, as in Billionaire Barber 2 */
+#landing{position:absolute;inset:0;z-index:70;
+  /* cover fills the screen, anchored to the top so any crop eats the bottom (behind PLAY), never the title */
+  background:#0b0e12 url("art/key_title.jpg?v=1") center top/cover no-repeat;
+  display:grid;align-items:end;justify-items:center;transition:opacity .45s ease,transform .45s ease}
+#landing.leaving{opacity:0;transform:scale(1.04);pointer-events:none}
+#landing[hidden]{display:none}
+@media (max-aspect-ratio:3/4){ #landing{background-image:url("art/key_portrait.jpg?v=1")} }
+.landing-foot{width:100%;display:grid;justify-items:center;gap:12px;
+  padding:70px 16px calc(28px + env(safe-area-inset-bottom));background:linear-gradient(180deg,transparent,rgba(11,8,6,.86))}
+.landing-tag{font-family:var(--mono);font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:#F5D97A;
+  text-shadow:0 2px 10px rgba(0,0,0,.9);text-align:center}
+#btnPlay{min-width:220px;padding:14px 28px;font-size:17px;letter-spacing:.3em;font-weight:900;border-radius:12px;
+  box-shadow:0 10px 34px rgba(245,217,122,.35)}
+#start{background:#0b0e12 url("art/key_notitle.jpg?v=1") center/cover no-repeat}
+#start::after{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(90% 80% at 50% 55%,rgba(8,6,5,.42),rgba(8,6,5,.86))}
+#start.compact{background:#0b0e12 url("art/key_notitle.jpg?v=1") center/cover no-repeat}
+#start.compact::after{background:rgba(8,6,5,.8)}
+
+#err{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:999;background:var(--slate);
+  border:1px solid var(--blood);padding:14px 18px;border-radius:12px;font-size:13px}
+#err[hidden]{display:none}
