@@ -216,6 +216,7 @@ globalThis.SB = globalThis.SB || {};
       const team = f.sign > 0 ? 0 : 1, col = TEAM_COL[team];
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(26, 10.5), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.18, depthWrite: false }));
       floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0.02, f.zc); G.add(floor);
+      if (sim.mode === "ctf") return;   // the real flags (below) stand here instead of the decoration
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 5, 8), new THREE.MeshStandardMaterial({ color: 0xdfe6ee }));
       pole.position.set(0, 2.5, f.sign * (CFG.HZ - 4.6)); pole.castShadow = true; G.add(pole);
       const flagGeo = new THREE.PlaneGeometry(2.2, 1.3, 10, 4);
@@ -223,6 +224,63 @@ globalThis.SB = globalThis.SB || {};
       flag.position.set(1.15, 4.3, pole.position.z); G.add(flag);
       world.flags.push({ mesh: flag, base: flagGeo.attributes.position.array.slice(), phase: team * 2 });
     });
+
+    // --- capture the flag: each team's CTSG flag (team-colour cloth, gold edge, the seal), its stand and a beacon
+    world.ctf = [];
+    if (sim.mode === "ctf") {
+      const seal = new Image();
+      const cloths = [0, 1].map(function (team) {
+        const css = "#" + TEAM_COL[team].toString(16).padStart(6, "0");
+        const draw = function () {
+          const tex = canvasTex(384, 256, function (g, w, h) {
+            const gr = g.createLinearGradient(0, 0, 0, h);
+            gr.addColorStop(0, css); gr.addColorStop(1, "rgba(0,0,0,0.35)");
+            g.fillStyle = css; g.fillRect(0, 0, w, h);
+            g.fillStyle = gr; g.globalAlpha = 0.45; g.fillRect(0, 0, w, h); g.globalAlpha = 1;
+            g.strokeStyle = "#f2b640"; g.lineWidth = 12; g.strokeRect(6, 6, w - 12, h - 12);
+            g.strokeStyle = "rgba(255,255,255,0.55)"; g.lineWidth = 3; g.setLineDash([14, 9]); g.strokeRect(20, 20, w - 40, h - 40);
+            if (seal.complete && seal.naturalWidth) g.drawImage(seal, w / 2 - 98, h / 2 - 98, 196, 196);
+          });
+          tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.repeat.set(1, 1);
+          return tex;
+        };
+        return { draw: draw, tex: draw() };
+      });
+      const stand = new THREE.MeshStandardMaterial({ color: 0xdfe6ee, roughness: 0.6 });
+      [0, 1].forEach(function (team) {
+        const f = sim.flags[team] || { hx: 0, hz: (team === 0 ? 1 : -1) * (CFG.HZ - CFG.FLAG.homeZ) }, col = TEAM_COL[team];
+        // The stand where it's captured: an ice plinth and a team ring on the snow, always there even when the flag is out.
+        const base = new THREE.Group();
+        const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.9, 0.3, 20), new THREE.MeshStandardMaterial({ map: iceTex, roughness: 0.85 }));
+        plinth.position.y = 0.15; plinth.castShadow = true; plinth.receiveShadow = true; base.add(plinth);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.95, 40), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
+        ring.rotation.x = -Math.PI / 2; ring.position.y = 0.035; base.add(ring);
+        base.position.set(f.hx, 0, f.hz); G.add(base);
+        // The flag itself (pole origin at the foot of the pole; the cloth streams towards +x).
+        const grp = new THREE.Group(), geo = new THREE.PlaneGeometry(2.55, 1.7, 14, 4);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.075, 4.4, 8), stand);
+        pole.position.y = 2.2; pole.castShadow = true; grp.add(pole);
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), new THREE.MeshStandardMaterial({ color: 0xf2b640, roughness: 0.35, metalness: 0.6 }));
+        knob.position.y = 4.45; grp.add(knob);
+        const front = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: cloths[team].tex, side: THREE.FrontSide, roughness: 0.75 }));
+        const backTex = cloths[team].tex.clone(); backTex.repeat.x = -1; backTex.offset.x = 1; backTex.needsUpdate = true;   // seal reads right from behind too
+        const back = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: backTex, side: THREE.BackSide, roughness: 0.75 }));
+        front.position.set(1.3, 3.4, 0); back.position.copy(front.position);
+        front.castShadow = true; grp.add(front); grp.add(back);
+        const beacon = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 34, 14, 1, true), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.2, depthWrite: false, fog: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+        beacon.position.y = 17; grp.add(beacon);
+        G.add(grp);
+        world.ctf.push({ grp: grp, geo: geo, base: geo.attributes.position.array.slice(), beacon: beacon, phase: team * 2, cloth: cloths[team], mats: [front.material, back.material], backTex: backTex });
+      });
+      seal.onload = function () {   // the seal arrives after the first frame: repaint both cloths
+        world.ctf.forEach(function (c) {
+          const nt = c.cloth.draw();
+          c.mats[0].map.image = nt.image; c.mats[0].map.needsUpdate = true;
+          c.backTex.image = nt.image; c.backTex.needsUpdate = true;
+        });
+      };
+      seal.src = SB.SEAL;
+    }
 
     // --- mounds (one mesh per mound; rebuilt each round, grown when built)
     const geos = [moundGeometry(11), moundGeometry(23), moundGeometry(37)];
@@ -277,6 +335,26 @@ globalThis.SB = globalThis.SB || {};
           p.setZ(i, Math.sin(x * 2.4 - t * 5 + f.phase) * 0.08 * x);
         }
         p.needsUpdate = true;
+      });
+      // The capture-the-flag flags: on their stands, on a carrier's back, or lying where they were dropped.
+      world.ctf.forEach(function (c, team) {
+        const f = sim.flags[team];
+        if (!f) return;
+        const p = c.geo.attributes.position, b = c.base;
+        for (let i = 0; i < p.count; i++) { const x = b[i * 3] + 1.275; p.setZ(i, Math.sin(x * 2.4 - t * 6 + c.phase) * 0.08 * x); }
+        p.needsUpdate = true;
+        const g = c.grp, h = f.state === "carried" ? sim.players[f.carrier] : null;
+        if (h) {
+          // On the carrier's back-left shoulder, the cloth streaming out to the left (the follow camera sits behind the right shoulder).
+          const sy = Math.sin(h.yaw), cy = Math.cos(h.yaw), dx = -cy * 0.8 + sy * 0.6, dz = sy * 0.8 + cy * 0.6;
+          g.position.set(h.x + sy * 0.3 - cy * 0.22, h.roll > 0 ? 0.25 : 0, h.z + cy * 0.3 + sy * 0.22);
+          g.rotation.set(0, Math.atan2(-dz, dx), 0); g.scale.setScalar(0.5);
+        } else {
+          g.position.set(f.x, f.state === "home" ? 0.3 : 0, f.z);
+          g.rotation.set(0, f.state === "home" ? 0 : team * 2.2, f.state === "dropped" ? -0.32 : 0); g.scale.setScalar(1);
+        }
+        c.beacon.material.opacity = f.state === "home" ? 0.16 : f.state === "dropped" ? 0.3 + 0.18 * Math.sin(t * 7) : 0.3;
+        c.beacon.visible = !(h && h.human);   // the carrier's own view isn't a pink pillar
       });
       // Snow falls round the camera.
       const S = world.snow, P = S.pos;

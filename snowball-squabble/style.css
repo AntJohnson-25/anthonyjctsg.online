@@ -140,3 +140,19 @@ body.touch #cross { margin-top: -11px; }
 #rotate small { display: block; margin-top: 8px; font-weight: 400; font-size: 14px; color: #cfe3f8; }
 @media (orientation: portrait) { body.touch.playing #rotate { display: flex; } }
 @media (max-width: 760px) { .opts { grid-template-columns: 1fr; } #keys { display: none; } }
+
+/* Capture the flag: flag status chips in the score bar, edge-clamped flag markers, the carrier banner */
+.fchip { display: none; width: 16px; height: 16px; border-radius: 3px; background: currentColor; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55); }
+.team.blue .fchip { color: var(--blue); } .team.red .fchip { color: var(--red); }
+body.ctf .fchip { display: inline-block; } body.ctf .pips { display: none; }
+.fchip.carried { animation: chipPulse 0.7s infinite alternate; clip-path: polygon(0 0, 100% 25%, 100% 75%, 0 100%); }
+.fchip.dropped { animation: chipPulse 0.35s infinite alternate; opacity: 0.8; border-radius: 50%; }
+@keyframes chipPulse { from { transform: scale(0.8); filter: brightness(1); } to { transform: scale(1.25); filter: brightness(1.6); } }
+#flagMarks { position: absolute; inset: 0; pointer-events: none; display: none; }
+body.ctf #flagMarks { display: block; }
+.fmark { position: absolute; left: 0; top: 0; width: 46px; margin: -23px 0 0 -23px; text-align: center; font-size: 12px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); }
+.fmark img { width: 38px; height: 38px; border-radius: 50%; display: block; margin: 0 auto 2px; background: #0f2a4a; box-shadow: 0 0 0 3px var(--blue), 0 2px 8px rgba(0, 0, 0, 0.45); }
+.fmark.red img { box-shadow: 0 0 0 3px var(--red), 0 2px 8px rgba(0, 0, 0, 0.45); }
+.fmark span { display: block; white-space: nowrap; margin-left: -20px; margin-right: -20px; }
+#carryBanner { position: absolute; top: 15%; left: 0; right: 0; text-align: center; font-size: clamp(18px, 2.6vw, 28px); font-weight: 900; letter-spacing: 0.08em; color: #fff; text-shadow: 0 3px 0 rgba(242, 182, 64, 0.95), 0 6px 22px rgba(0, 0, 0, 0.5); animation: carryPulse 0.8s infinite alternate; }
+@keyframes carryPulse { from { opacity: 0.75; } to { opacity: 1; } }

@@ -13,7 +13,7 @@ globalThis.SB = globalThis.SB || {};
   function save() {
     try {
       localStorage.setItem("snowball-fight", JSON.stringify({ name: $("optName").value, char: $("optChar").value, size: $("optSize").value, diff: $("optDiff").value,
-        rounds: $("optRounds").value, sens: $("optSens").value, vol: $("optVol").value, music: $("optMusic").value }));
+        mode: $("optMode").value, rounds: $("optRounds").value, sens: $("optSens").value, vol: $("optVol").value, music: $("optMusic").value }));
     } catch (e) { /* private window */ }
   }
   function restore() {
@@ -25,14 +25,23 @@ globalThis.SB = globalThis.SB || {};
     if (o.name) $("optName").value = o.name;
     if (o.size) $("optSize").value = o.size;
     if (o.diff) $("optDiff").value = o.diff;
+    if (o.mode) $("optMode").value = o.mode;
+    if (Q.get("mode") === "ctf" || Q.get("mode") === "elim") $("optMode").value = Q.get("mode");   // ?mode=ctf (links, tests)
+    syncMode();
     if (o.rounds) $("optRounds").value = o.rounds;
     if (o.sens) $("optSens").value = o.sens;
     if (o.vol) $("optVol").value = o.vol;
     if (o.music) $("optMusic").value = o.music;
   }
 
+  // "First to" counts rounds in elimination and captures in capture the flag.
+  function syncMode() {
+    const word = $("optMode").value === "ctf" ? " captures" : " rounds";
+    Array.prototype.forEach.call($("optRounds").options, function (op) { op.textContent = op.value + word; });
+  }
   function options() {
-    return { name: $("optName").value.trim().slice(0, 12), teamSize: +$("optSize").value, difficulty: +$("optDiff").value, winRounds: +$("optRounds").value };
+    return { name: $("optName").value.trim().slice(0, 12), teamSize: +$("optSize").value, difficulty: +$("optDiff").value, winRounds: +$("optRounds").value,
+      mode: $("optMode").value };
   }
 
   // Who plays whom: your pick (or a random one), every other fighter a different character.
@@ -104,7 +113,7 @@ globalThis.SB = globalThis.SB || {};
       SB.View.event(sim, e);
       SB.Audio.event(e, sim);
       SB.Hud.event(e, sim);
-      if (e.t === "round") { SB.View.newRound(); SB.Input.reset(0); }
+      if (e.t === "round" || (e.t === "respawn" && e.id === sim.humanId)) { if (e.t === "round") SB.View.newRound(); SB.Input.reset(0); }
       if (e.t === "out" && e.id === sim.humanId) { /* spectate picks itself */ }
     }
   }
@@ -133,7 +142,7 @@ globalThis.SB = globalThis.SB || {};
     document.body.classList.remove("playing");
     if (document.pointerLockElement) document.exitPointerLock();
     const won = sim.winner === sim.humanTeam;
-    $("overKicker").textContent = "Match over";
+    $("overKicker").textContent = sim.mode === "ctf" ? "Capture the flag · match over" : "Match over";
     $("overTitle").textContent = won ? "VICTORY" : "DEFEAT";
     $("overScore").textContent = "Blue " + sim.score[0] + "  —  " + sim.score[1] + " Red";
     $("over").classList.remove("hidden");
@@ -177,6 +186,7 @@ globalThis.SB = globalThis.SB || {};
     const preload = function () { const id = $("optChar").value; if (id) SB.Body.load([id]).catch(function () {}); };
     $("optChar").addEventListener("change", preload);
     preload();
+    $("optMode").addEventListener("change", syncMode);
     $("startBtn").addEventListener("click", begin);
     $("againBtn").addEventListener("click", begin);
     $("menuBtn").addEventListener("click", toMenu);

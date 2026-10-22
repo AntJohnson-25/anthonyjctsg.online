@@ -30,6 +30,8 @@ globalThis.SB = globalThis.SB || {};
     MERLON: { h: 0.5, pitch: 1.5, w: 0.85 },       // castle battlements: block height, spacing, block width
     TOWER_R: 1.35, TOWER_H: 4.6,                   // castle towers
     POND: { x: 0, z: 0, r: 8.5 },
+    // Capture the flag: the flag stands inside each castle; a hit player respawns at home instead of sitting out.
+    FLAG: { pickR: 1.35, capR: 1.9, returnT: 14, respawn: 8, shield: 1.6, carrySpeed: 1.12, carrierHp: 3, hitShield: 0.9, roundT: 240, homeZ: 6.5 },
     COUNTDOWN: 3.2, OVER_T: 4.2
   };
 
@@ -118,6 +120,7 @@ globalThis.SB = globalThis.SB || {};
     const sim = {
       cfg: CFG, field: F, mounds: F.mounds, circles: F.circles, boxes: F.boxes,
       players: [], balls: [], events: [], time: 0,
+      mode: opt.mode === "ctf" ? "ctf" : "elim", flags: [],
       teamSize: opt.teamSize || 4, winRounds: opt.winRounds || 3, difficulty: opt.difficulty == null ? 1 : opt.difficulty,
       humanId: opt.human === false ? -1 : 0, humanTeam: 0,
       phase: "menu", phaseT: 0, playT: 0, round: 0, score: [0, 0], winner: -1, roundWinner: -1, spectateId: -1
@@ -192,6 +195,7 @@ globalThis.SB = globalThis.SB || {};
     // --- players
     function makePlayer(id, team, human, name) {
       return { id: id, team: team, human: human, name: name, x: 0, y: 0, z: 0, vx: 0, vz: 0, yaw: 0, pitch: 0, crouch: 0, crouchWant: false,
+        flag: false, flagHp: 0, respawnT: 0, shield: 0,
         alive: true, ammo: CFG.MAX_AMMO, charge: 0, fireDown: false, cd: 0, windT: 0, wind: null, packT: 0, roll: 0, rollCd: 0, rollDx: 0, rollDz: 0,
         sprint: false, moving: 0, hitT: 9, throwT: 9, outBy: -1, outAt: 0, kills: 0, score: 0,
         ai: { mode: "advance", cover: -1, modeT: 0, target: -1, react: 0, strafe: 1, strafeT: 0, thinkT: rnd() * 0.3, aimT: 0, stuck: 0, lastX: 0, lastZ: 0, dodgeT: 0, hold: 0 } };
@@ -221,10 +225,71 @@ globalThis.SB = globalThis.SB || {};
         p.yaw = team === 0 ? 0 : Math.PI; p.pitch = 0;
         p.crouch = 0; p.crouchWant = false; p.alive = true; p.ammo = CFG.MAX_AMMO; p.charge = 0; p.fireDown = false;
         p.cd = 0; p.windT = 0; p.wind = null; p.packT = 0; p.roll = 0; p.rollCd = 0; p.hitT = 9; p.throwT = 9; p.outBy = -1;
+        p.flag = false; p.respawnT = 0; p.shield = 0;
         const a = p.ai;
         a.mode = "advance"; a.cover = -1; a.modeT = 0; a.target = -1; a.react = 0; a.thinkT = rnd() * 0.3; a.stuck = 0; a.dodgeT = 0; a.hold = 0;
       });
       sim.spectateId = -1;
+      sim.flags = [0, 1].map((team) => {
+        const s = team === 0 ? 1 : -1;
+        return { team: team, hx: 0, hz: s * (CFG.HZ - CFG.FLAG.homeZ), x: 0, z: s * (CFG.HZ - CFG.FLAG.homeZ), state: "home", carrier: -1, dropT: 0 };
+      });
+    }
+
+    // --- capture the flag: flags[t] is team t's own flag (it stands in t's castle); the other team steals it.
+    function dropFlag(p) {
+      const f = sim.flags[1 - p.team];
+      f.state = "dropped"; f.carrier = -1; f.x = p.x; f.z = p.z; f.dropT = CFG.FLAG.returnT; p.flag = false;
+      sim.events.push({ t: "flagdrop", team: f.team, by: p.id, x: f.x, z: f.z });
+    }
+    function sendHome(f, by, quiet) {   // by: who touched it, -1 = timed out; quiet: a capture, which has its own event
+      f.state = "home"; f.carrier = -1; f.x = f.hx; f.z = f.hz;
+      if (!quiet) sim.events.push({ t: "flagreturn", team: f.team, by: by, x: f.x, z: f.z });
+    }
+    function respawn(p) {
+      const sign = p.team === 0 ? 1 : -1;
+      p.x = (rnd() * 2 - 1) * 10; p.z = sign * (CFG.HZ - 9) + (rnd() - 0.5); p.y = 0; p.vx = p.vz = 0;
+      p.yaw = p.team === 0 ? 0 : Math.PI; p.pitch = 0;
+      p.crouch = 0; p.crouchWant = false; p.alive = true; p.ammo = CFG.MAX_AMMO; p.charge = 0; p.fireDown = false;
+      p.cd = 0; p.windT = 0; p.wind = null; p.packT = 0; p.roll = 0; p.rollCd = 0; p.hitT = 9; p.throwT = 9; p.outBy = -1; p.flag = false;
+      p.shield = CFG.FLAG.shield; p.ai.mode = "advance"; p.ai.target = -1; p.ai.react = 0;
+      sim.events.push({ t: "respawn", id: p.id });
+    }
+    function stepFlags(dt) {
+      for (const f of sim.flags) {
+        if (f.state === "dropped") { f.dropT -= dt; if (f.dropT <= 0) sendHome(f, -1); }
+        if (f.state === "carried") { const c = sim.players[f.carrier]; f.x = c.x; f.z = c.z; continue; }
+        for (const p of sim.players) {
+          if (!p.alive || f.state === "home" && p.team === f.team) continue;
+          if (Math.hypot(p.x - f.x, p.z - f.z) > CFG.FLAG.pickR) continue;
+          if (p.team !== f.team) {
+            f.state = "carried"; f.carrier = p.id; p.flag = true; p.flagHp = CFG.FLAG.carrierHp;
+            sim.events.push({ t: "flagtake", team: f.team, by: p.id, x: f.x, z: f.z });
+            break;
+          }
+          if (f.state === "dropped") { sendHome(f, p.id); break; }   // your own flag: touch it to send it back
+        }
+      }
+      // A carrier who gets home with their own flag still on its stand scores.
+      for (const p of sim.players) {
+        if (!p.alive || !p.flag) continue;
+        const mine = sim.flags[p.team];
+        if (mine.state === "home" && Math.hypot(p.x - mine.hx, p.z - mine.hz) < CFG.FLAG.capR) {
+          const f = sim.flags[1 - p.team];
+          p.flag = false; p.score += 500;
+          sendHome(f, -1, true);
+          sim.events.push({ t: "capture", team: p.team, by: p.id });
+          endRound(p.team);
+          return;
+        }
+      }
+    }
+    function endRound(w) {
+      sim.roundWinner = w;
+      if (w >= 0) sim.score[w]++;
+      sim.winner = sim.score[0] >= sim.winRounds ? 0 : sim.score[1] >= sim.winRounds ? 1 : -1;
+      sim.phase = "roundover"; sim.phaseT = CFG.OVER_T;
+      sim.events.push({ t: "roundover", winner: w, match: sim.winner });
     }
     sim.start = function () {
       sim.score = [0, 0]; sim.round = 0; sim.winner = -1; sim.time = 0;
@@ -298,7 +363,15 @@ globalThis.SB = globalThis.SB || {};
 
     function eliminate(p, by, x, y, z) {
       if (!p.alive) return;
+      // A flag carrier has a bit of cover from the flag itself: the first hit only knocks them about.
+      if (p.flag && p.flagHp > 1) {
+        p.flagHp--; p.shield = CFG.FLAG.hitShield; p.hitT = 0;
+        sim.events.push({ t: "flaghit", id: p.id, by: by, x: x, y: y, z: z });
+        return;
+      }
       p.alive = false; p.outBy = by; p.outAt = sim.time; p.hitT = 0; p.charge = 0; p.fireDown = false; p.wind = null; p.windT = 0; p.roll = 0;
+      if (p.flag) dropFlag(p);
+      if (sim.mode === "ctf") p.respawnT = CFG.FLAG.respawn;
       const k = sim.players[by];
       if (k) { k.kills++; k.score += 100; }
       // Fall away from the shot: onto the back if they were facing the thrower.
@@ -354,7 +427,8 @@ globalThis.SB = globalThis.SB || {};
         if (p.roll <= 0) { p.roll = 0; p.crouchWant = true; }
       } else if (!keep) {
         const crouched = p.crouch > 0.5;
-        const top = crouched ? CFG.CROUCH : (p.sprint && mz > 0 && p.charge === 0 ? CFG.SPRINT : CFG.RUN);
+        let top = crouched ? CFG.CROUCH : (p.sprint && mz > 0 && p.charge === 0 ? CFG.SPRINT : CFG.RUN);
+        if (p.flag) top = Math.min(top, CFG.RUN) * CFG.FLAG.carrySpeed;   // the flag's heavy: no sprinting with it
         const tx = wx * top, tz = wz * top;
         const pond = onPond(p), acc = pond ? 2.2 : 28;
         const a = Math.min(1, acc * dt);
@@ -416,9 +490,11 @@ globalThis.SB = globalThis.SB || {};
     function steer(p, gx, gz, dt, speedScale, mode) {
       // Walk towards (gx,gz), feeling ahead for things in the way and bending round them.
       const a = p.ai;
-      const sign = p.team === 0 ? 1 : -1, zf = CFG.HZ - 15;
-      // Inside the fort pen with the goal outside it: out through the gap first.
-      if (p.z * sign > zf + 0.6 && Math.abs(p.x) < 14.5 && gz * sign < zf - 0.5) { gx = clamp(p.x, -3, 3) * 0.2; gz = sign * (zf - 1.8); }
+      const zf = CFG.HZ - 15;
+      // Inside a fort pen (either one) with the goal outside it: out through the gap first.
+      for (const s of [1, -1]) {
+        if (p.z * s > zf + 0.6 && Math.abs(p.x) < 14.5 && gz * s < zf - 0.5) { gx = clamp(p.x, -3, 3) * 0.2; gz = s * (zf - 1.8); break; }
+      }
       const dx = gx - p.x, dz = gz - p.z, d = Math.hypot(dx, dz);
       if (d < 0.25) { p.vx *= 0.6; p.vz *= 0.6; return true; }
       const want = Math.atan2(-dx, -dz);
@@ -481,8 +557,8 @@ globalThis.SB = globalThis.SB || {};
       const visible = tgt && tgt.alive && seeing(p, tgt);
       const empty = p.ammo <= 0;
       // Mode logic
-      if (empty && a.mode !== "pack") { a.mode = "pack"; a.modeT = 0; p.crouchWant = true; }
-      if (a.mode === "pack") {
+      if (empty && a.mode !== "pack" && !p.flag) { a.mode = "pack"; a.modeT = 0; p.crouchWant = true; }   // a flag carrier runs on empty
+      if (a.mode === "pack" && !p.flag) {
         p.crouchWant = true;
         const slow = p.moving < 0.6;
         if (a.cover >= 0 && F.mounds[a.cover] && F.mounds[a.cover].hp > 0) {
@@ -496,6 +572,7 @@ globalThis.SB = globalThis.SB || {};
         return;
       }
       p.packT = 0;
+      if (sim.mode === "ctf") { ctfBot(p, dt, D, tgt, visible); return; }
       if (a.mode === "advance") {
         p.crouchWant = false;
         const rush = sim.playT > 40;   // a slow round: stop hopping between mounds, go and find them
@@ -534,6 +611,91 @@ globalThis.SB = globalThis.SB || {};
           if (a.modeT > 9 && rnd() < 0.01) { a.mode = "advance"; a.cover = -1; a.modeT = 0; }
         }
       }
+      if (a.strafeT <= 0) { a.strafeT = 0.8 + rnd() * 1.4; a.strafe = rnd() < 0.5 ? 1 : -1; }
+      move(p, dt, 0, 0, true);
+    }
+    // Capture the flag. Each team keeps one defender (the last seat) near its own flag; everyone else goes for the
+    // enemy flag, escorts whoever has it, or hunts whoever has ours. The closest bot returns a dropped flag of ours.
+    function ctfGoal(p) {
+      const my = sim.flags[p.team], en = sim.flags[1 - p.team], sign = p.team === 0 ? 1 : -1, n = sim.teamSize;
+      if (p.flag) return { x: my.hx, z: my.hz, speed: 1 };
+      if (my.state === "carried" && sim.players[my.carrier]) { const c = sim.players[my.carrier]; return { x: c.x, z: c.z, speed: 1 }; }
+      if (my.state === "dropped") {
+        let best = null, bd = 1e9;
+        for (const o of sim.players) if (o.team === p.team && o.alive && !o.flag) { const d = Math.hypot(o.x - my.x, o.z - my.z); if (d < bd) { bd = d; best = o; } }
+        if (best === p) return { x: my.x, z: my.z, speed: 1 };
+      }
+      if (p.id % n === n - 1 && n > 2) {   // the defender: lingers in front of the flag
+        const ph = sim.time * 0.35 + p.id;
+        return { x: my.hx + Math.sin(ph) * 6, z: my.hz - sign * (3.5 + 2 * Math.sin(ph * 1.3)), speed: 0.6 };
+      }
+      if (en.state === "carried" && sim.players[en.carrier]) { const c = sim.players[en.carrier]; return { x: c.x + (p.id % 3 - 1) * 2.5, z: c.z + sign * 3.5, speed: 1 }; }
+      return { x: en.x, z: en.z, speed: 1 };
+    }
+    // Round the castle walls: aim for the gate of a castle the goal is inside of, before heading in.
+    function navGoal(p, gx, gz) {
+      const zf = CFG.HZ - 15;
+      for (const s of [1, -1]) {
+        if (gz * s > zf + 0.5 && !(p.z * s > zf + 0.2 && Math.abs(p.x) < 14.5) && (Math.abs(p.x) > 3.5 || p.z * s < zf - 3.5)) return { x: 0, z: s * (zf - 3) };
+      }
+      return { x: gx, z: gz };
+    }
+    // The next mound that gets us closer to the goal, one hop at a time (a bot in the open gets shot).
+    function pickHop(p, g) {
+      const dp = Math.hypot(p.x - g.x, p.z - g.z);
+      let best = -1, bs = -1e9;
+      F.mounds.forEach((m, i) => {
+        if (m.hp <= 1) return;
+        const dm = Math.hypot(m.x - g.x, m.z - g.z), dist = Math.hypot(m.x - p.x, m.z - p.z);
+        if (dp - dm < 4 || dist > 24 || dist < 2.5) return;
+        if (sim.players.some((o) => o !== p && o.alive && o.team === p.team && o.ai.cover === i)) return;
+        const s = -dm * 0.6 + rnd() * 5 + m.r0;
+        if (s > bs) { bs = s; best = i; }
+      });
+      return best;
+    }
+    function ctfBot(p, dt, D, tgt, visible) {
+      const a = p.ai, g = ctfGoal(p), carry = !!p.flag, dGoal = Math.hypot(g.x - p.x, g.z - p.z);
+      const spd = carry ? CFG.FLAG.carrySpeed : g.speed;
+      const aimed = () => { if (visible && a.react <= 0) fireAt(p, tgt, D); };
+      let m = a.cover >= 0 ? F.mounds[a.cover] : null;
+      if (m && m.hp <= 1) { a.cover = -1; m = null; if (a.mode === "hold") a.mode = "advance"; }
+      a.hopT = (a.hopT || 0) - dt;
+      if (!m && g.hop !== false && dGoal > 22 && a.hopT <= 0) {
+        a.hopT = 0.4; a.cover = pickHop(p, g); m = a.cover >= 0 ? F.mounds[a.cover] : null;
+        if (m) { a.mode = "advance"; a.modeT = 0; }
+      }
+      if (m && dGoal > 14) {
+        // Shelter on the side of the mound facing away from where we're going.
+        const dx = g.x - m.x, dz = g.z - m.z, L = Math.hypot(dx, dz) || 1, r = moundR(m) + 0.55;
+        const sx = m.x - dx / L * r, sz = m.z - dz / L * r;
+        if (a.mode !== "hold") {
+          p.crouchWant = false; p.sprint = !carry;
+          const arrived = steer(p, sx, sz, dt, spd, carry ? "run" : "sprint");
+          if (arrived || Math.hypot(sx - p.x, sz - p.z) < 0.8) { a.mode = "hold"; a.modeT = 0; a.hold = (carry ? 0.3 : 0.5) + rnd() * 1.3; }
+          if (a.modeT > 12) { a.cover = -1; a.modeT = 0; }
+          aimed();
+          if (visible) faceTarget(p, tgt, dt, D); else if (a.moveYaw !== undefined) p.yaw += clamp(wrap(a.moveYaw - p.yaw), -D.turn * dt, D.turn * dt);
+        } else {
+          a.hold -= dt;
+          steer(p, sx, sz, dt, 0.5);
+          p.crouchWant = !((a.modeT % 3.2 > 1.5) || (visible && a.react <= 0));
+          if (visible) { a.react -= dt; faceTarget(p, tgt, dt, D); if (a.react <= 0 && p.crouch < 0.35) fireAt(p, tgt, D); }
+          else p.yaw += clamp(wrap(Math.atan2(-dx, -dz) - p.yaw), -D.turn * 0.5 * dt, D.turn * 0.5 * dt);
+          if ((a.hold <= 0 && !visible) || a.modeT > 7) { a.cover = -1; a.mode = "advance"; a.modeT = 0; }
+        }
+        if (a.strafeT <= 0) { a.strafeT = 0.8 + rnd() * 1.4; a.strafe = rnd() < 0.5 ? 1 : -1; }
+        move(p, dt, 0, 0, true);
+        return;
+      }
+      // Close to the goal (or nothing to hide behind): straight at it, throwing on the move.
+      a.cover = -1;
+      const w = navGoal(p, g.x, g.z);
+      p.crouchWant = false; p.sprint = !carry;
+      steer(p, w.x, w.z, dt, spd, carry ? "run" : "sprint");
+      aimed();
+      a.react -= dt;
+      if (visible) faceTarget(p, tgt, dt, D); else if (a.moveYaw !== undefined) p.yaw += clamp(wrap(a.moveYaw - p.yaw), -D.turn * dt, D.turn * dt);
       if (a.strafeT <= 0) { a.strafeT = 0.8 + rnd() * 1.4; a.strafe = rnd() < 0.5 ? 1 : -1; }
       move(p, dt, 0, 0, true);
     }
@@ -579,8 +741,11 @@ globalThis.SB = globalThis.SB || {};
 
       // players
       for (const p of sim.players) {
-        p.cd = Math.max(0, p.cd - dt); p.hitT += dt; p.throwT += dt;
-        if (!p.alive) continue;
+        p.cd = Math.max(0, p.cd - dt); p.hitT += dt; p.throwT += dt; p.shield = Math.max(0, p.shield - dt);
+        if (!p.alive) {
+          if (sim.mode === "ctf" && sim.phase === "play") { p.respawnT -= dt; if (p.respawnT <= 0) respawn(p); }
+          continue;
+        }
         if (p.human) {
           if (inp) {
             p.yaw = inp.yaw; p.pitch = clamp(inp.pitch, -1.15, 0.6);
@@ -616,16 +781,17 @@ globalThis.SB = globalThis.SB || {};
 
       if (sim.phase === "play") {
         sim.playT += dt;
-        const a0 = sim.alive(0), a1 = sim.alive(1);
-        // A round nobody can finish is a draw.
-        if (sim.playT > 120 && a0 > 0 && a1 > 0) sim.drawn = true;
-        if (a0 === 0 || a1 === 0 || sim.drawn) {
-          sim.drawn = false;
-          sim.roundWinner = (a0 === 0 && a1 === 0) || (a0 > 0 && a1 > 0) ? -2 : a0 === 0 ? 1 : 0;
-          if (sim.roundWinner >= 0) sim.score[sim.roundWinner]++;
-          sim.winner = sim.score[0] >= sim.winRounds ? 0 : sim.score[1] >= sim.winRounds ? 1 : -1;
-          sim.phase = "roundover"; sim.phaseT = CFG.OVER_T;
-          sim.events.push({ t: "roundover", winner: sim.roundWinner, match: sim.winner });
+        if (sim.mode === "ctf") {
+          stepFlags(dt);
+          if (sim.phase === "play" && sim.playT > CFG.FLAG.roundT) endRound(-2);   // nobody got a flag home: a draw
+        } else {
+          const a0 = sim.alive(0), a1 = sim.alive(1);
+          // A round nobody can finish is a draw.
+          if (sim.playT > 120 && a0 > 0 && a1 > 0) sim.drawn = true;
+          if (a0 === 0 || a1 === 0 || sim.drawn) {
+            sim.drawn = false;
+            endRound((a0 === 0 && a1 === 0) || (a0 > 0 && a1 > 0) ? -2 : a0 === 0 ? 1 : 0);
+          }
         }
       }
     };
@@ -640,7 +806,7 @@ globalThis.SB = globalThis.SB || {};
           if (b.age > 5 || Math.abs(b.x) > CFG.HX + 12 || Math.abs(b.z) > CFG.HZ + 12) { b.alive = false; break; }
           // Enemy bodies first (a ball is in the player's capsule: radius R, height by pose).
           for (const p of sim.players) {
-            if (!p.alive || p.team === b.team) continue;
+            if (!p.alive || p.team === b.team || p.shield > 0) continue;
             const dx = b.x - p.x, dz = b.z - p.z, rr = CFG.R + CFG.BALL_R;
             if (dx * dx + dz * dz < rr * rr && b.y > 0 && b.y < capsuleY(p) + CFG.BALL_R) {
               b.alive = false;

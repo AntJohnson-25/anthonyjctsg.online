@@ -94,6 +94,8 @@ globalThis.SB = globalThis.SB || {};
       case "pack": noise(t, 0.12, "bandpass", 900, 500, 0.3); noise(t + 0.09, 0.1, "bandpass", 1100, 600, 0.25); break;
       case "empty": tone(t, 0.07, 300, 200, 0.12, "square"); break;
       case "built": noise(t, 0.3, "lowpass", 1500, 250, 0.4, e.x, e.z); break;
+      case "flagtake": tone(t, 0.14, 520, 520, 0.2, "triangle"); tone(t + 0.14, 0.2, 780, 780, 0.2, "triangle"); break;   // flags stay quiet: a blip each
+      case "flagdrop": tone(t, 0.3, 600, 260, 0.2, "triangle"); break;
       case "go": tone(t, 0.18, 660, 660, 0.25, "square"); tone(t + 0.2, 0.34, 990, 990, 0.25, "square"); break;
       case "count": tone(t, 0.12, 440, 440, 0.2, "square"); break;
       case "roundover":
