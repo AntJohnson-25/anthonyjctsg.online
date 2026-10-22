@@ -502,6 +502,10 @@ body.inkitchen #chits{top:92px}
 .hotspot.want{border-color:var(--chit);box-shadow:0 0 0 1px var(--chit) inset,0 0 26px rgba(245,217,122,.45)}
 .hotspot.wrong{animation:wrongsh2 .28s;border-color:var(--blood)}
 @keyframes wrongsh2{25%{transform:translate(calc(-50% - 5px),-100%)}75%{transform:translate(calc(-50% + 5px),-100%)}}
+/* hold to prepare: the fill bar under each item button */
+.hotspot .hold{display:block;width:100%;height:5px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden;margin-top:3px}
+.hotspot .hold > i{display:block;height:100%;width:0;background:var(--chit);border-radius:3px}
+.hotspot{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 #cartstreak{z-index:4}
 .cfloat{text-shadow:0 3px 14px rgba(0,0,0,.8)}
 @media (max-width:520px){ .hotspot{min-width:54px;padding:6px 8px 5px} .hotspot .tag{font-size:10px} }

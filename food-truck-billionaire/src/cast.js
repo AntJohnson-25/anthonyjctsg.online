@@ -21,8 +21,9 @@ globalThis.HS = globalThis.HS || {};
   // You: the owner at the cart and in the truck. You pick one of Wealth Runner 2's four runners on
   // New game (user, 2026-10-22); the pick is remembered on this device (not in the game save).
   HS.RUNNERS = [
-    { id: "runner_m_dark", label: "Male · Dark" }, { id: "runner_m_light", label: "Male · Light" },
-    { id: "runner_f_dark", label: "Female · Dark" }, { id: "runner_f_light", label: "Female · Light" }
+    // named, not labelled by gender and race (user, 2026-10-22)
+    { id: "runner_m_dark", label: "Darius" }, { id: "runner_m_light", label: "Tyler" },
+    { id: "runner_f_dark", label: "Jade" }, { id: "runner_f_light", label: "Brooke" }
   ];
   HS.PLAYER = "runner_m_dark";
   try { const p = localStorage.getItem("ftb_player"); if (p && HS.RUNNERS.some(function (r) { return r.id === p; })) HS.PLAYER = p; } catch (e) { /* private mode */ }

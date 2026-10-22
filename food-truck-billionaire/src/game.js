@@ -1336,13 +1336,15 @@ const World = {
       // during the cart prologue 1/2/3 are the hands, not the speed control
       if(Cart.on){
         const m=CART_MENU.find(x=>x.key===e.key);
-        if(m){ e.preventDefault(); Cart.tap(m.id); }
+        if(m){ e.preventDefault(); if(!e.repeat) Cart.press(m.id); }   // hold the key to make it
         return;
       }
       if(e.key===' '){ e.preventDefault(); UI.setSpeed(G.speed?0:1); }
       if(e.key==='k'||e.key==='K') UI.toggleKitchen();
       const n=['1','2','3','4'].indexOf(e.key); if(n>=0) UI.setSpeed([0,1,2,4][n]);
     });
+    addEventListener('keyup',e=>{ const m=CART_MENU.find(x=>x.key===e.key); if(m) Cart.release(m.id); });
+    addEventListener('blur',()=>{ if(Cart.holding) Cart.release(Cart.holding); });
   },
   pickAt(p){
     if(this.dead) return;
@@ -2860,6 +2862,8 @@ const CART_ANIM = {
 /* embedded above so the hot dog cart never depends on an external assets/ folder */
 /* the photos are gone: the cart is a 3D street corner (src/cart3d.js) */
 const cartArt=f=>f;
+/* seconds of holding to make one of each (hold to prepare, 2026-10-22) */
+const CART_HOLD = {dog:1.0, pretz:0.8, soda:0.55};
 
 /* the dice — one roll at the close of every cart day. Life happens whether or
    not you had a good shift. */
@@ -2909,7 +2913,7 @@ const Cart = {
     G.cash=800; G.debt=0; G.phase='cart'; G.started=true; G.paused=false; G.speed=1;
     this.mount();
     UI.banner('DAY 1','the cart');
-    setTimeout(()=>UI.note('','🌭 Work the line','Tap an item — or press 1, 2, 3 — to build the order. Faster hands mean bigger tips.'),1200);
+    setTimeout(()=>UI.note('','🌭 Work the line','Press and hold an item — or hold 1, 2, 3 — until it fills to make it. The faster you serve, the bigger the tip.'),1200);
   },
   stop(){
     this.on=false;
@@ -2951,14 +2955,53 @@ const Cart = {
       const b=document.createElement('div');
       b.className='hotspot'; b.dataset.m=m.id;
       b.innerHTML='<span class="tag">'+m.em+' '+m.name+' · '+m.key+'</span>';
-      const go=e=>{ e.preventDefault(); this.tap(m.id); };
-      b.addEventListener('mousedown',go);
-      b.addEventListener('touchstart',go,{passive:false});
+      // press and HOLD to make it (user, 2026-10-22: no more mashing the button)
+      b.innerHTML+='<span class="hold"><i></i></span>';
+      b.addEventListener('pointerdown',e=>{ e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(err){} this.press(m.id); });
+      const up=()=>this.release(m.id);
+      b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up); b.addEventListener('lostpointercapture',up);
       wrap.appendChild(b);
     }
   },
 
   active(){ return this.queue.length? this.queue[0] : null; },
+
+  /* ---- hold to prepare (2026-10-22, replaces tapping) ----
+     Hold an item (pointer, or 1/2/3) and it fills over CART_HOLD seconds; when it fills, that
+     one is made. If the order needs another, keep holding and the next one starts. Progress
+     you let go of is kept. Pressing something the customer didn't order costs patience, once
+     per press, as a wrong tap did. */
+  press(mid){
+    if(!this.on || this.summary) return;
+    this.holding=mid;
+    const btn=el('carthotspots').querySelector('[data-m="'+mid+'"]');
+    if(btn) btn.classList.add('hit');
+    const c=this.active(); if(!c) return;
+    if(!c.items.find(x=>x.m.id===mid && x.done<x.qty)){
+      c.pat=Math.max(0,c.pat-1.1);
+      if(btn){ btn.classList.remove('wrong'); void btn.offsetWidth; btn.classList.add('wrong'); }
+      Sfx.play('alert');
+      this.holding=null;
+    }
+  },
+  release(mid){
+    if(this.holding===mid) this.holding=null;
+    const btn=el('carthotspots') && el('carthotspots').querySelector('[data-m="'+mid+'"]');
+    if(btn){ btn.classList.remove('hit'); const f=btn.querySelector('.hold > i'); if(f) f.style.width='0%'; }
+  },
+  holdStep(dt){
+    const mid=this.holding; if(!mid) return;
+    const c=this.active(); if(!c) return;
+    const it=c.items.find(x=>x.m.id===mid && x.done<x.qty);
+    const btn=el('carthotspots').querySelector('[data-m="'+mid+'"]');
+    if(!it){ if(btn){ const f=btn.querySelector('.hold > i'); if(f) f.style.width='0%'; } return; }
+    HS.Cart3D.holding(mid);                               // your hand stays in the compartment
+    it.prog += dt*it.m.taps/CART_HOLD[mid];               // prog still counts in "taps" for the order strip
+    if(btn){ const f=btn.querySelector('.hold > i'); if(f) f.style.width=Math.min(100,it.prog/it.m.taps*100)+'%'; }
+    if(it.prog >= it.m.taps){ it.prog=0; it.done++; Sfx.play('sizzle'); this.playAnim(mid); }
+    if(c.items.every(x=>x.done>=x.qty)) this.complete(c);
+    else this.renderOrder();
+  },
 
   tap(mid){
     if(!this.on) return;
@@ -3054,6 +3097,7 @@ const Cart = {
       c.pat -= dt * (i===0?1:0.72);          // the person being served feels it most
       if(c.pat<=0) this.walkout(c);
     }
+    this.holdStep(dt);
     if(performance.now()-this.lastTap>700 && this.streak) this.streak=0;
 
     this.render(false);
@@ -3285,7 +3329,7 @@ const Boot = {
         'just slower. Every customer has a patience bar; when it empties they walk out.</p>'+
         '<h3>The money</h3><p>Ingredient costs come from a live commodity market. Wages, rent, fuel and interest are charged at close. '+
         'Revenue is not profit — a busy truck can still lose money.</p>'+
-        '<h3>The cart</h3><p>You start on a sidewalk with $800 and a hot dog cart. Tap an item — or press 1, 2, 3 — to build '+
+        '<h3>The cart</h3><p>You start on a sidewalk with $800 and a hot dog cart. Press and hold an item — or hold 1, 2, 3 — until it fills to build '+
         'each order. Speed is everything: the faster your hands, the bigger the tip and the faster your name grows. '+
         'At $9,000 saved and 60 reputation the bank will lend you the rest of a truck.</p>'+
         '<h3>The year</h3><p>Days are real dates across a 365-day year. Summer fills the park, winter empties it. '+

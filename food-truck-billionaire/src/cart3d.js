@@ -202,6 +202,8 @@ globalThis.HS = globalThis.HS || {};
   /* ------------------------------------------------------------------ hooks from the Cart logic */
   // a tap: dip into that compartment
   C3.tap = function (mid) { const a = C3.me; if (!a) return; a.reachKey = mid; a.reachT = 0.32; };
+  // holding an item: keep the hand at the bottom of the dip (full reach) until you let go
+  C3.holding = function (mid) { const a = C3.me; if (!a) return; a.reachKey = mid; a.reachT = 0.16; };
   // an item finished: it comes up in your hand
   C3.grab = function (mid) {
     const a = C3.me; if (!a) return;
