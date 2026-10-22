@@ -87,6 +87,7 @@ globalThis.SB = globalThis.SB || {};
   function flags(sim, h) {
     const cam = SB.View.camera, W = innerWidth, Ht = innerHeight;
     cam.updateMatrixWorld();
+    const pos = [];
     sim.flags.forEach(function (f, team) {
       el.chips[team].className = "fchip" + (f.state === "carried" ? " carried" : f.state === "dropped" ? " dropped" : "");
       const m = el.marks[team];
@@ -98,10 +99,25 @@ globalThis.SB = globalThis.SB || {};
       _p.applyMatrix4(cam.projectionMatrix);
       let x = (_p.x * 0.5 + 0.5) * W, y = (-_p.y * 0.5 + 0.5) * Ht;
       if (behind) { x = W - x; y = Ht - 60; }
-      x = Math.min(W - 40, Math.max(40, x)); y = Math.min(Ht - 60, Math.max(96, y));
-      m.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
+      pos[team] = { x: x, y: y };
       const d = Math.round(Math.hypot(f.x - cam.position.x, f.z - cam.position.z));
       m.lastChild.textContent = (f.state === "carried" ? "CARRIED " : f.state === "dropped" ? "LOOSE " : "") + d + "m";
+    });
+    // Both flags in the same direction: spread the markers sideways so the seals and labels don't overlap
+    // (a "CARRIED 65m" label is ~90px wide).
+    const a = pos[0], b = pos[1], GAP = 100;
+    if (a && b) {
+      a.x = Math.min(W - 40, Math.max(40, a.x)); b.x = Math.min(W - 40, Math.max(40, b.x));
+      a.y = Math.min(Ht - 60, Math.max(96, a.y)); b.y = Math.min(Ht - 60, Math.max(96, b.y));
+    }
+    if (a && b && Math.abs(a.y - b.y) < 60 && Math.abs(a.x - b.x) < GAP) {
+      const mid = Math.min(W - 40 - GAP / 2, Math.max(40 + GAP / 2, (a.x + b.x) / 2)), side = a.x <= b.x ? 1 : -1;
+      a.x = mid - side * GAP / 2; b.x = mid + side * GAP / 2;
+    }
+    pos.forEach(function (p, team) {
+      if (!p) return;
+      const x = Math.min(W - 40, Math.max(40, p.x)), y = Math.min(Ht - 60, Math.max(96, p.y));
+      el.marks[team].style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)";
     });
   }
 
