@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+// iPhone Safari ignores user-scalable=no: no double-tap zoom or pinch (same guard as the other games on the arcade).
+(function () {
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<title>Cornhole</title>
+<meta name="description" content="Backyard turf cornhole with the CTSG crew: aim, time your throw, sink the bag in the hole. 3D, 1v1 or 2v2, cancellation scoring.">
+<meta name="theme-color" content="#0b1426">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:title" content="Cornhole">
+<meta property="og:description" content="Backyard turf cornhole with the CTSG crew. 3D, 1v1 or 2v2.">
+<meta property="og:image" content="https://anthonyjctsg.online/cornhole_thumbnail.jpg">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css?v=19">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tags"></div>
+
+<div id="hud" class="hidden">
+  <div id="score">
+    <div class="side s0"><div class="nm"><b id="n0"></b></div><div class="pt" id="sc0">0</div><div class="pips" id="pips0"></div></div>
+    <div id="mid"><small id="tgt"></small><b id="rnd"></b></div>
+    <div class="side s1"><div class="pt" id="sc1">0</div><div class="nm"><b id="n1"></b></div><div class="pips" id="pips1"></div></div>
+  </div>
+  <div id="turn"><span id="turnTxt"></span><i id="turnClock"></i></div>
+  <div id="pop"></div>
+  <div id="sub"></div>
+
+  <div id="pull"></div>
+
+  <div id="tools">
+    <button type="button" id="btnGuide" title="Aim guide line">Guide</button>
+    <button type="button" id="btnSound" title="Sound">Sound</button>
+    <button type="button" id="btnMenu" title="Back to the menu">Menu</button>
+  </div>
+
+  <div id="summary" class="hidden"></div>
+</div>
+
+<div id="end" class="hidden">
+  <div class="card">
+    <h2 id="endTitle"></h2>
+    <p id="endSub"></p>
+    <div class="row"><button type="button" id="btnAgain" class="go">Play again</button><button type="button" id="btnBack">Change players</button></div>
+  </div>
+</div>
+
+<div id="landing" class="hidden">
+  <img src="art/key_title.jpg?v=19" alt="Cornhole: six friends tossing bags on a turf backyard, Blue against Orange">
+  <button type="button" id="landPlay" class="go">Play</button>
+</div>
+
+<div id="menu" class="hidden">
+  <div class="panel">
+    <div class="logo">CORN<span>HOLE</span></div>
+    <p class="tag-line">Backyard turf cornhole with the CTSG crew.</p>
+
+    <h3>Your player</h3>
+    <div id="cast" class="cast"></div>
+    <p id="castInfo" class="cast-info"></p>
+
+    <div class="opts">
+      <div><h3>Match</h3><div class="seg" data-key="mode"><button type="button" data-v="1v1">1 v 1</button><button type="button" data-v="2v2">2 v 2</button></div></div>
+      <div><h3>Play to</h3><div class="seg" data-key="target"><button type="button" data-v="11">11</button><button type="button" data-v="15">15</button><button type="button" data-v="21">21</button></div></div>
+      <div><h3>Computer skill</h3><div class="seg" data-key="rival"><button type="button" data-v="0">Easy</button><button type="button" data-v="1">Normal</button><button type="button" data-v="2">Hard</button></div></div>
+      <div><h3>Graphics</h3><div class="seg" data-key="gfx"><button type="button" data-v="low">Low</button><button type="button" data-v="medium">Medium</button><button type="button" data-v="high">High</button></div></div>
+    </div>
+
+    <button type="button" id="btnPlay" class="go">Play</button>
+    <p class="how"><span class="how-mouse">Aim with the mouse (or ← → / A D) · press and pull down to draw back, let go to toss.</span><span class="how-touch">Put your thumb down and slide: sideways to aim, down to draw back. Let go to toss.</span> In the hole = 3, on the board = 1. Points cancel between the two sides each round.</p>
+    <p class="rotate">Tip: turn your phone sideways for the best view.</p>
+    <div class="brand"><img src="assets/brand/ctsg-seal-color-512.png" alt="Calamity Tech Solutions Group"><small>A CTSG GAME</small></div>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="logo">CORN<span>HOLE</span></div>
+  <div class="ld-bar"><span id="ld-fill"></span></div>
+  <div class="ld-sub" id="ld-msg">Loading...</div>
+  <div class="ld-brands"><div class="ld-brand"><img src="assets/brand/ctsg-seal-color-512.png" alt="Calamity Tech Solutions Group"><small>A CTSG GAME</small></div></div>
+</div>
+<script>
+// Show load failures on the loading screen instead of hanging on "Loading...".
+addEventListener("error", function (e) { var m = document.getElementById("ld-msg"); if (m && document.getElementById("loading") && !document.getElementById("loading").classList.contains("hidden")) m.textContent = "Could not start: " + (e.message || "a file failed to load"); });
+addEventListener("unhandledrejection", function (e) { var m = document.getElementById("ld-msg"); if (m && document.getElementById("loading") && !document.getElementById("loading").classList.contains("hidden")) m.textContent = "Could not start: " + (e.reason && e.reason.message || e.reason); });
+</script>
+
+<script type="module" src="src/boot.js?v=19"></script>
+<script defer src="src/sim.js?v=19"></script>
+<script defer src="src/rig.js?v=19"></script>
+<script defer src="src/yard.js?v=19"></script>
+<script defer src="src/world.js?v=19"></script>
+<script defer src="src/view.js?v=19"></script>
+<script defer src="src/input.js?v=19"></script>
+<script defer src="src/audio.js?v=19"></script>
+<script defer src="src/hud.js?v=19"></script>
+<script defer src="src/main.js?v=19"></script>
+</body>
+</html>

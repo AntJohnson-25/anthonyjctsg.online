@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+// iPhone Safari ignores user-scalable=no: no double-tap zoom or pinch (same guard as the other games on the arcade).
+(function () {
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1426">
+<title>Dodge It: team dodgeball</title>
+<meta name="description" content="Dodge It is team dodgeball in a big gym. Pick your athlete, lead your team from 1v1 to 5v5, and throw, catch, block, dodge and flip out of the way. A catch puts the thrower out and brings a teammate back in.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css?v=5">
+<meta property="og:image" content="https://anthonyjctsg.online/dodge-it_thumbnail.jpg">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="score">
+    <div class="team t0"><span class="nm">BLUE</span><b id="s0">0</b><div class="dots" id="d0"></div></div>
+    <div id="mid"><div id="rd">ROUND 1</div><small id="bo">BEST OF 3</small></div>
+    <div class="team t1"><b id="s1">0</b><span class="nm">GOLD</span><div class="dots" id="d1"></div></div>
+  </div>
+  <div id="feed"></div>
+  <div id="sight">
+    <svg viewBox="0 0 60 60"><circle class="track" cx="30" cy="30" r="25"></circle><circle id="powerRing" cx="30" cy="30" r="25"></circle></svg>
+    <i class="h"></i><i class="v"></i><b></b>
+  </div>
+  <div id="ballTag">BALL</div>
+  <div id="stam"><span id="stamFill"></span></div>
+  <div id="count"></div>
+  <div id="big"></div>
+  <div id="sub"></div>
+  <div id="outNote">You're out: watch the court. A teammate's catch brings you back in.</div>
+  <div id="tc">
+    <div id="tzL"></div><div id="tzR"></div>
+    <div id="stick"><i id="knob"></i></div>
+    <button type="button" id="bPause" class="tb tiny" aria-label="Pause">❚❚</button>
+    <button type="button" id="bThrow" class="tb big">THROW</button>
+    <button type="button" id="bCatch" class="tb">CATCH</button>
+    <button type="button" id="bJump" class="tb">JUMP</button>
+    <button type="button" id="bDodge" class="tb small">DODGE</button>
+  </div>
+  <div id="keys"><span><kbd>WASD</kbd> move</span><span><kbd>HOLD CLICK</kbd> wind up, let go to throw</span><span><kbd>RIGHT CLICK</kbd> catch / block</span><span><kbd>SPACE</kbd> jump, again to flip</span><span><kbd>SHIFT</kbd> dodge</span><span><kbd>ESC</kbd> pause</span></div>
+</div>
+
+<div id="landing" class="hidden">
+  <img src="art/key_title.jpg?v=1" alt="Dodge It: six athletes in a dodgeball match, Blue against Gold">
+  <button type="button" id="landPlay">PLAY</button>
+</div>
+
+<div id="menu" class="hidden">
+  <div class="logo">DODGE<span> IT</span></div>
+  <div class="panel">
+    <h2>Pick your athlete: <b id="pickName"></b></h2>
+    <div id="athletes"></div>
+    <div class="opts">
+      <div class="opt"><h3>Team size</h3><div class="seg" data-opt="size">
+        <button type="button" data-v="1">1v1</button><button type="button" data-v="2">2v2</button><button type="button" data-v="3">3v3</button><button type="button" data-v="4">4v4</button><button type="button" data-v="5">5v5</button>
+      </div></div>
+      <div class="opt"><h3>Match</h3><div class="seg" data-opt="rounds">
+        <button type="button" data-v="1">1 round</button><button type="button" data-v="3">Best of 3</button><button type="button" data-v="5">Best of 5</button>
+      </div></div>
+      <div class="opt"><h3>Bots</h3><div class="seg" data-opt="level">
+        <button type="button" data-v="0">Easy</button><button type="button" data-v="1">Normal</button><button type="button" data-v="2">Hard</button>
+      </div></div>
+    </div>
+    <button type="button" id="play">PLAY</button>
+    <div class="links"><button type="button" id="menuSettings">Settings</button><button type="button" id="menuCredits">Credits</button></div>
+  </div>
+  <p class="howto"><span class="how-mouse">Walk over a ball to pick it up. Hold click to wind up, let go to throw. Right click catches (or blocks with a ball). Space jumps, again to flip.</span><span class="how-touch">Left thumb moves, drag the right side to look. Walk over a ball to pick it up. Hold THROW to wind up (slide that thumb to aim), let go to throw. CATCH catches, or blocks with a ball. JUMP jumps, again in the air to flip.</span> A hit puts you out; a catch puts the thrower out and brings a teammate back.</p>
+</div>
+
+<div id="settings" class="hidden"><div class="card">
+  <b>Settings</b>
+  <label>Graphics</label>
+  <div class="seg"><button type="button" data-gfx="auto">Auto</button><button type="button" data-gfx="low">Low</button><button type="button" data-gfx="medium">Medium</button><button type="button" data-gfx="high">High</button></div>
+  <label for="setSens">Look sensitivity</label><input id="setSens" type="range" min="0.3" max="2.5" step="0.05">
+  <label class="check"><input id="setInv" type="checkbox"> Invert look Y</label>
+  <label for="setVol">Sound</label><input id="setVol" type="range" min="0" max="1" step="0.05">
+  <label for="setMusic">Music</label><input id="setMusic" type="range" min="0" max="1" step="0.05">
+  <button type="button" id="setDone" class="wide">Done</button>
+</div></div>
+
+<div id="pause" class="hidden"><div class="card">
+  <b>Paused</b>
+  <button type="button" id="pResume" class="wide">Resume</button>
+  <button type="button" id="pSettings" class="wide">Settings</button>
+  <button type="button" id="pQuit" class="wide">Quit to menu</button>
+</div></div>
+
+<div id="results" class="hidden"><div class="card">
+  <b id="resTitle"></b>
+  <div id="resScore"></div>
+  <table><thead><tr><th>Player</th><th>Hits</th><th>Catches</th></tr></thead><tbody id="resTable"></tbody></table>
+  <button type="button" id="resAgain" class="wide">Play again</button>
+  <button type="button" id="resMenu" class="wide">Menu</button>
+</div></div>
+
+<div id="needClick" class="hidden"><div><b id="ncTitle">Click to play</b><small id="ncSub">Esc pauses</small></div></div>
+<div id="credits" class="hidden"><div><b>Credits</b><p id="creditsTxt">three.js (MIT) · athletes made with Meshy AI · animations from Adobe Mixamo · game by Calamity Tech Solutions Group</p><button type="button" onclick="this.closest('#credits').classList.add('hidden')">Close</button></div></div>
+<div id="rotate"><div>Turn your phone sideways to play<br><small>Dodge It uses two thumbs: move on the left, look and throw on the right</small></div></div>
+
+<div id="loading">
+  <div class="logo">DODGE<span> IT</span></div>
+  <div class="ld-bar"><span id="ld-fill"></span></div>
+  <div class="ld-sub" id="ld-msg">Loading...</div>
+  <div class="ld-brands"><div class="ld-brand"><img src="assets/brand/ctsg-seal-color-512.png" alt="Calamity Tech Solutions Group"><small>A CTSG GAME</small></div></div>
+</div>
+<script>
+// Show load failures on the loading screen instead of hanging on "Loading...".
+addEventListener("error", function (e) { var m = document.getElementById("ld-msg"); if (m && document.getElementById("loading") && !document.getElementById("loading").classList.contains("hidden")) m.textContent = "Could not start: " + (e.message || "a file failed to load"); });
+addEventListener("unhandledrejection", function (e) { var m = document.getElementById("ld-msg"); if (m && document.getElementById("loading") && !document.getElementById("loading").classList.contains("hidden")) m.textContent = "Could not start: " + (e.reason && e.reason.message || e.reason); });
+</script>
+
+<script type="module" src="src/boot.js?v=2"></script>
+<script defer src="src/sim.js?v=2"></script>
+<script defer src="src/chars/clips.js?v=1"></script>
+<script defer src="music/tracks.js?v=1"></script>
+<script defer src="src/body.js?v=2"></script>
+<script defer src="src/world.js?v=2"></script>
+<script defer src="src/fx.js?v=2"></script>
+<script defer src="src/view.js?v=2"></script>
+<script defer src="src/input.js?v=4"></script>
+<script defer src="src/audio.js?v=2"></script>
+<script defer src="src/hud.js?v=2"></script>
+<script defer src="src/main.js?v=4"></script>
+</body>
+</html>
