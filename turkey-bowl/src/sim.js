@@ -997,6 +997,15 @@
     const reach = (b.catchR || D.CATCH_RADIUS) + (b.highPoint ? C.HIGH_POINT_REACH : 0);
     const rt = tgt ? W.dist(b.x, b.y, tgt.x, tgt.y) : Infinity;
 
+    // Out of bounds is not a catch: the ball came down past a touchline, or the
+    // receiver (steered by the human) had stepped out before he got his hands on it.
+    if (b.x < 0 || b.x > D.FIELD_W || (tgt && (tgt.x < 0 || tgt.x > D.FIELD_W))) {
+      gs.oobCatch = true;
+      emit(gs, "incomplete", { x: b.x, y: b.y, oob: true });
+      endPlay(gs, gs.los, "INCOMPLETE");
+      return;
+    }
+
     // An overthrow: the target never got anywhere near it.
     if (rt > C.DIVE_RADIUS + (b.highPoint ? C.HIGH_POINT_REACH : 0)) {
       emit(gs, "incomplete", { x: b.x, y: b.y, overthrow: true });

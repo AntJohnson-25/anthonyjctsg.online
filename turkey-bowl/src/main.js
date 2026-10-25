@@ -774,7 +774,8 @@
             const g = Math.round(ev.gain);
             banner((r === "OUT OF BOUNDS" ? "OUT OF BOUNDS" : r) + "  ·  " + (g === 0 ? "NO GAIN" : (g > 0 ? "+" : "") + g + " YD" + (Math.abs(g) === 1 ? "" : "S")), g > 0 ? "#2e9e4f" : "#c0392b", false, 1.4);
           } else if (r === "INCOMPLETE") {
-            banner("INCOMPLETE", "#9aa0a6", false, 1.3);
+            banner(gs.oobCatch ? "INCOMPLETE  ·  OUT OF BOUNDS" : "INCOMPLETE", "#9aa0a6", false, 1.3);
+            gs.oobCatch = false;
           } else if (r === "SAFETY") {
             banner("SAFETY!", "#e8452c", true, 2.2);
           }
