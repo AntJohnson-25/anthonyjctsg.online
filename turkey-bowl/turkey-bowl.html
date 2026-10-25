@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2a1e14">
+<script>
+// iPhone Safari ignores user-scalable=no: no double-tap zoom or pinch (same guard as the other games on the arcade).
+(function () {
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<title>Turkey Bowl 3D</title>
+<meta name="description" content="Seven-on-seven Thanksgiving backyard football in 3D: the Turkeys against the Wildcats. Call plays Madden-style, throw, catch, juke, hurdle and flip, with instant replays and an MVP turkey leg. Keyboard or phone.">
+<meta property="og:title" content="Turkey Bowl 3D">
+<meta property="og:description" content="Seven-on-seven Thanksgiving backyard football in 3D: the Turkeys against the Wildcats. Call plays Madden-style, throw, catch, juke, hurdle and flip, with instant replays and an MVP turkey leg. Keyboard or phone.">
+<meta property="og:image" content="https://anthonyjctsg.online/turkey-bowl_thumbnail.jpg">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="stylesheet" href="style.css?v=6">
+</head>
+<body>
+<canvas id="view" aria-label="Turkey Bowl field"></canvas>
+
+<!-- Loading, then team select over the 3D team photos -->
+<div id="loading" class="loading">
+  <picture><source media="(orientation: portrait)" srcset="assets/art/menu-tall.jpg"><img class="load-art" src="assets/art/menu-wide.jpg" alt=""></picture>
+  <div class="load-title">TURKEY BOWL <span>3D</span></div>
+  <div class="load-foot">
+    <div class="load-sub">Setting up the backyard…</div>
+    <div class="load-bar"><span id="loadFill"></span></div>
+  </div>
+</div>
+
+<!-- Collage key art greets you first; PLAY goes to the team select -->
+<div id="splash" class="splash" hidden>
+  <picture><source media="(orientation: portrait)" srcset="assets/art/menu-tall.jpg"><img src="assets/art/menu-wide.jpg" alt="Turkey Bowl 3D: the Turkeys and the Wildcats play a Thanksgiving back yard football game"></picture>
+  <h1 class="sp-title">TURKEY BOWL <span>3D</span></h1>
+  <button type="button" id="spPlay" class="big sp-play">PLAY</button>
+</div>
+
+<div id="select" class="select" hidden>
+  <header class="sel-head">
+    <h1>TURKEY BOWL <span>3D</span></h1>
+    <p>Seven on seven in the back yard. Loser carves the turkey.</p>
+  </header>
+  <div id="labels" class="labels" aria-hidden="true"></div>
+  <div class="sel-teams">
+    <button type="button" class="team-btn" data-team="0" style="--tc:#7c2733">
+      <img src="assets/mascot-paw.png" alt=""><span class="tn">WILDCATS</span><span class="tp">Play as the Wildcats</span>
+    </button>
+    <button type="button" class="team-btn" data-team="1" style="--tc:#dc7422">
+      <img src="assets/mascot-turkey.png" alt=""><span class="tn">TURKEYS</span><span class="tp">Play as the Turkeys</span>
+    </button>
+  </div>
+  <p class="sel-foot">Keyboard: arrows to run, <kbd>Space</kbd> to snap, <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> to throw. Phone: joystick and buttons.</p>
+</div>
+
+<!-- In-game HUD -->
+<div id="hud" class="hud" hidden>
+  <div class="scorebug">
+    <div class="sb-team" id="sbAway"><img alt=""><span class="nm"></span><span class="sc"></span><i class="poss"></i></div>
+    <div class="sb-mid"><span id="sbQuarter">Q1</span><span id="sbClock">2:00</span></div>
+    <div class="sb-team" id="sbHome"><img alt=""><span class="nm"></span><span class="sc"></span><i class="poss"></i></div>
+  </div>
+  <div class="downs" id="downs"></div>
+  <div class="topbtns">
+    <button type="button" id="btnCam" title="Camera (C)">CAM</button>
+    <button type="button" id="btnSound" title="Sound (M)">SOUND</button>
+    <button type="button" id="btnPause" title="Pause (P)">II</button>
+  </div>
+  <div class="banner" id="banner"><span></span></div>
+  <div class="flash" id="flash"></div>
+  <div class="hint" id="hint"></div>
+  <div id="badges" class="badges"></div>
+
+  <!-- Madden-style play call: opens in the huddle, closes on the call -->
+  <div id="callscreen" class="callscreen" hidden>
+    <div class="cs-top">
+      <img id="csLogo" class="cs-logo" alt="">
+      <div class="cs-title"><b id="csSide">OFFENSE</b><span id="csSit"></span></div>
+      <button type="button" class="cs-btn" id="csReplay" hidden title="Replay the last play (R)">&#9664;&#9664; REPLAY</button>
+      <button type="button" class="cs-btn" id="csFlip" title="Flip the play (X)">&#8644; FLIP</button>
+      <div class="cs-clock" id="csClock"><span>25</span><small>PLAY CLOCK</small></div>
+    </div>
+    <div class="cs-tabs" id="csTabs"></div>
+    <div class="cs-body">
+      <button type="button" class="cs-nav" id="csPrev" aria-label="Previous plays">&#8249;</button>
+      <div class="cs-cards" id="csCards"></div>
+      <button type="button" class="cs-nav" id="csNext" aria-label="More plays">&#8250;</button>
+    </div>
+    <div class="cs-foot"><span id="csDots" class="cs-dots"></span><em id="csKeys"></em></div>
+  </div>
+  <button type="button" id="callchip" class="callchip" hidden><span id="ccSide">PLAY</span><b id="ccName"></b><em id="ccKey">B · AUDIBLE</em></button>
+
+  <!-- Big-play cameo: letterbox bars and the title stamp -->
+  <div id="cine" class="cine"><i class="bar top"></i><i class="bar bot"></i><div class="stamp"><img alt=""><b></b></div></div>
+
+  <!-- Instant replay -->
+  <div id="replay" class="replay" hidden>
+    <div class="rp-bug"><img src="assets/art/replay.png" alt="Instant replay"><span id="rpTitle">INSTANT REPLAY</span></div>
+    <div class="rp-bar"><i id="rpBar"></i></div>
+    <div class="rp-ctl">
+      <button type="button" id="rpRestart" title="Watch again (R)">&#10226; AGAIN</button>
+      <button type="button" id="rpSpeed" title="Speed (S)">1&times;</button>
+      <button type="button" id="rpCam" title="Camera (C)">CAM</button>
+      <button type="button" id="rpDone" class="done" title="Done (Space)">DONE &#10005;</button>
+    </div>
+  </div>
+
+  <!-- touch -->
+  <div class="touchpad" id="touchpad">
+    <div class="joy" id="joy"><div class="knob" id="knob"></div></div>
+    <div class="acts" id="acts"></div>
+  </div>
+</div>
+
+<div id="fade" class="fade"><img id="fadeLogo" alt=""></div>
+
+<div id="pause" class="overlay" hidden>
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <button type="button" id="pResume" class="big">Resume</button>
+    <div class="row"><span>Camera</span><button type="button" id="pCam"></button></div>
+    <div class="row"><span>Graphics</span><button type="button" id="pQuality"></button></div>
+    <div class="row"><span>Sound</span><button type="button" id="pSound"></button></div>
+    <div class="row"><span>Auto replay</span><button type="button" id="pReplay"></button></div>
+    <button type="button" id="pRestart">Restart game</button>
+    <button type="button" id="pTeams">Change teams</button>
+    <div class="keys">
+      <b>Play call</b> <kbd>←</kbd><kbd>→</kbd> choose · <kbd>↑</kbd><kbd>↓</kbd> category · <kbd>1</kbd>–<kbd>3</kbd> or <kbd>Enter</kbd> call · <kbd>B</kbd> audible at the line<br>
+      <b>Offense</b> arrows/WASD run · <kbd>Space</kbd> snap · <kbd>X</kbd> flip the play · tap <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> touch pass to WR1 / WR2 / TE, hold for a bullet · <kbd>4</kbd> pitch<br>
+      <b>Ball in the air</b> arrows steer the receiver · <kbd>Shift</kbd> high-point it<br>
+      <b>Running</b> <kbd>Shift</kbd> juke · <kbd>Q</kbd> spin · <kbd>Space</kbd> hurdle, twice for a corkscrew flip<br>
+      <b>Defense</b> call your defense in the huddle · you steer the defender with the cyan ring · <kbd>F</kbd> dive (near a pass: play the ball)<br>
+      <b>Between plays</b> <kbd>R</kbd> instant replay<br>
+      <b>Any time</b> <kbd>C</kbd> camera · <kbd>M</kbd> sound · <kbd>P</kbd> pause
+    </div>
+  </div>
+</div>
+
+<!-- Postgame: the MVP card beside the MVP (with his turkey leg) in 3D -->
+<div id="final" class="mvp-wrap" hidden>
+  <div class="mvp-card">
+    <img class="mvp-head" src="assets/art/mvphead.jpg" alt="MVP">
+    <div class="mvp-body">
+      <div class="mvp-final"><b id="finalTitle">FINAL</b><span class="final-score" id="finalScore"></span></div>
+      <div class="mvp-name" id="mvpName"></div>
+      <div class="mvp-team" id="mvpTeam"></div>
+      <div class="mvp-stats" id="mvpStats"></div>
+      <div class="mvp-btns">
+        <button type="button" id="fAgain" class="big">Play again</button>
+        <button type="button" id="fTeams">Change teams</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rotate" class="rotate" hidden>
+  <div>Turn your phone sideways<br><small>the field is wide — landscape shows the whole play</small></div>
+  <button type="button" id="rotateOk">Play upright anyway</button>
+</div>
+
+<div id="err" class="err" hidden></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="src/data.js?v=3"></script>
+<script src="src/util.js?v=1"></script>
+<script src="src/sim.js?v=3"></script>
+<script src="src/rig.js?v=2"></script>
+<script src="src/anim.js?v=1"></script>
+<script src="src/chars/clips.js?v=4"></script>
+<script src="src/chars/turkey_01.js"></script>
+<script src="src/chars/turkey_02.js"></script>
+<script src="src/chars/turkey_03.js"></script>
+<script src="src/chars/turkey_04.js"></script>
+<script src="src/chars/turkey_05.js"></script>
+<script src="src/chars/turkey_06.js"></script>
+<script src="src/chars/turkey_07.js"></script>
+<script src="src/chars/wildcat_01.js"></script>
+<script src="src/chars/wildcat_02.js"></script>
+<script src="src/chars/wildcat_03.js"></script>
+<script src="src/chars/wildcat_04.js"></script>
+<script src="src/chars/wildcat_05.js"></script>
+<script src="src/chars/wildcat_06.js"></script>
+<script src="src/chars/wildcat_07.js"></script>
+<script src="src/mxrig.js?v=3"></script>
+<script src="src/world3d.js?v=1"></script>
+<script src="src/view.js?v=8"></script>
+<script src="src/audio.js?v=1"></script>
+<script src="src/main.js?v=7"></script>
+</body>
+</html>
