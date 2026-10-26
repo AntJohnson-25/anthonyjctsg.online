@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<script>
+// iPhone Safari ignores user-scalable=no: no double-tap zoom or pinch (same guard as the other games on the arcade).
+(function () {
+  var lastTouchEnd = 0;
+  document.addEventListener('touchend', function (e) {
+    var now = Date.now();
+    if (now - lastTouchEnd < 350) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); }, { passive: false });
+})();
+</script>
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#1b1712">
+<title>Wrong Door: Free Package Delivery Game | AnthonyJCTSG Games</title>
+<meta name="description" content="Wrong Door is a free third-person delivery game in your browser. Race the clock through a confusing 108-door apartment complex, upstairs and down, and get every parcel to the right door, or face the dogs, the angry residents and the neighbour who keeps your valuables. Desktop or phone, no download.">
+<link rel="canonical" href="https://anthonyjctsg.online/wrong-door/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Wrong Door: Free Package Delivery Game">
+<meta property="og:description" content="Race the clock through a confusing 108-door apartment complex, dodge the dogs and the angry residents, and get every parcel to the right door. Free, no download.">
+<meta property="og:url" content="https://anthonyjctsg.online/wrong-door/">
+<meta property="og:image" content="https://anthonyjctsg.online/wrong-door_thumbnail.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://anthonyjctsg.online/wrong-door_thumbnail.jpg">
+<link rel="stylesheet" href="style.css?v=5">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="topbar">
+    <div id="left"></div>
+    <div id="clock">0:00</div>
+    <div id="scoreBox"><b id="score">0</b><span id="combo"></span></div>
+  </div>
+  <div id="scanArrow" class="hidden"><i></i><span id="scanTxt"></span></div>
+  <div id="device" class="hidden" aria-hidden="true">
+    <div class="dev-top"><i></i><span id="devTitle">ROUTE</span><em id="devTrip"></em></div>
+    <canvas id="deviceMap" width="480" height="416"></canvas>
+    <div id="devStops"></div>
+    <div class="dev-foot"><span id="devKey">▲ upstairs · ★ valuable</span><b id="devCount"></b></div>
+  </div>
+  <div id="big"></div>
+  <div id="bigSub"></div>
+  <div id="toast"></div>
+  <div id="hint" class="hidden"></div>
+  <div id="trayBox">
+    <div id="tray"></div>
+    <div id="trayMeta"><span id="vanLeft"></span><span id="scans"></span></div>
+  </div>
+  <div id="stam"><div id="stamFill"></div></div>
+  <div id="keys">E / click: leave parcel &nbsp;·&nbsp; Q / wheel: next parcel &nbsp;·&nbsp; F / right-click: scanner &nbsp;·&nbsp; Shift: run</div>
+</div>
+
+<div id="touchUI">
+  <div id="stickBase"><i id="stickKnob"></i></div>
+  <button id="tbPause" aria-label="Pause">❚❚</button>
+  <button id="tbScan" class="tb small">SCAN</button>
+  <button id="tbRun" class="tb small">RUN</button>
+  <button id="tbNext" class="tb">NEXT</button>
+  <button id="tbDrop" class="tb big">DROP</button>
+</div>
+<div id="rotate"><div>Turn your phone sideways<br><small>Wrong Door plays in landscape</small></div></div>
+
+<div id="loading" class="screen" aria-live="polite">
+  <div class="ld-card">
+    <div class="ld-title">Wrong Door</div>
+    <div class="ld-bar"><i></i></div>
+    <p id="ldTip">Loading the complex…</p>
+  </div>
+</div>
+
+<div id="menu" class="screen">
+  <div class="title">
+    <div class="doorart" aria-hidden="true"><span>12</span></div>
+    <div>
+      <h1>Wrong<br>Door</h1>
+      <p class="tagline">108 units · nine buildings · one van · zero helpful signs</p>
+    </div>
+  </div>
+  <div class="menubar">
+    <div class="drivers-head">Your driver</div>
+    <div id="drivers"></div>
+    <div id="shifts"></div>
+    <p id="shiftBlurb"></p>
+    <div class="row">
+      <button id="startBtn" class="big-btn">Start shift</button>
+      <button id="gearBtn" class="gear" aria-label="Settings and controls" aria-expanded="false">⚙</button>
+    </div>
+    <div id="settings" class="pop">
+      <div class="pop-title">Settings &amp; controls</div>
+      <div class="opts">
+        <label>Look speed <input id="optSens" type="range" min="0.3" max="2.5" step="0.05" value="1"></label>
+        <label>Sound <input id="optVol" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+        <label>Music <input id="optMusic" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+        <label>Detail <select id="optDetail"><option value="high">High</option><option value="low">Low (faster)</option></select></label>
+      </div>
+      <div id="touchNote" class="note hidden">Phone: play in landscape. Left thumb moves, drag the right side to look. DROP leaves the selected parcel at the door you're standing at, NEXT picks another, RUN toggles running.</div>
+      <ul class="controls kb">
+        <li><kbd>W A S D</kbd> walk &nbsp; <kbd>Shift</kbd> run (uses stamina) &nbsp; <kbd>Mouse</kbd> look</li>
+        <li><kbd>E</kbd> / <kbd>Click</kbd> leave the selected parcel at this door</li>
+        <li><kbd>Q</kbd> / <kbd>Wheel</kbd> / <kbd>1</kbd>–<kbd>7</kbd> pick a parcel &nbsp; <kbd>F</kbd> scanner (points roughly at the door)</li>
+        <li>Walk up to the van to load. A wrong door costs 8 seconds, and can cost more: a dog let out, an angry resident on your heels, or a gold-edged valuable that nobody hands back. Units 1–6 are downstairs, 7–12 upstairs, in each of the nine buildings (A to I). The handheld shows your route before every shift.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel small">
+    <h2>Paused</h2>
+    <button id="resumeBtn" class="big-btn">Click to resume</button>
+    <button id="quitBtn" class="ghost-btn">Quit to menu</button>
+  </div>
+</div>
+
+<div id="over" class="screen hidden">
+  <div class="panel small">
+    <div class="kicker" id="overKicker"></div>
+    <h2 id="overTitle"></h2>
+    <div class="stars big" id="overStars"></div>
+    <ul id="overStats"></ul>
+    <p class="note" id="overNote"></p>
+    <button id="againBtn" class="big-btn">Run it again</button>
+    <button id="nextBtn" class="big-btn alt">Next shift</button>
+    <button id="menuBtn" class="ghost-btn">Menu</button>
+  </div>
+</div>
+
+<script type="module" src="src/boot.js?v=2"></script>
+<script defer src="src/sim.js?v=3"></script>
+<script defer src="src/gear.js?v=2"></script>
+<script defer src="src/world.js?v=4"></script>
+<script defer src="src/chars.js?v=4"></script>
+<script defer src="src/view.js?v=5"></script>
+<script defer src="src/input.js?v=1"></script>
+<script defer src="music/tracks.js?v=1"></script>
+<script defer src="src/audio.js?v=1"></script>
+<script defer src="src/hud.js?v=2"></script>
+<script defer src="src/main.js?v=5"></script>
+</body>
+</html>
