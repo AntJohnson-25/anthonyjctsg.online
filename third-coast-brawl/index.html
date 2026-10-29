@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel pinch gestures, two-finger moves and a double
+   tap's second touchend so the page can't zoom. Same guard as the other games on the site. */
+(function () {
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault();
+  }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) { var n = Date.now(); if (n - last < 350) e.preventDefault(); last = n; }, { passive: false });
+  document.addEventListener("dblclick", function (e) { e.preventDefault(); }, { passive: false });
+  // headless checks read script errors from the title
+  window.addEventListener("error", function (e) { document.title = "ERR " + e.message + " @" + String(e.filename || "").split("/").pop() + ":" + e.lineno; });
+})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1024">
+<title>Third Coast Brawl</title>
+<meta name="description" content="Third Coast Brawl: four riders race across Houston and anything goes. Inline skates downtown, mountain bikes on the bayou trails, dirt bikes at the Ship Channel. Punch, kick, flip, boost.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<!-- arcade SEO tags (anthonyjctsg.online) -->
+<link rel="canonical" href="https://anthonyjctsg.online/third-coast-brawl/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AnthonyJCTSG Games">
+<meta property="og:title" content="Third Coast Brawl: free browser game">
+<meta property="og:description" content="Free 3D extreme-sports brawl-racer in your browser. Race inline skates through downtown Houston, mountain bikes on the bayou trails and dirt bikes at the Ship Channel against three rivals, with punches, kicks, flips and boosts along the way. Three events plus a points tour, nine riders, desktop or phone.">
+<meta property="og:url" content="https://anthonyjctsg.online/third-coast-brawl/">
+<meta property="og:image" content="https://anthonyjctsg.online/third-coast-brawl_thumbnail.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Third Coast Brawl", "url": "https://anthonyjctsg.online/third-coast-brawl/", "image": "https://anthonyjctsg.online/third-coast-brawl_thumbnail.jpg", "description": "Free 3D extreme-sports brawl-racer in your browser. Race inline skates through downtown Houston, mountain bikes on the bayou trails and dirt bikes at the Ship Channel against three rivals, with punches, kicks, flips and boosts along the way. Three events plus a points tour, nine riders, desktop or phone.", "genre": ["Racing", "Fighting", "Extreme Sports", "3D"], "author": {"@type": "Person", "@id": "https://anthonyjctsg.com/#person", "name": "Anthony C Johnson", "url": "https://anthonyjctsg.com/"}, "gamePlatform": "Web Browser", "applicationCategory": "Game", "operatingSystem": "Any", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isPartOf": {"@type": "WebSite", "@id": "https://anthonyjctsg.online/#website", "name": "AnthonyJCTSG Games", "url": "https://anthonyjctsg.online/"}}</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="tags"></div>
+
+<div id="hud">
+  <div id="hud-l">
+    <div id="place">1<span>ST</span></div>
+    <div id="lap">DOWNTOWN DROP</div>
+    <div id="time">0:00.00</div>
+    <div id="hype"><div id="hype-txt">HYPE</div><div class="bar"><div id="hype-fill"></div><i></i></div></div>
+  </div>
+  <div id="hud-r">
+    <canvas id="mini" width="132" height="240"></canvas>
+  </div>
+  <div id="sys"><button id="btn-pause" aria-label="Pause">❚❚</button><button id="btn-mute" aria-label="Sound">🔊</button></div>
+</div>
+<div id="count"></div>
+<div id="toast"></div>
+<div id="trick"></div>
+<div id="wrong">WRONG WAY</div>
+
+<div id="pad">
+  <div class="pl"><button data-key="L">◀</button><button data-key="R">▶</button></div>
+  <div class="pr"><div class="ud"><button data-key="U" class="r">▲</button><button data-key="D" class="b">▼</button></div><button data-key="S" class="jump">HIT</button></div>
+</div>
+
+<div id="screen-menu" class="screen">
+  <div id="menu-art"><i data-k="skate"></i><i data-k="mtb"></i><i data-k="moto"></i><i data-k="tour"></i><u></u></div>
+  <div class="mwrap">
+    <header class="mtop">
+      <h1>THIRD COAST<span>BRAWL</span></h1>
+      <div class="mtag"><b>HOUSTON, TX</b>SKATE · BIKE · BRAWL</div>
+    </header>
+    <section class="mhero">
+      <div class="hero-ev">
+        <div id="hero-place"></div>
+        <div id="hero-sub"></div>
+        <div id="vs"></div>
+      </div>
+      <aside id="m-rider">
+        <div id="mr-face"><b id="mr-num">7</b></div>
+        <div id="mr-name">SUNNY</div>
+        <div class="mr-stats" id="mr-stats"></div>
+        <div id="mr-best"></div>
+      </aside>
+    </section>
+    <div class="mrow"><div class="pick-title">PICK YOUR EVENT <small>◀ ▶</small></div><div id="events"></div></div>
+    <div class="mrow"><div class="pick-title">PICK YOUR RIDER <small>◀ ▶</small></div><div id="riders"></div></div>
+    <footer class="mfoot">
+      <p id="controls"></p>
+      <button class="btn" id="btn-play">RIDE! <small>SPACE</small></button>
+    </footer>
+    <div class="row2 mrow"><span id="menu-best"></span><button class="q" id="btn-q">GRAPHICS <b id="q-label">ULTRA</b> <small>◀ ▶</small></button></div>
+  </div>
+</div>
+
+<div id="screen-over" class="screen">
+  <div class="panel">
+    <div class="kicker" id="over-kicker">RACE RESULT</div>
+    <div class="big" id="over-place">1ST</div>
+    <div id="over-rows"></div>
+    <div id="over-tour"></div>
+    <div class="best" id="over-best"></div>
+    <button class="btn" id="btn-again">RACE AGAIN <small>SPACE</small></button>
+    <button class="btn alt" id="btn-menu">MENU <small>▲</small></button>
+  </div>
+</div>
+
+<div id="screen-pause" class="screen">
+  <div class="panel">
+    <div class="kicker">PAUSED</div>
+    <button class="btn" id="btn-resume">RESUME <small>SPACE</small></button>
+    <button class="btn alt" id="btn-quit">QUIT RACE</button>
+  </div>
+</div>
+
+<div id="screen-build" class="screen">
+  <div class="build-card"><small id="build-place">HOUSTON</small><b id="build-name">DOWNTOWN DROP</b><i>LOADING THE COURSE</i></div>
+</div>
+
+<div id="loading"><div class="ld-title">THIRD COAST<span>BRAWL</span></div><div id="loading-text">LOADING</div></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="src/util.js"></script>
+<script src="src/clips.js"></script>
+<script src="src/runner.js"></script>
+<script src="src/sky.js"></script>
+<script src="src/course.js"></script>
+<script src="src/props.js"></script>
+<script src="src/courses.js"></script>
+<script src="src/world.js"></script>
+<script src="src/dress-city.js"></script>
+<script src="src/dress-bayou.js"></script>
+<script src="src/dress-channel.js"></script>
+<script src="src/detail.js"></script>
+<script src="src/post.js"></script>
+<script src="src/vehicle.js"></script>
+<script src="src/rider.js"></script>
+<script src="src/fx.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
