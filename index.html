@@ -12,15 +12,16 @@
     <meta name="theme-color" content="#080c16">
     <link rel="canonical" href="https://anthonyjctsg.online/">
 
-    <!-- Seasonal theme: Halloween runs through October and switches itself off on Nov 1
-         (nothing to revert). ?season=halloween previews it any day, ?season=off hides it.
+    <!-- Seasonal theme: fall runs Oct 1 to Nov 30 and switches itself off on Dec 1
+         (nothing to revert); November adds the Thanksgiving greeting. ?season=fall or
+         ?season=thanksgiving previews it any day, ?season=off hides it.
          Set here in the head so the colours are right on the first paint. -->
     <script>
         (function () {
-            var q = /[?&]season=([a-z]+)/.exec(location.search), s = q ? q[1] : null;
-            if (s === 'halloween' || (s !== 'off' && new Date().getMonth() === 9)) {
-                document.documentElement.classList.add('halloween');
-            }
+            var q = /[?&]season=([a-z]+)/.exec(location.search), s = q ? q[1] : null,
+                m = new Date().getMonth(), c = document.documentElement.classList;
+            if (s === 'fall' || s === 'thanksgiving' || (!s && (m === 9 || m === 10))) { c.add('fall'); }
+            if (s === 'thanksgiving' || (!s && m === 10)) { c.add('thanksgiving'); }
         }());
     </script>
 
@@ -1634,75 +1635,61 @@
         footer .proud { margin: 0 0 0.6rem; }
         footer .proud a { color: var(--accent); font-weight: 600; }
 
-        /* ---- Halloween (html.halloween: October, or ?season=halloween) ----
-           Colours here; the moon, bats, webs, spider, fog and pumpkins are added
-           by halloween.js into the fixed background layer, behind everything. */
-        html.halloween {
-            --bg: #07040c;
-            --accent: #ff8a1f;
-            --accent-soft: rgba(255, 138, 31, 0.18);
-            --blue: #ffb46b;
+        /* ---- Fall / Thanksgiving (html.fall: Oct-Nov; html.thanksgiving: Nov) ----
+           Colours here; the moon, leaves, haze and pumpkins are added by fall.js
+           into the fixed background layer, behind everything. */
+        html.fall {
+            --bg: #0c0705;
+            --accent: #f0903a;
+            --accent-soft: rgba(240, 144, 58, 0.18);
+            --blue: #f3b56b;
         }
-        html.halloween .liquid-bg .blob-1 { background: radial-gradient(circle at 35% 35%, #ff6a00, transparent 70%); opacity: 0.42; }
-        html.halloween .liquid-bg .blob-2 { background: radial-gradient(circle at 60% 40%, #7c2bd9, transparent 70%); }
-        html.halloween .liquid-bg .blob-3 { background: radial-gradient(circle at 50% 50%, #4a1d8f, transparent 70%); }
-        html.halloween .liquid-bg .blob-4 { background: radial-gradient(circle at 50% 50%, #3ddc84, transparent 70%); opacity: 0.18; }
-        html.halloween .carousel-head h1 { text-shadow: 0 0 22px rgba(255, 120, 20, 0.55), 0 2px 24px rgba(0, 0, 0, 0.6); }
-        html.halloween .carousel-head::before {
-            content: "Happy Halloween from the Arcade";
+        html.fall .liquid-bg .blob-1 { background: radial-gradient(circle at 35% 35%, #e0701c, transparent 70%); opacity: 0.4; }
+        html.fall .liquid-bg .blob-2 { background: radial-gradient(circle at 60% 40%, #9a2c1a, transparent 70%); }
+        html.fall .liquid-bg .blob-3 { background: radial-gradient(circle at 50% 50%, #6e3a18, transparent 70%); }
+        html.fall .liquid-bg .blob-4 { background: radial-gradient(circle at 50% 50%, #e6b13c, transparent 70%); opacity: 0.2; }
+        html.fall .carousel-head h1 { text-shadow: 0 0 22px rgba(240, 130, 40, 0.5), 0 2px 24px rgba(0, 0, 0, 0.6); }
+        html.fall .carousel-head::before {
+            content: "Happy Fall from the Arcade";
             display: block;
             margin-bottom: 0.2rem;
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
             font-size: 0.68rem;
             letter-spacing: 3px;
             text-transform: uppercase;
-            color: #ff9a3c;
+            color: #f3a04a;
         }
-        html.halloween .card.is-active .cabinet-art { box-shadow: 0 0 0 2px rgba(255, 138, 31, 0.85), 0 0 46px rgba(255, 110, 20, 0.45); }
-        html.halloween .tile:hover { box-shadow: 0 0 30px rgba(255, 110, 20, 0.3); }
-        /* A lit jack-o'-lantern by the logo, flickering like a candle. */
-        html.halloween .brand-logo::after {
+        html.thanksgiving .carousel-head::before { content: "Happy Thanksgiving from the Arcade"; }
+        html.fall .card.is-active .cabinet-art { box-shadow: 0 0 0 2px rgba(240, 144, 58, 0.85), 0 0 46px rgba(224, 112, 28, 0.42); }
+        html.fall .tile:hover { box-shadow: 0 0 30px rgba(224, 112, 28, 0.3); }
+        /* A Thanksgiving cornucopia by the logo with a soft warm glow. */
+        html.fall .brand-logo::after {
             content: "";
             display: inline-block;
-            width: 28px;
-            height: 28px;
+            width: 34px;
+            height: 34px;
             margin-left: 8px;
             vertical-align: -6px;
-            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M30 6c2-3 6-3 7 0l-1 9h-5z' fill='%234d7c2a'/%3E%3Cellipse cx='19' cy='38' rx='14' ry='20' fill='%23e8650f'/%3E%3Cellipse cx='45' cy='38' rx='14' ry='20' fill='%23e8650f'/%3E%3Cellipse cx='32' cy='38' rx='15' ry='22' fill='%23ff7f1a'/%3E%3Cpath d='M18 30l7-6 5 7zM46 30l-7-6-5 7z' fill='%23ffd34d'/%3E%3Cpath d='M29 37h6l-3 5z' fill='%23ffd34d'/%3E%3Cpath d='M14 44c6 7 30 7 36 0l-5 6-4-3-4 4-5-4-5 4-4-4-4 3z' fill='%23ffd34d'/%3E%3C/svg%3E") center / contain no-repeat;
-            animation: hw-flicker 2.6s infinite;
+            filter: drop-shadow(0 0 6px rgba(240, 150, 60, 0.6));
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M8 13C4 15 5 21 9 20C12 20 13 23 15 27C20 36 30 43 42 46L46 22C35 22 27 18 21 13C17 10 12 10 8 13Z' fill='%23c98a3e' stroke='%237a4a1c' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M20 15C19 20 19 25 22 30M28 19C27 25 27 32 30 39M36 21C35 28 35 36 37 44' stroke='%237a4a1c' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3Cellipse cx='44' cy='34' rx='4' ry='12' fill='%234a2a10'/%3E%3Ccircle cx='53' cy='29' r='6' fill='%23c8322a'/%3E%3Cpath d='M53 23c0-2 1-3 2-4' stroke='%235a3a1a' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3Cpath d='M55 20c3-3 7-2 8 0-3 2-6 2-8 0z' fill='%236f9a35'/%3E%3Cellipse cx='56' cy='50' rx='5' ry='6.5' fill='%23e6b13c'/%3E%3Ccircle cx='44' cy='54' r='3.2' fill='%236b2f7a'/%3E%3Ccircle cx='49' cy='56' r='3.2' fill='%237b3a8c'/%3E%3Ccircle cx='46' cy='59' r='3.2' fill='%236b2f7a'/%3E%3Ccircle cx='48' cy='43' r='7.5' fill='%23e6772a'/%3E%3Cpath d='M45 37c-2 4-2 8 0 12M51 37c2 4 2 8 0 12' stroke='%23b04c16' stroke-width='1.1' fill='none'/%3E%3C/svg%3E") center / contain no-repeat;
         }
-        @keyframes hw-flicker {
-            0%, 100% { filter: drop-shadow(0 0 6px rgba(255, 170, 40, 0.9)); }
-            20% { filter: drop-shadow(0 0 3px rgba(255, 150, 30, 0.6)); }
-            45% { filter: drop-shadow(0 0 9px rgba(255, 190, 60, 1)); }
-            70% { filter: drop-shadow(0 0 4px rgba(255, 150, 30, 0.7)); }
-        }
-        /* The background pieces (halloween.js). */
-        .hw-moon { position: absolute; top: 9vh; right: 8vw; width: 15vmin; height: 15vmin; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #fff6d8, #f2d58a 60%, #d8a94e); box-shadow: 0 0 60px 22px rgba(255, 210, 120, 0.35), 0 0 160px 60px rgba(255, 150, 60, 0.18); opacity: 0.9; }
-        .hw-bat { position: absolute; left: -8vw; width: 46px; animation: hw-fly linear infinite; }
-        .hw-bat svg { display: block; width: 100%; animation: hw-flap 0.32s ease-in-out infinite alternate; transform-origin: 50% 40%; }
-        .hw-bat > span { display: block; animation: hw-bob 2.4s ease-in-out infinite alternate; }
-        @keyframes hw-fly { from { transform: translateX(0); } to { transform: translateX(120vw); } }
-        @keyframes hw-bob { from { transform: translateY(-18px); } to { transform: translateY(22px); } }
-        @keyframes hw-flap { from { transform: scaleY(1); } to { transform: scaleY(0.35); } }
-        .hw-web { position: absolute; top: 58px; width: 190px; opacity: 0.32; }
-        .hw-web--l { left: 0; }
-        .hw-web--r { right: 0; transform: scaleX(-1); }
-        .hw-spider { position: absolute; top: 58px; right: 150px; width: 2px; height: 26vh; background: linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.15)); transform-origin: top; animation: hw-dangle 7s ease-in-out infinite alternate; }
-        .hw-spider svg { position: absolute; bottom: -16px; left: -13px; width: 28px; }
-        @keyframes hw-dangle { from { transform: scaleY(0.55); } to { transform: scaleY(1); } }
-        .hw-fog { position: absolute; left: -20%; right: -20%; bottom: -6vh; height: 34vh; background: radial-gradient(ellipse 40% 60% at 20% 70%, rgba(170, 160, 210, 0.22), transparent 70%), radial-gradient(ellipse 45% 55% at 65% 80%, rgba(150, 140, 200, 0.2), transparent 70%), radial-gradient(ellipse 35% 50% at 95% 60%, rgba(170, 160, 210, 0.16), transparent 70%); filter: blur(10px); animation: hw-fog 38s ease-in-out infinite alternate; }
-        @keyframes hw-fog { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
-        .hw-pumpkin { position: absolute; bottom: 10px; width: 64px; filter: drop-shadow(0 0 14px rgba(255, 140, 30, 0.7)); }
-        .hw-pumpkin--l { left: 18px; }
-        .hw-pumpkin--r { right: 18px; width: 52px; }
+        /* The background pieces (fall.js). */
+        .fl-moon { position: absolute; top: 9vh; right: 8vw; width: 15vmin; height: 15vmin; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #fff1d0, #f2c27a 60%, #d8923e); box-shadow: 0 0 60px 22px rgba(255, 190, 100, 0.32), 0 0 160px 60px rgba(240, 130, 50, 0.18); opacity: 0.85; }
+        .fl-haze { position: absolute; left: -20%; right: -20%; bottom: -6vh; height: 30vh; background: radial-gradient(ellipse 40% 60% at 20% 70%, rgba(230, 140, 60, 0.16), transparent 70%), radial-gradient(ellipse 45% 55% at 65% 80%, rgba(180, 70, 30, 0.16), transparent 70%), radial-gradient(ellipse 35% 50% at 95% 60%, rgba(230, 170, 70, 0.12), transparent 70%); filter: blur(10px); animation: fl-haze 38s ease-in-out infinite alternate; }
+        @keyframes fl-haze { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+        .fl-leaf { position: absolute; top: -56px; animation: fl-drop linear infinite; will-change: transform; }
+        .fl-leaf i { display: block; width: 100%; height: 100%; perspective: 240px; animation: fl-sway ease-in-out infinite alternate; }
+        .fl-leaf svg { display: block; width: 100%; height: 100%; overflow: visible; }
+        @keyframes fl-drop { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--drift), calc(100vh + 112px), 0); } }
+        @keyframes fl-sway { from { transform: translateX(calc(var(--sway) * -1)) rotate(calc(var(--swing) * -1)); } to { transform: translateX(var(--sway)) rotate(var(--swing)); } }
+        @keyframes fl-flip { from { transform: rotate3d(1, var(--axis), 0, 0deg); } to { transform: rotate3d(1, var(--axis), 0, 360deg); } }
+        @keyframes fl-rock { from { transform: rotate3d(1, var(--axis), 0, -55deg); } to { transform: rotate3d(1, var(--axis), 0, 55deg); } }
+        .fl-horn { position: absolute; bottom: 8px; width: 96px; filter: drop-shadow(0 0 12px rgba(240, 140, 50, 0.4)); }
+        .fl-horn svg { display: block; width: 100%; }
+        .fl-horn--l { left: 14px; }
+        .fl-horn--r { right: 14px; width: 80px; transform: scaleX(-1); }
         @media (max-width: 600px) {
-            .hw-web { width: 120px; }
-            .hw-spider { right: 70px; }
-            .hw-pumpkin { width: 44px; } .hw-pumpkin--r { width: 36px; }
-        }
-        @media (prefers-reduced-motion: reduce) {
-            .hw-bat, .hw-spider { display: none; }
+            .fl-horn { width: 60px; } .fl-horn--r { width: 50px; }
         }
 
         /* ---- Phones ------------------------------------------------------ */
@@ -2319,7 +2306,7 @@
     </footer>
 
     <script src="ctsg-data.js"></script>
-    <script src="halloween.js?v=1"></script>
+    <script src="fall.js?v=1"></script>
     <script>
         // Game carousel: one vertical stack of cards, the selected one in the
         // middle and its neighbours dimmed above and below (the user picked this
