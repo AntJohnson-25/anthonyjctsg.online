@@ -9,6 +9,9 @@ let bed = null;           // { gain, lp, pad } the looping ambience
 let timer = 0;
 let mode = "off";
 let muted = false;
+// 2026-11-03 (user): the looping music (assets/music) is the soundtrack; the only effect left is Marcus's phone
+// beep. Everything else below is kept but switched off here (set false to bring the synthesized effects back).
+const ALERT_ONLY = true;
 try { muted = localStorage.getItem("sqlquest.sfx") === "0"; } catch (e) { /* ignore */ }
 
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -99,13 +102,13 @@ export const sfx = {
     try {
       if (!ctx && !make()) return;
       if (ctx.state === "suspended") ctx.resume();
-      startBed();
+      if (!ALERT_ONLY) startBed();
     } catch (e) { /* no audio, no sound */ }
   },
   // ambience per place: the lab floor, zoomed into the terminal (fan only), the hologram room (pad)
   scene(m) {
     mode = m;
-    if (!ctx || !bed) return;
+    if (ALERT_ONLY || !ctx || !bed) return;
     const t = ctx.currentTime;
     const lab = { gain: 0.05, lp: 420, pad: 0 }, term = { gain: 0.022, lp: 260, pad: 0 }, holo = { gain: 0.012, lp: 200, pad: 0.016 };
     const s = m === "term" ? term : m === "holo" ? holo : lab;
@@ -168,3 +171,5 @@ export const sfx = {
   // sitting down / standing up: a soft chair-and-cushion thump
   chair() { if (!ctx || muted) return; const t = ctx.currentTime; puff(t, 0.3, { vol: 0.06, freq: 260, q: 0.8, type: "lowpass" }); tone(95, t, 0.18, { vol: 0.05, to: 60 }); }
 };
+// alert-only: silence every effect except the phone beep
+if (ALERT_ONLY) for (const k of ["key", "run", "ok", "bad", "err", "holo", "text", "ui", "pick", "chair"]) sfx[k] = () => {};

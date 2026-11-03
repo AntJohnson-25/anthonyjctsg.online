@@ -829,9 +829,11 @@ function setupSfx() {
   addEventListener("keydown", first, { once: true });
   $("sql").addEventListener("keydown", (e) => { if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length <= 9 && !e.repeat) sfx.key(e.key); });
   document.addEventListener("click", (e) => { if (e.target.closest("button") && !e.target.closest("#run, #hero-picker, #sfx-btn")) sfx.ui(); });
+  // the only effect left is Marcus's beep, so this button is the beep's on/off
   const btn = $("sfx-btn");
-  const paint = () => { btn.classList.toggle("on", !sfx.muted); btn.textContent = sfx.muted ? "FX off" : "FX on"; };
-  btn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paint(); if (!sfx.muted) sfx.ui(); };
+  btn.title = "Marcus's phone beep on/off";
+  const paint = () => { btn.classList.toggle("on", !sfx.muted); btn.textContent = sfx.muted ? "Beep off" : "Beep on"; };
+  btn.onclick = () => { sfx.unlock(); sfx.setMuted(!sfx.muted); paint(); if (!sfx.muted) sfx.phone(); };
   paint();
 }
 
@@ -845,20 +847,31 @@ async function setupMusic() {
   if (!Array.isArray(tracks) || !tracks.length) return;
   const btn = $("music-btn");
   btn.hidden = false;
+  // One <audio> (iPhone Safari ignores .volume and dislikes several). One track = it loops; several = they play in turn.
   const audio = new Audio();
   let i = 0;
   audio.volume = 0.5;
+  audio.preload = "auto";
+  audio.loop = tracks.length === 1;
   audio.addEventListener("ended", () => { i = (i + 1) % tracks.length; audio.src = "assets/music/" + tracks[i]; audio.play().catch(() => {}); });
-  let on = false;
-  try { on = localStorage.getItem("sqlquest.music") === "1"; } catch (e) { /* ignore */ }
-  const set = (v) => {
+  // ON by default (user, 2026-11-03: the song is the game's sound); the ♫ button turns it off and that sticks
+  let on = true;
+  try { on = localStorage.getItem("sqlquest.music") !== "0"; } catch (e) { /* ignore */ }
+  const set = (v, keep = true) => {
     on = v;
     btn.classList.toggle("on", on);
-    try { localStorage.setItem("sqlquest.music", on ? "1" : "0"); } catch (e) { /* ignore */ }
+    btn.title = on ? "Music on (click to turn off)" : "Music off (click to turn on)";
+    if (keep) try { localStorage.setItem("sqlquest.music", on ? "1" : "0"); } catch (e) { /* ignore */ }
     if (on) { if (!audio.src) audio.src = "assets/music/" + tracks[i]; audio.play().catch(() => {}); } else audio.pause();
   };
   btn.onclick = () => set(!on);
-  if (on) addEventListener("pointerdown", () => set(true), { once: true });
+  btn.classList.toggle("on", on);
+  // browsers only allow sound after a tap or key: start on the first one (the Play button counts)
+  if (on) {
+    const start = (e) => { if (e && e.target && e.target.closest && e.target.closest("#music-btn")) return; if (on && audio.paused) set(true, false); };
+    addEventListener("pointerdown", start, { once: true });
+    addEventListener("keydown", start, { once: true });
+  }
 }
 
 boot();
