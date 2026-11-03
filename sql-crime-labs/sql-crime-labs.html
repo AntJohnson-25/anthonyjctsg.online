@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel pinch gestures, two-finger moves and a double
+   tap's second touchend so the page can't zoom. Same guard as the other games on the site, except
+   the query box and name field keep their own taps (double-tap to select a word). */
+(function () {
+  var typing = function (e) { return e.target && e.target.closest && e.target.closest("textarea, input"); };
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (type) {
+    document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+  });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1 || (e.scale && e.scale !== 1)) e.preventDefault();
+  }, { passive: false });
+  var last = 0;
+  document.addEventListener("touchend", function (e) { if (typing(e)) return; var n = Date.now(); if (n - last < 350) e.preventDefault(); last = n; }, { passive: false });
+  document.addEventListener("dblclick", function (e) { if (!typing(e)) e.preventDefault(); }, { passive: false });
+})();
+</script>
+<title>SQL Crime Labs</title>
+<meta name="description" content="SQL Crime Labs: you are the lead data analyst. Write real SQL at your laptop and walk through the results as a green hologram. Rookie to Pro, with clues and explanations.">
+<meta name="theme-color" content="#050912">
+<link rel="icon" type="image/png" href="assets/ctsg-seal.png">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<!-- arcade SEO tags (anthonyjctsg.online) -->
+<link rel="canonical" href="https://anthonyjctsg.online/sql-crime-labs/sql-crime-labs.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AnthonyJCTSG Games">
+<meta property="og:title" content="SQL Crime Labs: free browser game">
+<meta property="og:description" content="Free 3D SQL game in your browser. You are the lead data analyst at a world-wide crime lab: walk the office, take case requests from your boss, write real SQL queries (SQLite runs in the page) and walk through the results as a green hologram. Rookie, Semi-Pro and Pro cases with three tries, clues and explanations, desktop or phone.">
+<meta property="og:url" content="https://anthonyjctsg.online/sql-crime-labs/sql-crime-labs.html">
+<meta property="og:image" content="https://anthonyjctsg.online/sql-crime-labs_thumbnail.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "SQL Crime Labs", "url": "https://anthonyjctsg.online/sql-crime-labs/sql-crime-labs.html", "image": "https://anthonyjctsg.online/sql-crime-labs_thumbnail.jpg", "description": "Free 3D SQL game in your browser. You are the lead data analyst at a world-wide crime lab: walk the office, take case requests from your boss, write real SQL queries (SQLite runs in the page) and walk through the results as a green hologram. Rookie, Semi-Pro and Pro cases with three tries, clues and explanations, desktop or phone.", "genre": ["Puzzle", "Educational", "Detective", "3D"], "author": {"@type": "Person", "@id": "https://anthonyjctsg.com/#person", "name": "Anthony C Johnson", "url": "https://anthonyjctsg.com/"}, "gamePlatform": "Web Browser", "applicationCategory": "Game", "operatingSystem": "Any", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isPartOf": {"@type": "WebSite", "@id": "https://anthonyjctsg.online/#website", "name": "AnthonyJCTSG Games", "url": "https://anthonyjctsg.online/"}}</script>
+</head>
+<body>
+<div id="app">
+  <header id="top">
+    <button id="brand" class="brand" title="Menu"><img src="assets/ctsg-seal.png" alt=""><span>SQL<b>CRIME LABS</b></span></button>
+    <nav id="tiers" class="tiers"></nav>
+    <div class="top-right">
+      <span id="hud-name" class="hud-name"></span>
+      <button id="stand-btn" class="ghost-btn stand-btn" title="Stand up from the laptop (Esc)">Stand up &middot; Esc</button>
+      <div class="xp" title="Experience points"><span id="xp-n">0</span> XP</div>
+      <button id="sfx-btn" class="ghost-btn" title="Sound effects on/off">FX on</button>
+      <button id="music-btn" class="icon-btn" title="Music on/off" hidden>&#9835;</button>
+    </div>
+  </header>
+
+  <main id="layout">
+    <div id="left">
+      <section id="question" class="panel">
+        <div class="q-meta">
+          <span id="q-tier" class="chip"></span>
+          <span id="q-num" class="muted"></span>
+          <span class="spacer"></span>
+          <button id="prev" class="ghost-btn" title="Previous question">&#8249;</button>
+          <button id="next" class="ghost-btn" title="Next question">&#8250;</button>
+        </div>
+        <div id="q-dots" class="q-dots"></div>
+        <h1 id="q-title"></h1>
+        <p id="q-prompt"></p>
+        <div class="attempt-row"><div id="attempts" class="attempts"></div><span id="attempt-text" class="muted"></span></div>
+        <div id="clue" class="clue" hidden></div>
+      </section>
+      <section id="schema" class="panel schema"></section>
+    </div>
+    <div id="side-grip" class="grip grip-side" title="Drag to resize the sidebar &middot; double-click to hide or show it"></div>
+
+    <section id="view">
+      <canvas id="scene"></canvas>
+      <div class="hud">
+        <div class="hud-top">
+          <span id="hud-status" class="status">Waiting for a query</span>
+          <button id="back-term" class="ghost-btn back-term">&#8249; Back to laptop (Esc)</button>
+          <div id="hud-toggle" class="toggle" hidden>
+            <button data-v="mine" class="on">Your result</button>
+            <button data-v="answer">Correct result</button>
+          </div>
+        </div>
+        <div id="hud-caption" class="caption">Every figure is a row in the case files, standing at its desk. Run a query and the rows it returns step onto the evidence table.</div>
+        <div id="hud-legend" class="legend" hidden>
+          <div class="lg-col" id="lg-col"></div>
+          <div class="lg-bar" id="lg-bar"></div>
+          <div class="lg-ends"><span id="lg-min"></span><span id="lg-max"></span></div>
+        </div>
+        <div class="help">Drag to orbit &middot; scroll or pinch to zoom</div>
+      </div>
+      <div id="card" class="card" hidden></div>
+      <div id="fade" class="fade"></div>
+      <div id="walk-hud" class="walk-hud">
+        <div id="phone" class="phone" hidden>
+          <div class="ph-top"><span>&#9632; MARCUS</span><em>SEMI-URGENT</em></div>
+          <div id="ph-msg" class="ph-msg"></div>
+          <div class="ph-foot">Get to your laptop.</div>
+        </div>
+        <div id="wh-prompt" class="wh-prompt" hidden></div>
+        <div class="wh-help">WASD move &middot; Shift run &middot; drag to look &middot; wheel zoom &middot; E use</div>
+        <div class="touch-ui">
+          <div id="stick" class="stick"><i id="stick-knob"></i></div>
+          <button id="use-btn" class="use-btn">Use</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="dock">
+      <div class="editor-col panel">
+        <!-- Terminal title bar: the player's prompt, then the adjustment tabs (sizes saved in localStorage). -->
+        <div class="ed-bar">
+          <span id="ed-who" class="ed-who">analyst@crimelab:~$ sqlite3 evidence.db</span>
+          <span class="spacer"></span>
+          <div id="ed-tabs" class="ed-tabs">
+            <button data-adj="side" title="Hide or show the case sidebar">&#9703;<span class="lbl"> Sidebar</span></button>
+            <span class="ed-sep"></span>
+            <button data-adj="font-" title="Smaller text">A&minus;</button>
+            <b id="ed-fs" class="ed-fs">14</b>
+            <button data-adj="font+" title="Bigger text">A+</button>
+            <span class="ed-sep"></span>
+            <button data-adj="h-short" title="Short query box, more room for results">Short</button>
+            <button data-adj="h-split" title="Even split">Split</button>
+            <button data-adj="h-tall" title="Tall query box">Tall</button>
+            <span class="ed-sep"></span>
+            <button data-adj="reset" title="Back to the default layout">&#8634;<span class="lbl"> Reset</span></button>
+          </div>
+        </div>
+        <div class="editor" id="editor">
+          <pre id="hl" aria-hidden="true"></pre>
+          <textarea id="sql" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="SQL query" placeholder="type your query...   (Ctrl+Enter to run)"></textarea>
+        </div>
+        <div class="actions">
+          <button id="run" class="run-btn">&#9654; Run <kbd>Ctrl+Enter</kbd></button>
+          <button id="clear" class="ghost-btn">Clear</button>
+          <button id="holo-btn" class="ghost-btn" hidden title="Look at your result as a hologram">Hologram</button>
+          <span class="spacer"></span>
+          <span class="dialect" title="The game runs real SQLite in your browser">SQLite</span>
+        </div>
+        <div id="feedback" class="feedback"></div>
+      </div>
+      <div id="ed-grip" class="grip grip-h" title="Drag to resize the query box and results"></div>
+      <div class="results-col panel">
+        <div class="results-head"><span>Results</span><span id="res-count" class="muted"></span></div>
+        <div id="grid" class="grid"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="title" class="title-screen ts" hidden>
+  <div class="art-bg" aria-hidden="true"><img class="art-blur" src="assets/art/key_title_s.jpg" alt=""><img class="art-main" src="assets/art/key_title.jpg" alt="SQL Crime Labs"></div>
+  <div id="ts-art" class="ts-art">
+    <div class="ts-bar">
+      <p class="ts-lede">You're the lead data analyst at a world-wide crime lab. When your phone beeps it's a query request from Marcus: get to your laptop, write the query, and walk through the evidence as a hologram.</p>
+      <button id="play" class="run-btn big">Play</button>
+      <button id="new-run" class="ghost-btn new-run" hidden>&#8634; Start a new run (back to Rookie)</button>
+      <div class="controls-hint">WASD walk &middot; Shift run &middot; drag to look &middot; E use &middot; Esc stand up &middot; real SQLite in your browser &middot; a CTSG game</div>
+    </div>
+  </div>
+  <div id="ts-select" class="ts-select" hidden>
+    <div class="sel-head"><span class="kicker">Choose your analyst</span><button id="sel-back" class="ghost-btn">&#8249; Back</button></div>
+    <div class="sel-stage">
+      <canvas id="sel-canvas"></canvas>
+      <button id="sel-prev" class="sel-arrow" aria-label="Previous analyst">&#8249;</button>
+      <button id="sel-next" class="sel-arrow" aria-label="Next analyst">&#8250;</button>
+      <div id="sel-loading" class="sel-loading">Pulling the analysts' files...</div>
+    </div>
+    <div class="sel-strip">
+      <div class="sel-info"><b id="sel-name">Analyst 1</b><span id="sel-tag">Lead Data Analyst</span></div>
+      <div id="hero-picker" class="hero-picker"></div>
+      <div class="name-block">
+        <label class="kicker pick" for="player-name">Your name</label>
+        <div class="name-row">
+          <input id="player-name" class="name-input" type="text" autocomplete="off" spellcheck="false" placeholder="Type your name">
+          <span id="name-hint" class="name-hint">Enter a name to start. Marcus and the crew will use it.</span>
+        </div>
+      </div>
+      <button id="enter" class="run-btn big">Enter the lab</button>
+    </div>
+  </div>
+</div>
+
+<div id="board" class="title-screen board" hidden>
+  <div class="title-card">
+    <div class="kicker">Marcus Vale &middot; Case board</div>
+    <div id="board-now" class="board-now"></div>
+    <div class="kicker pick">Pick a case</div>
+    <div id="tier-cards" class="tier-cards"></div>
+    <div class="board-btns">
+      <button id="board-close" class="ghost-btn">Back to the lab (Esc)</button>
+      <button id="board-newrun" class="ghost-btn new-run" title="Wipe progress and XP, reshuffle every level, start at Rookie">&#8634; Start a new run</button>
+    </div>
+  </div>
+</div>
+
+<div id="loading" class="loading"><div class="art-bg" aria-hidden="true"><img class="art-blur" src="assets/art/key_title_s.jpg" alt=""><img class="art-main" src="assets/art/key_title.jpg" alt=""></div><div class="ld-bar"><div id="ld-msg" class="ld-msg">Loading the database engine...</div><div class="ld-track"><i></i></div></div></div>
+<script>
+addEventListener("error", function (e) { var m = document.getElementById("ld-msg"); if (m) m.textContent = "Could not start: " + (e.message || "a file failed to load"); });
+addEventListener("unhandledrejection", function (e) { var m = document.getElementById("ld-msg"); if (m) m.textContent = "Could not start: " + (e.reason && e.reason.message || e.reason); });
+if (location.protocol === "file:") document.getElementById("ld-msg").textContent = "Open this through Play.bat (it needs a local web server).";
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
