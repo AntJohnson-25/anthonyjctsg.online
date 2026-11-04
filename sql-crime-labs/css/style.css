@@ -413,6 +413,9 @@ body { --ed-min: 290px; }
 @media (pointer: coarse) {
   .ed-tabs button { padding: 8px 9px; font-size: 12px; }
   .run-btn kbd { display: none; }   /* no Ctrl+Enter on a phone */
+  /* iPhone Safari zooms the page into any text field under 16px (and leaves it zoomed): never go below 16 on touch */
+  .editor pre, .editor textarea, .editor::before { font-size: max(16px, var(--ed-fs, 14px)); }
+  .name-input { font-size: 16px; }
   body.term-on #dock { grid-template-rows: var(--ed-h, minmax(var(--ed-min), 50%)) 18px minmax(0, 1fr); }
   body.term-on .grip-h::after { top: 6px; width: 64px; height: 5px; margin-left: -32px; }
   body.term-on .grip-side { width: 22px; margin-left: -11px; }

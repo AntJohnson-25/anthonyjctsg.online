@@ -461,6 +461,17 @@ export class Plaza {
     this.walker.locked = false;
   }
 
+  // Safety net for standFromDesk: finish standing right now (no animation) and hand the controls back.
+  forceStand() {
+    const c = this.crew;
+    c.slide = null; c.after = null; c.heroState = "stand"; c.state = "idle";
+    if (c.hero) { c.hero.clear(); c.hero.hold(null); }
+    this.setMode("walk");
+    this.walker.auto = null;
+    this.walker.place(APPROACH.x, APPROACH.z, APPROACH.yaw, this.orbit.theta - Math.PI);
+    this.walker.locked = false;
+  }
+
   // Which desks a result touches (their desktops rise, the rest settle back down).
   _raiseDesks(keys) {
     this.anchors.forEach((a, i) => { if (a.rise) a.rise.upGoal = keys && keys.has(i) ? 0.34 : 0; });

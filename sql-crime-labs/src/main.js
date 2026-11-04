@@ -119,8 +119,17 @@ async function boot() {
 
 // ------------------------------------------------------------------ modes: walking the lab vs sitting at the laptop
 
+// Leaving the laptop: let go of the query box / name field. A hidden-but-focused textarea keeps the phone keyboard
+// (and iOS's zoom) up and swallows WASD on desktop, so the analyst can't walk.
+function releaseTyping() {
+  const el = document.activeElement;
+  if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT")) el.blur();
+  if (scrollX || scrollY) scrollTo(0, 0);
+}
+
 function setMode(m) {
   S.mode = m;
+  if (m !== "term") releaseTyping();
   for (const c of ["walk", "term", "holo"]) document.body.classList.toggle(c, m === c);
   clearTimeout(S.termTimer);
   document.body.classList.remove("term-on");
@@ -199,8 +208,14 @@ async function standUp() {
   hideCard();
   setMode("walk");
   sfx.chair();
-  await plaza.standFromDesk();
+  try {
+    // never leave the analyst frozen: if the stand-up animation's timer stalls, carry on after 4 s anyway
+    let done = false;
+    await Promise.race([plaza.standFromDesk().then(() => { done = true; }), sleep(4000).then(() => { if (!done) { done = true; plaza.forceStand(); } })]);
+    done = true;   // a late-firing timer must not snap the analyst back to the desk
+  } catch (e) { console.error(e); plaza.forceStand(); }
   S.moving = false;
+  syncInput();
   // the boss does not forget: an unsolved request nags again, a finished one is followed by the next
   scheduleRequest(S.run && S.run.finished ? 6000 : 25000);
 }
@@ -213,6 +228,7 @@ async function goHolo(which) {
   S.moving = true;
   clearTimeout(S.termTimer);
   document.body.classList.remove("term-on");
+  releaseTyping();   // you walk in the hologram room: the query box must let go of the keys (and the phone keyboard)
   S.mode = "holo";
   document.body.classList.remove("term");
   document.body.classList.add("holo");
@@ -451,7 +467,7 @@ function setupAdjust() {
     if (A.edH) st.setProperty("--ed-h", "clamp(var(--ed-min), " + (clamp(A.edH, 0.16, 0.84) * 100).toFixed(1) + "%, calc(100% - 130px))"); else st.removeProperty("--ed-h");
     const fs = clamp(A.fs || 14, FS_MIN, FS_MAX);
     st.setProperty("--ed-fs", fs + "px");
-    $("ed-fs").textContent = fs;
+    $("ed-fs").textContent = matchMedia("(pointer: coarse)").matches ? Math.max(16, fs) : fs;   // touch never shows under 16 (CSS)
     document.body.classList.toggle("side-off", !!A.off);
     for (const b of $("ed-tabs").querySelectorAll("button")) {
       const k = b.dataset.adj;
