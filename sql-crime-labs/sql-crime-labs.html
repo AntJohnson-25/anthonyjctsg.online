@@ -20,8 +20,8 @@
   document.addEventListener("dblclick", function (e) { if (!typing(e)) e.preventDefault(); }, { passive: false });
 })();
 </script>
-<title>SQL Crime Labs: Free 3D Game to Learn SQL | AnthonyJCTSG Games</title>
-<meta name="description" content="SQL Crime Labs: you are the lead data analyst. Write real SQL at your laptop and walk through the results as a green hologram. Rookie to Pro, with clues and explanations.">
+<title>SQL Crime Labs: Free SQL Learning Game in 3D | AnthonyJCTSG Games</title>
+<meta name="description" content="A free SQL learning game: write real SQL queries as a crime lab's lead data analyst and walk your results as a 3D hologram. 26 cases, beginner to window functions.">
 <meta name="theme-color" content="#050912">
 <link rel="icon" type="image/png" href="assets/ctsg-seal.png">
 <link rel="stylesheet" href="css/style.css">
@@ -31,11 +31,11 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="AnthonyJCTSG Games">
 <meta property="og:title" content="SQL Crime Labs: free browser game">
-<meta property="og:description" content="Free 3D SQL game in your browser. You are the lead data analyst at a world-wide crime lab: walk the office, take case requests from your boss, write real SQL queries (SQLite runs in the page) and walk through the results as a green hologram. Rookie, Semi-Pro and Pro cases with three tries, clues and explanations, desktop or phone.">
+<meta property="og:description" content="A free SQL learning game in 3D. You are the lead data analyst at a world-wide crime lab: take case requests from your boss, write real SQL queries (SQLite runs in the page) and walk through the results as a green hologram. 26 SQL practice cases from beginner SELECT to joins, CTEs and window functions, with three tries, clues and worked solutions, desktop or phone.">
 <meta property="og:url" content="https://anthonyjctsg.online/sql-crime-labs/sql-crime-labs.html">
 <meta property="og:image" content="https://anthonyjctsg.online/sql-crime-labs_thumbnail.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "SQL Crime Labs", "url": "https://anthonyjctsg.online/sql-crime-labs/sql-crime-labs.html", "image": "https://anthonyjctsg.online/sql-crime-labs_thumbnail.jpg", "description": "Free 3D SQL game in your browser. You are the lead data analyst at a world-wide crime lab: walk the office, take case requests from your boss, write real SQL queries (SQLite runs in the page) and walk through the results as a green hologram. Rookie, Semi-Pro and Pro cases with three tries, clues and explanations, desktop or phone.", "genre": ["Puzzle", "Educational", "Detective", "3D"], "author": {"@type": "Person", "@id": "https://anthonyjctsg.com/#person", "name": "Anthony C Johnson", "url": "https://anthonyjctsg.com/"}, "gamePlatform": "Web Browser", "applicationCategory": "Game", "operatingSystem": "Any", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isPartOf": {"@type": "WebSite", "@id": "https://anthonyjctsg.online/#website", "name": "AnthonyJCTSG Games", "url": "https://anthonyjctsg.online/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "SQL Crime Labs", "url": "https://anthonyjctsg.online/sql-crime-labs/sql-crime-labs.html", "image": "https://anthonyjctsg.online/sql-crime-labs_thumbnail.jpg", "description": "A free SQL learning game in 3D. You are the lead data analyst at a world-wide crime lab: take case requests from your boss, write real SQL queries (SQLite runs in the page) and walk through the results as a green hologram. 26 SQL practice cases from beginner SELECT to joins, CTEs and window functions, with three tries, clues and worked solutions, desktop or phone.", "genre": ["Puzzle", "Educational", "Detective", "3D"], "author": {"@type": "Person", "@id": "https://anthonyjctsg.com/#person", "name": "Anthony C Johnson", "url": "https://anthonyjctsg.com/"}, "gamePlatform": "Web Browser", "applicationCategory": "Game", "operatingSystem": "Any", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isPartOf": {"@type": "WebSite", "@id": "https://anthonyjctsg.online/#website", "name": "AnthonyJCTSG Games", "url": "https://anthonyjctsg.online/"}}</script>
 </head>
 <body>
 <div id="app">
@@ -157,6 +157,17 @@
       <button id="play" class="run-btn big">Play</button>
       <button id="new-run" class="ghost-btn new-run" hidden>&#8634; Start a new run (back to Rookie)</button>
       <div class="controls-hint">WASD walk &middot; Shift run &middot; drag to look &middot; E use &middot; Esc stand up &middot; real SQLite in your browser &middot; a CTSG game</div>
+      <!-- What the game teaches, in plain text (players and search engines), with the practice pages built from the same cases. -->
+      <details class="learn">
+        <summary>What you'll learn: a free SQL learning game</summary>
+        <p>SQL Crime Labs is a free SQL game for beginners and analysts. Each case request is a real SQL practice problem: you write the query, SQLite runs it in your browser, and the rows it returns walk onto the evidence table as a 3D hologram. Three tries per case, a clue before the last one, and a worked solution with an explanation after.</p>
+        <ul>
+          <li><b>Rookie</b> (9 cases): SELECT, WHERE, AND/OR, IN, LIKE, ORDER BY, LIMIT, DISTINCT and first aggregates.</li>
+          <li><b>Semi-Pro</b> (9 cases): GROUP BY, HAVING, INNER and LEFT JOIN, NULLs, subqueries, CASE and dates.</li>
+          <li><b>Pro</b> (8 cases): CTEs, window functions, self-joins, a recursive query and set operations.</li>
+        </ul>
+        <p>Prefer to read first? <a href="sql-practice-exercises.html">SQL practice exercises with solutions</a> &middot; <a href="sql-join-practice.html">SQL JOIN practice</a> &middot; <a href="sql-window-functions-practice.html">SQL window functions practice</a></p>
+      </details>
     </div>
   </div>
   <div id="ts-select" class="ts-select" hidden>

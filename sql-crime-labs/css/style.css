@@ -475,6 +475,16 @@ body.holo .wh-help { left: 50%; transform: translateX(-50%); }
 .ts-bar { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .ts-lede { color: #b8ffcc; max-width: 720px; margin: 0; font-size: 13px; line-height: 1.4; }
 .ts-bar .controls-hint { margin-top: 0; }
+/* "What you'll learn" on the title: closed it is one line; open it scrolls inside itself so Play never moves off screen */
+.learn { max-width: 720px; width: 100%; font-size: 13px; color: #b8ffcc; text-align: left; }
+.learn summary { cursor: pointer; text-align: center; color: var(--cyan); font-weight: 600; list-style: none; }
+.learn summary::-webkit-details-marker { display: none; }
+.learn summary::after { content: " \25BE"; }
+.learn[open] summary::after { content: " \25B4"; }
+.learn[open] { background: rgba(0, 10, 3, 0.92); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 14px; max-height: 38vh; overflow-y: auto; }
+.learn p, .learn ul { margin: 6px 0; line-height: 1.45; }
+.learn ul { padding-left: 18px; }
+.learn a { color: var(--cyan); }
 .ts-select { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .sel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 0; }
 .sel-head .kicker { margin: 0; }
