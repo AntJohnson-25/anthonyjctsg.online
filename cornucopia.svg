@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<defs>
+<linearGradient id="cc-horn" x1="0" y1="0" x2="0.7" y2="1">
+<stop offset="0" stop-color="#f0cd85"/><stop offset=".45" stop-color="#cf9644"/><stop offset="1" stop-color="#87521f"/>
+</linearGradient>
+<linearGradient id="cc-mouth" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#2a1608"/><stop offset="1" stop-color="#5a3412"/>
+</linearGradient>
+<radialGradient id="cc-pump" cx=".38" cy=".3" r=".85">
+<stop offset="0" stop-color="#ffb35a"/><stop offset=".55" stop-color="#e46f1c"/><stop offset="1" stop-color="#a8400e"/>
+</radialGradient>
+<radialGradient id="cc-apple" cx=".35" cy=".3" r=".8">
+<stop offset="0" stop-color="#f0624f"/><stop offset=".55" stop-color="#c52b24"/><stop offset="1" stop-color="#7d1414"/>
+</radialGradient>
+<radialGradient id="cc-pear" cx=".35" cy=".3" r=".85">
+<stop offset="0" stop-color="#f4e68a"/><stop offset=".6" stop-color="#c9b83c"/><stop offset="1" stop-color="#8a7a1c"/>
+</radialGradient>
+<radialGradient id="cc-grape" cx=".35" cy=".3" r=".8">
+<stop offset="0" stop-color="#a566c0"/><stop offset=".6" stop-color="#6b2f86"/><stop offset="1" stop-color="#3a1450"/>
+</radialGradient>
+<radialGradient id="cc-corn" cx=".4" cy=".3" r=".9">
+<stop offset="0" stop-color="#fff0a0"/><stop offset="1" stop-color="#e3a91f"/>
+</radialGradient>
+<clipPath id="cc-clip"><path d="M5.5 11.5C2.5 14.5 4.5 19.5 9 19.2C12.6 19 13.6 23.5 16.4 27.6C22.6 36.6 32.8 43.6 44.6 46.6L49.4 20.4C38.4 20.6 29 17.4 22 12C17 8 9 7.6 5.5 11.5Z"/></clipPath>
+</defs>
+<!-- wheat behind the horn -->
+<g stroke="#b9842c" stroke-width="1" stroke-linecap="round" fill="none"><path d="M47 22C50 14 54 9 58 5"/><path d="M50 24C54 17 59 13 62 10"/></g>
+<g fill="#e2b552"><ellipse cx="58.3" cy="5.4" rx="1.1" ry="2.2" transform="rotate(35 58.3 5.4)"/><ellipse cx="56.4" cy="8.2" rx="1.1" ry="2.1" transform="rotate(35 56.4 8.2)"/><ellipse cx="54.6" cy="11" rx="1.1" ry="2" transform="rotate(35 54.6 11)"/><ellipse cx="61.8" cy="10.6" rx="1.1" ry="2.1" transform="rotate(48 61.8 10.6)"/><ellipse cx="59.6" cy="13.2" rx="1.1" ry="2" transform="rotate(48 59.6 13.2)"/></g>
+<!-- horn body -->
+<path d="M5.5 11.5C2.5 14.5 4.5 19.5 9 19.2C12.6 19 13.6 23.5 16.4 27.6C22.6 36.6 32.8 43.6 44.6 46.6L49.4 20.4C38.4 20.6 29 17.4 22 12C17 8 9 7.6 5.5 11.5Z" fill="url(#cc-horn)"/>
+<g clip-path="url(#cc-clip)" fill="none" stroke-linecap="round">
+<g stroke="#6f4118" stroke-width="1.5" opacity=".75"><path d="M13 8C12 16 14 24 19 31"/><path d="M19 9C18 18 21 27 27 36"/><path d="M25 12C24 21 27 30 34 40"/><path d="M31 15C30 24 33 33 41 43"/><path d="M37 17C36 26 38 35 45 46"/></g>
+<g stroke="#f8dc9a" stroke-width=".9" opacity=".7"><path d="M3 15C13 13 24 19 32 27C38 33 44 37 50 38"/><path d="M3 18C13 17 22 23 29 31C34 37 41 42 49 43"/><path d="M8 11C16 11 24 16 31 22C37 27 43 30 50 31"/></g>
+</g>
+<path d="M5.5 11.5C2.5 14.5 4.5 19.5 9 19.2C12.6 19 13.6 23.5 16.4 27.6C22.6 36.6 32.8 43.6 44.6 46.6" fill="none" stroke="#6a3c14" stroke-width="1.2" stroke-linecap="round"/>
+<path d="M5.5 11.5C9 7.6 17 8 22 12C29 17.4 38.4 20.6 49.4 20.4" fill="none" stroke="#fbe3a6" stroke-width=".9" stroke-linecap="round" opacity=".85"/>
+<!-- horn mouth -->
+<ellipse cx="47" cy="33.5" rx="4.6" ry="13.4" fill="url(#cc-mouth)" stroke="#6a3c14" stroke-width="1.1"/>
+<!-- spilling harvest, back to front -->
+<path d="M52 13c4-4 9-3 10-1-3 3-8 4-10 1z" fill="#6f9a35"/><path d="M52 13c3-1 6-2 9-1" stroke="#41631a" stroke-width=".6" fill="none"/>
+<path d="M57.6 41.4c3.2-.6 5.2 1.6 4.8 4.4-.4 3-3.4 4.6-6 3.6-2.6-1-2.4-7 1.2-8z" fill="url(#cc-pear)" stroke="#6e6212" stroke-width=".6"/>
+<path d="M58.6 41.6c.6-1.8 1.8-3 3.2-3.4" stroke="#5a3a1a" stroke-width="1" fill="none" stroke-linecap="round"/>
+<ellipse cx="57.6" cy="45" rx="1" ry="1.8" fill="#fff9c4" opacity=".6"/>
+<path d="M52 36c3.6-2.4 8-1.6 9 .8-2.4 2.6-7 2.8-9-.8z" fill="#8aac3c" stroke="#4c6e1e" stroke-width=".5"/>
+<!-- pumpkin -->
+<g>
+<ellipse cx="47.8" cy="49" rx="9.2" ry="8" fill="url(#cc-pump)" stroke="#8a3208" stroke-width=".8"/>
+<path d="M47.8 41c-3.6 3-3.6 13 0 16M43 42.4c-4 3-4.2 11.4-.8 14.6M52.6 42.4c4 3 4.2 11.4.8 14.6" fill="none" stroke="#9a3c0c" stroke-width=".9" stroke-linecap="round" opacity=".8"/>
+<path d="M47.4 41.2c.2-2 1-3.2 2.6-3.8" stroke="#4e3418" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<ellipse cx="43.6" cy="45.6" rx="2.4" ry="1.4" fill="#ffe0a8" opacity=".5" transform="rotate(-30 43.6 45.6)"/>
+</g>
+<!-- grapes -->
+<g stroke="#2e0e40" stroke-width=".4">
+<circle cx="38.6" cy="53.4" r="3" fill="url(#cc-grape)"/><circle cx="43.4" cy="56.6" r="3" fill="url(#cc-grape)"/><circle cx="37.2" cy="58.2" r="3" fill="url(#cc-grape)"/><circle cx="41.6" cy="60.8" r="3" fill="url(#cc-grape)"/><circle cx="46.6" cy="60.2" r="3" fill="url(#cc-grape)"/><circle cx="35" cy="54.4" r="2.8" fill="url(#cc-grape)"/>
+</g>
+<path d="M37 51c0-2 1-3 2.4-3.6" stroke="#4e3418" stroke-width="1" fill="none" stroke-linecap="round"/>
+<g fill="#fff" opacity=".45"><circle cx="37.7" cy="52.5" r=".8"/><circle cx="42.5" cy="55.7" r=".8"/><circle cx="36.3" cy="57.3" r=".8"/><circle cx="40.7" cy="59.9" r=".8"/></g>
+<!-- apple -->
+<g>
+<circle cx="55.2" cy="27.6" r="6.6" fill="url(#cc-apple)" stroke="#6a1010" stroke-width=".7"/>
+<path d="M55.2 21.8c.2-2 1.2-3 2.4-3.4" stroke="#4e3418" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+<path d="M57.4 20.2c2.4-2 5-1.6 5.8-.2-2 1.8-4.6 2.2-5.8.2z" fill="#6f9a35" stroke="#41631a" stroke-width=".5"/>
+<ellipse cx="52.4" cy="25" rx="2" ry="1.3" fill="#fff" opacity=".4" transform="rotate(-35 52.4 25)"/>
+</g>
+</svg>
