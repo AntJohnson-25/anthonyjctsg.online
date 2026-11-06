@@ -13,6 +13,30 @@ globalThis.HS = globalThis.HS || {};
   const FPS = 30;
   const Body = { loading: {} };
 
+  // Short mip chain for the Meshy colour maps (the Run It Up fix, 2026-11-04). Meshy lays the map out as hundreds of
+  // UV islands that touch with no gutter: a full mip chain blends white skin/shoe islands into dark cloth (white
+  // streaks), no mips at all shimmers at distance. Two extra levels (1/2, 1/4) take the shimmer out and keep the bleed
+  // within a few texels of an island edge. ?mips=N to compare (0 = none, 3+ drifts back toward the full chain).
+  // Only the Wealth Runner bodies are Meshy here; the Mixamo stock bodies (Ch*, Remy, Lola) and Ant keep their mips.
+  const MESHY = { runner_m_dark: 1, runner_f_dark: 1, runner_m_light: 1, runner_f_light: 1 };
+  const qMips = /[?&]mips=(\d)/.exec(globalThis.location ? globalThis.location.search : "");
+  const SHORT_MIPS = qMips ? +qMips[1] : 2;
+  function shortMips(tx) {
+    const img = tx.image;
+    tx.generateMipmaps = false;
+    if (!SHORT_MIPS || !img || !img.width) { tx.minFilter = THREE.LinearFilter; return; }
+    const levels = [img];
+    let w = img.width, h = img.height, src = img;
+    for (let i = 0; i < SHORT_MIPS && w > 1 && h > 1; i++) {
+      w = Math.max(1, w >> 1); h = Math.max(1, h >> 1);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, w, h);
+      levels.push(c); src = c;
+    }
+    tx.mipmaps = levels;
+    tx.minFilter = THREE.LinearMipmapLinearFilter;
+  }
+
   function fetchText(url, attempt) {
     return fetch(url + (attempt ? "?retry=" + attempt : "")).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
       .catch(function (err) { if (attempt < 3) return new Promise(function (ok) { setTimeout(ok, 500 * (attempt + 1)); }).then(function () { return fetchText(url, attempt + 1); }); throw err; });
@@ -59,7 +83,7 @@ globalThis.HS = globalThis.HS || {};
         const img = new Image(), tx = new THREE.Texture(img);
         if (slot === "map") tx.colorSpace = THREE.SRGBColorSpace;
         tx.anisotropy = 4;
-        waits.push(new Promise(function (ok) { img.onload = function () { tx.needsUpdate = true; ok(); }; img.onerror = ok; }));
+        waits.push(new Promise(function (ok) { img.onload = function () { if (slot === "map" && MESHY[id]) shortMips(tx); tx.needsUpdate = true; ok(); }; img.onerror = ok; }));
         img.src = m.tex[slot];
         p[slot] = tx;
       });
