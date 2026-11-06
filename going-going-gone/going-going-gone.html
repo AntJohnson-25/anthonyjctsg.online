@@ -1736,6 +1736,28 @@ const UNIT = 0.01;   // model cm -> world metres (the sluggers are packed 1.90-1
 const PLAYERS = { sentinel: "Iron Sentinel", slugger: "The Slugger", hammer: "The Hammer", cannon: "The Cannon" };
 const DEFAULT_PLAYER = "sentinel";
 
+// Short mip chain for Meshy colour maps (the Run It Up fix, 2026-11-04). Meshy lays the map out as hundreds of UV
+// islands that touch with no gutter: a full mip chain blends white skin/shoe islands into dark cloth (white streaks),
+// no mips at all shimmers at distance. Two extra levels (1/2, 1/4) take the shimmer out and keep the bleed within a few
+// texels of an island edge. ?mips=N to compare (0 = none, 3+ drifts back toward the full chain).
+const qMips = /[?&]mips=(\d)/.exec(typeof location !== "undefined" ? location.search : "");
+const SHORT_MIPS = qMips ? +qMips[1] : 2;
+function shortMips(tx) {
+  const img = tx.image;
+  tx.generateMipmaps = false;
+  if (!SHORT_MIPS || !img || !img.width) { tx.minFilter = THREE.LinearFilter; return; }
+  const levels = [img];
+  let w = img.width, h = img.height, src = img;
+  for (let i = 0; i < SHORT_MIPS && w > 1 && h > 1; i++) {
+    w = Math.max(1, w >> 1); h = Math.max(1, h >> 1);
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, w, h);
+    levels.push(c); src = c;
+  }
+  tx.mipmaps = levels;
+  tx.minFilter = THREE.LinearMipmapLinearFilter;
+}
+
 async function loadPlayer(id) {
   const [D, clips] = await Promise.all([assetJSON("chars/" + (PLAYERS[id] ? id : DEFAULT_PLAYER) + ".json"), assetJSON("clips.json")]);
   const map = D.map ? await new THREE.TextureLoader().loadAsync(D.map) : null;
@@ -1744,6 +1766,7 @@ async function loadPlayer(id) {
   if (map) {
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 4;
+    shortMips(map);
     M.mat = new THREE.MeshStandardMaterial({ map, roughness: 0.7, metalness: 0.0 });
   }
   return M;
@@ -1899,7 +1922,7 @@ class Character {
   }
 }
 
-return { UNIT, PLAYERS, DEFAULT_PLAYER, loadPlayer, sampleClip, Character };
+return { UNIT, PLAYERS, DEFAULT_PLAYER, shortMips, loadPlayer, sampleClip, Character };
 };
 __defs["js/assets.js"] = function () {
 // Asset access. Served: plain fetches from assets/. The single-file

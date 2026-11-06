@@ -35,14 +35,33 @@ const models = {};
 
 // Meshy bodies pack their colour map as hundreds of touching UV islands with no gutter, so the smaller mip levels
 // blend white shoe / skin islands into neighbouring black cloth: white streaks on dark clothes at desk-row sizes.
-// Drawing their colour map with NO mipmaps fixes it (render-verified in Dealin, see Work/NOTE-from-dealin-mipmap-streaks.md;
-// re-unwrapping, Lambert and a Meshy retexture did not). Costs a little shimmer on tiny far figures, saves ~1/3 texture memory.
+// Drawing their colour map without the full mip chain fixes it (render-verified in Dealin, see Work/NOTE-from-dealin-mipmap-streaks.md;
+// re-unwrapping, Lambert and a Meshy retexture did not). No mips at all shimmered on far figures, so it is a SHORT chain (below).
 // Every body in src/chars is Meshy; a Mixamo stock body would keep its mips. ?charmip=1 turns mips back on to compare.
 const MESHY = new Set(["dre", "nia", "diego", "lucia", "jake", "emily", "marcus", "dee", "ray", "iris", "earl", "mateo", "omar", "mai", "sina",
   "grant", "wr_marcus", "runner_m_light", "runner_m_dark", "runner_f_light", "runner_f_dark",
   "cop_m", "cop_f", "labcoat_f", "scrubs_f", "suit_m", "blazer_f", "polo_m", "hijab_f", "elder_m", "auntie_f", "elder_f", "hoodie_m", "courier_m", "track_m"]);
 const CHARMIP = new URLSearchParams(location.search).get("charmip");
-const noMip = (id) => (CHARMIP === "1" ? false : CHARMIP === "0" ? true : MESHY.has(id));
+const noMip = (id) => (CHARMIP === "1" ? false : MESHY.has(id) || CHARMIP === "0");
+// Short mip chain (the Run It Up fix, 2026-11-04): two extra levels (1/2, 1/4) take the distance shimmer out of "no
+// mips" while the bleed stays within a few texels of an island edge. ?charmip=0 = none, ?mips=N = chain length.
+const qMips = /[?&]mips=(\d)/.exec(location.search);
+const SHORT_MIPS = CHARMIP === "0" ? 0 : qMips ? +qMips[1] : 2;
+function shortMips(tx) {
+  const img = tx.image;
+  tx.generateMipmaps = false;
+  if (!SHORT_MIPS || !img || !img.width) { tx.minFilter = THREE.LinearFilter; return; }
+  const levels = [img];
+  let w = img.width, h = img.height, src = img;
+  for (let i = 0; i < SHORT_MIPS && w > 1 && h > 1; i++) {
+    w = Math.max(1, w >> 1); h = Math.max(1, h >> 1);
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, w, h);
+    levels.push(c); src = c;
+  }
+  tx.mipmaps = levels;
+  tx.minFilter = THREE.LinearMipmapLinearFilter;
+}
 
 function model(id, h = HEAD_M) {
   if (models[id] !== undefined) return models[id];
@@ -74,8 +93,9 @@ function model(id, h = HEAD_M) {
       const img = new Image(), tx = new THREE.Texture(img);
       if (slot === "map") tx.colorSpace = THREE.SRGBColorSpace;
       tx.anisotropy = 4;
-      if (slot === "map" && noMip(id)) { tx.generateMipmaps = false; tx.minFilter = THREE.LinearFilter; }   // see MESHY above
-      img.onload = () => { tx.needsUpdate = true; };
+      // 2026-11-06: a SHORT chain (2 extra levels, the Run It Up fix) instead of none: none shimmered at distance.
+      // ?charmip=0 = no mips at all, ?mips=N = chain length, ?charmip=1 = the full streaky chain.
+      img.onload = () => { if (slot === "map" && noMip(id)) shortMips(tx); tx.needsUpdate = true; };   // see MESHY above
       img.src = m.tex[slot];
       mat[slot] = tx;
     }

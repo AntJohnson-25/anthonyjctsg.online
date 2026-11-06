@@ -9,6 +9,36 @@
 import * as THREE from "three";
 import { GLTFLoader } from "../vendor/jsm/loaders/GLTFLoader.js";
 
+// Short mip chain for Meshy colour maps (the Run It Up fix, 2026-11-04). Meshy lays the map out as hundreds of UV
+// islands that touch with no gutter: a full mip chain blends white skin/shoe islands into dark cloth (white streaks),
+// no mips at all shimmers at distance. Two extra levels (1/2, 1/4) take the shimmer out and keep the bleed within a few
+// texels of an island edge. ?mips=N to compare (0 = none, 3+ drifts back toward the full chain).
+const qMips = /[?&]mips=(\d)/.exec(typeof location !== "undefined" ? location.search : "");
+const SHORT_MIPS = qMips ? +qMips[1] : 2;
+function shortMips(tx) {
+  const img = tx.image;
+  tx.generateMipmaps = false;
+  if (!SHORT_MIPS || !img || !img.width) { tx.minFilter = THREE.LinearFilter; tx.needsUpdate = true; return; }
+  const levels = [img];
+  let w = img.width, h = img.height, src = img;
+  for (let i = 0; i < SHORT_MIPS && w > 1 && h > 1; i++) {
+    w = Math.max(1, w >> 1); h = Math.max(1, h >> 1);
+    const c = document.createElement("canvas"); c.width = w; c.height = h;
+    const g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(src, 0, 0, w, h);
+    levels.push(c); src = c;
+  }
+  tx.mipmaps = levels;
+  tx.minFilter = THREE.LinearMipmapLinearFilter;
+  tx.needsUpdate = true;
+}
+function meshyMips(root) {
+  const seen = new Set();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    for (const m of [].concat(o.material)) { const t = m && m.map; if (t && !seen.has(t)) { seen.add(t); shortMips(t); } }
+  });
+}
+
 const NB = 19;
 const HIPS = 0, SPINE = 1, CHEST = 2, NECK = 3, HEAD = 4;
 // Logical bones on the driver (Mixamo names), in the reader's order.
@@ -102,6 +132,7 @@ export async function loadAvatar(buffer, driver, tint) {
   // A Meshy character already faces +Z like the driver; any other avatar faces -Z and is turned to match.
   let map = readMeshyRig(bones);
   const meshy = !!map;
+  if (meshy) meshyMips(root);                    // Meshy bodies only: Ant and other Mixamo bodies keep their mips
   if (!map) map = readRig(bones);                // read before turning: right = +X
   if (!map) return null;
   root.rotation.set(0, meshy ? 0 : Math.PI, 0);
