@@ -76,7 +76,8 @@ globalThis.HS = globalThis.HS || {};
     seed = seed || ((Math.random() * 4294967296) >>> 0) || 1;
     const humans = N.humans();
     const seats = crew.map(function (c) { return { name: c.name, bot: true, look: c.look }; });
-    humans.forEach(function (h, i) { const s = seats[ORDER[i]]; s.botName = s.name; s.bot = false; s.hl = h.hl; });
+    // (With friends, a seat shows the person's name; solo keeps the character's name.)
+    humans.forEach(function (h, i) { const s = seats[ORDER[i]]; s.botName = s.name; s.bot = false; s.hl = h.hl; if (N.role !== "solo") s.name = h.name; });
     N.t = T.create({ seed: seed, seats: seats, opts: opts });
     seats.forEach(function (s, i) { if (s.botName) N.t.seats[i].botName = s.botName; });
     T.start(N.t, N.now());
@@ -291,6 +292,15 @@ globalThis.HS = globalThis.HS || {};
   }
   function onPlayers(players, newHost) {
     const ids = new Set(players.map(function (p) { return p.id; }));
+    // We were host, dropped off, and came back to find someone else running the table:
+    // forget our copy (it may have run on without them) and follow theirs.
+    if (N.role === "host" && newHost && newHost !== myId()) {
+      N.role = "client"; N.t = null; N.st = null; N.hand = []; N.seat = -1; N.lastQ = 0;
+      N.rehand = null; N.pendingAct = null; N.sentHand = {};
+      if (N.on.demoted) N.on.demoted();
+      hello(true);
+      return;
+    }
     if (newHost === myId() && N.role === "client") {
       // The host left and HopLobby made us host.
       N.role = "host";

@@ -166,15 +166,25 @@ globalThis.HS = globalThis.HS || {};
   // ------------------------------------------------------------------ sitting down, standing up
   function sit(k, tutorial) {
     if (G.mode !== "walk" || k < 0) return;
-    A.unlock();
+    // In a friend's room the host picks the table; you are seated when they sit down.
+    if (Net.isClient()) { friendsMsg("The host picks the table. You'll be seated when they sit down."); return; }
+    if (Net.isHost()) tutorial = false;
     const Tb = Room.TABLES[k];
+    const o = tutorial ? { level: "easy", timer: 0, target: 500, blindNil: false, chaos: false } : Object.assign({ level: Tb.level }, G.opts);
+    if (Net.isHost()) On.setTable(k);   // before the deal goes out, so friends sit at the same table
+    seatAt(k, function () { Net.start(o, tutorial ? 20261013 : undefined, Crowd.crewSeats(k)); });
+    if (tutorial) Tut.start();
+  }
+  // Everything about sitting down except dealing: the camera, the HUD, the music.
+  // `start` deals the cards (the host and the solo game); a friend's game gets its cards from the host.
+  function seatAt(k, start) {
+    A.unlock();
     const before = Room.world.position.clone();
     Room.setActive(k);
     View.startBlend(1.2, Room.world.position.clone().sub(before));
     Crowd.handOver(k);
     G.table = k;
-    const o = tutorial ? { level: "easy", timer: 0, target: 500, blindNil: false, chaos: false } : Object.assign({ level: Tb.level }, G.opts);
-    Net.start(o, tutorial ? 20261013 : undefined, Crowd.crewSeats(k));
+    if (start) start();
     G.mode = "play"; G.recorded = false;
     $("walkHud").hidden = true; $("prompt").hidden = true; G.promptK = -1;
     ["summary", "final", "scoreSheet", "settings", "rulesBox"].forEach(function (id) { $(id).hidden = true; });
@@ -186,12 +196,19 @@ globalThis.HS = globalThis.HS || {};
     Seats.clear();
     A.music("play");
     G.lastHn = -1;
-    if (tutorial) Tut.start();
   }
   function leave() {
     if (G.mode !== "play") return;
-    const k = G.table, Tb = Room.TABLES[k];
+    // A guest who stands up leaves the friend's room too (a bot takes the seat).
+    if (Net.isClient()) { On.leave(); return; }
+    if (Net.isHost()) On.setTable(-1);
     Net.stop();
+    unseat();
+  }
+  // Stand up and walk again (the other half of seatAt).
+  function unseat() {
+    if (G.mode !== "play") return;
+    const k = G.table, Tb = Room.TABLES[k];
     Seats.clear();
     Tut.stop();
     H.unzoom(); H.playButton(-1); G.picked = -1;
@@ -208,7 +225,108 @@ globalThis.HS = globalThis.HS || {};
     $("walkHud").hidden = false;
     A.music("menu");
   }
-  function playAgain() { if (G.mode === "play") { const k = G.table; const st = Net.st; void st; Net.start(Object.assign({ level: Room.TABLES[k].level }, G.opts), undefined, Crowd.crewSeats(k)); G.recorded = false; H.last = {}; ["final", "summary"].forEach(function (id) { $(id).hidden = true; }); Seats.clear(); A.music("play"); } }
+  // ------------------------------------------------------------------ playing with friends (GameDB room)
+  const On = HS.Online;
+  function friendsMsg(text) { const el = $("frMsg"); if (el) el.textContent = text || ""; if (text && G.mode !== "title" && G.mode !== "landing") H.toast(text); }
+  function friendsSync() {
+    const inRoom = On.inRoom();
+    $("frOut").hidden = inRoom; $("frIn").hidden = !inRoom;
+    if (!inRoom) return;
+    const names = On.room.players.map(function (p) { return p.id === On.session.playerId ? "you" : (p.name || "Player"); });
+    $("frInfo").innerHTML = "Room <b>" + H.esc(On.room.code) + "</b> · " + H.esc(names.join(", "));
+    if (G.mode === "title" || G.mode === "landing") $("frMsg").textContent = On.isHost()
+      ? "Share the code or the link. Then enter the villa and sit at a table: your friends are dealt in."
+      : "You're in. Enter the villa; you'll be seated when the host sits down.";
+  }
+  function copyText(text, done) {
+    const ok = function () { if (done) done(); };
+    const old = function () { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); ok(); } catch (e) { /* the text is on screen to copy by hand */ } ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, old); else old();
+  }
+  // The by-hand way in (an invite text and its reply), for when a room code will not connect.
+  // The host makes the invite; the friend answers it; the host pastes the answer in.
+  function altSync() {
+    const inRoom = On.inRoom(), host = On.isHost();
+    $("frAltBtn").hidden = inRoom && !host;
+    $("frAltBtn").textContent = host ? "Friend can't connect with the code? Send an invite instead" : "Got an invite text from a friend?";
+    if (inRoom && !host) $("frAlt").hidden = true;
+  }
+  function altShow(o) {
+    $("frAlt").hidden = false;
+    $("frAltOutLabel").textContent = o.outLabel || ""; $("frAltOutRow").hidden = !o.out; $("frAltOut").value = o.out || "";
+    $("frAltInLabel").textContent = o.inLabel || ""; $("frAltInRow").hidden = !o.go; $("frAltIn").value = ""; $("frAltGo").textContent = o.goLabel || "";
+    $("frAltGo").onclick = o.go || null;
+    if (o.out) copyText(o.out);
+  }
+  function friendsInit() {
+    if (!On.enabled) return;
+    $("friends").hidden = false;
+    try { $("frName").value = localStorage.getItem("villaspades.name") || ""; } catch (e) { /* ignore */ }
+    const name = function () { const n = $("frName").value.trim().slice(0, 16); try { localStorage.setItem("villaspades.name", n); } catch (e) { /* ignore */ } return n || null; };
+    const busy = function (on) { ["frCreate", "frJoin"].forEach(function (id) { $(id).disabled = on; }); if (on) $("frMsg").textContent = "Connecting…"; };
+    $("frCreate").onclick = function () { busy(true); On.create(name()).then(function () { busy(false); }); };
+    $("frJoin").onclick = function () { if (!$("frCode").value.trim()) { friendsMsg("Type the room code your friend gave you."); return; } busy(true); On.join($("frCode").value, name()).then(function () { busy(false); }); };
+    $("frLeave").onclick = function () { On.leave(); };
+    $("frCopy").onclick = function () { copyText(On.link(), function () { friendsMsg("Link copied. Anyone who opens it joins this room."); }); };
+    $("frAltCopy").onclick = function () { copyText($("frAltOut").value, function () { friendsMsg("Copied."); }); };
+    $("frAltBtn").onclick = function () {
+      if (!$("frAlt").hidden) { $("frAlt").hidden = true; On.cancelInvite(); return; }
+      if (On.isHost()) {
+        // Host: one invite per friend.
+        On.invite().then(function (invite) {
+          if (!invite) return;
+          altShow({ outLabel: "1. Send this invite to one friend (it's copied). They paste it into their game.", out: invite,
+            inLabel: "2. Paste the reply they send back:", goLabel: "Connect",
+            go: function () { const r = $("frAltIn").value.trim(); if (!r) return; On.acceptReply(r).then(function (ok) { if (ok) { $("frAlt").hidden = true; friendsMsg("Connecting your friend…"); } }); } });
+        });
+      } else {
+        // Friend: paste the invite, get a reply to send back.
+        altShow({ inLabel: "Paste the invite your friend sent:", goLabel: "Answer",
+          go: function () {
+            const inv = $("frAltIn").value.trim(); if (!inv) return;
+            On.answer(inv, name()).then(function (reply) {
+              if (!reply) return;
+              altShow({ outLabel: "Send this reply back to your friend (it's copied). You're seated as soon as they paste it in.", out: reply });
+              friendsMsg("Waiting for the host…");
+            });
+          } });
+      }
+    };
+    altSync();
+    On.on.error = function (m) { friendsMsg(m); };
+    On.on.dropped = function () { friendsMsg("Connection lost. Reconnecting…"); };
+    On.on.room = function () { friendsSync(); altSync(); };
+    // Opened from a friend's link (?room=CODE): join that room straight away.
+    const linked = (new URLSearchParams(location.search).get("room") || "").trim().slice(0, 6);
+    if (linked) { $("frCode").value = linked.toUpperCase(); setTimeout(function () { if (!On.inRoom()) $("frJoin").onclick(); }, 0); }
+    // In a room: net.js now runs as host or guest instead of solo.
+    On.on.joined = function (ctx) {
+      Net.init(ctx, {
+        // The host dealt a game: sit at their table.
+        start: function () { if (G.mode === "landing" || G.mode === "title") enterVilla(); if (G.mode === "play") unseat(); if (G.mode === "walk") seatAt(On.table >= 0 ? On.table : 0); },
+        // The host stood up.
+        menu: function () { if (G.mode !== "play") return; unseat(); friendsMsg("The host left the table."); },
+        joined: function (n) { H.toast(n + " sat down."); },
+        left: function (n) { H.toast(n + " left. A bot is playing their cards."); },
+        promoted: function () { On.setTable(G.table); H.toast("The host left. You're running the table now."); },
+        demoted: function () { H.toast("Your connection dropped. Another player is running the table now."); },
+        rebuilt: function () { /* the table carries on */ }
+      });
+      friendsMsg(""); friendsSync(); altSync(); $("frAlt").hidden = true;
+    };
+    // Out of the room: by choice, or (with a reason) because the host left or the link was lost.
+    On.on.left = function (reason) {
+      const wasPlaying = G.mode === "play";
+      Net.stop(); Net.role = "solo"; Net.ctx = null; Net.rehand = null; Net.pendingAct = null;
+      if (wasPlaying) unseat();
+      friendsSync(); altSync(); $("frAlt").hidden = true;
+      friendsMsg(reason || (wasPlaying ? "You left the room." : ""));
+    };
+    // The host changed tables while we were walking about.
+    On.on.table = function () { /* used when the next game starts */ };
+  }
+
+  function playAgain() { if (!Net.runs()) return; if (G.mode === "play") { const k = G.table; const st = Net.st; void st; Net.start(Object.assign({ level: Room.TABLES[k].level }, G.opts), undefined, Crowd.crewSeats(k)); G.recorded = false; H.last = {}; ["final", "summary"].forEach(function (id) { $(id).hidden = true; }); Seats.clear(); A.music("play"); } }
   function dealNow() { if (Net.runs() && Net.t) { T.nextHand(Net.t, Net.now()); Net.step(); } }
 
   // ------------------------------------------------------------------ acting
@@ -271,6 +389,11 @@ globalThis.HS = globalThis.HS || {};
       case "game-over":
         A.chime(true); A.music("results");
         if (!G.recorded && st.win === R.team(me) && G.table >= 0) { G.recorded = true; const tier = Room.TABLES[G.table].tier; G.wins[tier] = (G.wins[tier] || 0) + 1; saveWins(); }
+        // With friends: the host sends the result to the wins leaderboard (people only, not bots).
+        if (Net.isHost()) {
+          const who = function (team) { return [team, team + 2].filter(function (s) { return !st.seats[s][1] && st.seats[s][2]; }).map(function (s) { return st.seats[s][2]; }); };
+          On.report(who(st.win), who(1 - st.win), st.sc);
+        }
         break;
       case "timeout": H.toast(t("tTimeout", obj(e.seat))); break;
       case "react":
@@ -368,8 +491,8 @@ globalThis.HS = globalThis.HS || {};
     const canPlay = myTurn && st.ph === "play" && G.picked >= 0 && Net.hand.indexOf(G.picked) >= 0;
     H.playButton(document.body.classList.contains("touch") && canPlay ? G.picked : -1, canPlay && Net.legal().indexOf(G.picked) >= 0);
     H.bidPanel({ open: open, blindOk: open && st.bl[seat] && st.o.blind, looked: !faceDown, hint: hint, partnerBid: seat >= 0 ? st.bids[(seat + 2) % 4] : null });
-    H.summary(st, seat, st.ph === "hand", { now: now, canDeal: true });
-    H.final(st, seat, st.ph === "over", { canRestart: true, online: false, host: false });
+    H.summary(st, seat, st.ph === "hand", { now: now, canDeal: Net.runs() });
+    H.final(st, seat, st.ph === "over", { canRestart: Net.runs(), online: Net.online(), host: Net.isHost() });
     H.sheet(st, seat, G.sheet && st.ph !== "over");
   }
   // Test hook: play our own turns with the bot's logic.
@@ -469,6 +592,7 @@ globalThis.HS = globalThis.HS || {};
     dock.addEventListener("pointercancel", dockUp);
     dock.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && !hd) G.hover = -1; });
     window.addEventListener("keydown", function (e) {
+      if (e.target && e.target.tagName === "INPUT" && e.target.type !== "range") return;   // typing a name or room code
       const k = e.key.toLowerCase();
       if (k === "escape") { closeOverlays(); return; }
       if (G.mode === "landing") { if (k === "enter" || k === " ") { e.preventDefault(); showTitle(); } return; }
@@ -506,6 +630,7 @@ globalThis.HS = globalThis.HS || {};
     $("btnZoom").onclick = zoomLast;
     $("sZoom").onclick = function () { G.prefs.zoomAuto = !G.prefs.zoomAuto; syncSettings(); savePrefs(); };
     $("btnEnter").onclick = enterVilla;
+    friendsInit();
     $("btnStart").onclick = showTitle;
     $("btnRandom").onclick = function () { const ids = Object.keys(HS.CAST).filter(function (x) { return x !== G.char; }); pick(ids[(Math.random() * ids.length) | 0]); };
     $("btnRules").onclick = function () { toggle("rulesBox"); };

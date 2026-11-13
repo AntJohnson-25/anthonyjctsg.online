@@ -17,17 +17,7 @@
 <meta name="description" content="Spades: partnership Spades at a seaside villa at sunset. Walk the terrace as Ant and sit down at one of four tables, from Rookie to Shark.">
 <link rel="icon" href="data:,">
 <link rel="preload" as="image" href="art/key_title.jpg">
-<link rel="stylesheet" href="style.css?v=3">
-<!-- arcade SEO tags (anthonyjctsg.online) -->
-<link rel="canonical" href="https://anthonyjctsg.online/spades/spades.html">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="AnthonyJCTSG Games">
-<meta property="og:title" content="Spades: free browser game">
-<meta property="og:description" content="Partnership Spades in 3D at a seaside villa at sunset. Pick your player, walk the terrace and sit down at one of four tables, from Rookie to Shark, with your partner across from you. Plays on keyboard, mouse or touch.">
-<meta property="og:url" content="https://anthonyjctsg.online/spades/spades.html">
-<meta property="og:image" content="https://anthonyjctsg.online/spades_thumbnail.jpg">
-<meta name="twitter:card" content="summary_large_image">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Spades", "url": "https://anthonyjctsg.online/spades/spades.html", "image": "https://anthonyjctsg.online/spades_thumbnail.jpg", "description": "Partnership Spades in 3D at a seaside villa at sunset. Pick your player, walk the terrace and sit down at one of four tables, from Rookie to Shark, with your partner across from you. Plays on keyboard, mouse or touch.", "genre": ["Card game", "Spades", "3D"], "author": {"@type": "Person", "@id": "https://anthonyjctsg.com/#person", "name": "Anthony C Johnson", "url": "https://anthonyjctsg.com/"}, "gamePlatform": "Web Browser", "applicationCategory": "Game", "operatingSystem": "Any", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isPartOf": {"@type": "WebSite", "@id": "https://anthonyjctsg.online/#website", "name": "AnthonyJCTSG Games", "url": "https://anthonyjctsg.online/"}}</script>
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <canvas id="view" aria-label="The villa terrace"></canvas>
@@ -62,6 +52,26 @@
       <div class="opt"><span class="opt-l" data-t="gameTo"></span><div class="seg" id="optTarget"><button type="button" data-v="500">500</button><button type="button" data-v="300">300</button></div></div>
       <div class="opt"><span class="opt-l" data-t="blindNil"></span><div class="seg" id="optBlind"><button type="button" data-v="1" data-t="on"></button><button type="button" data-v="0" data-t="off"></button></div></div>
       <div class="opt"><span class="opt-l"><span data-t="chaos"></span><small data-t="chaosHelp"></small></span><div class="seg" id="optChaos"><button type="button" data-v="0" data-t="off"></button><button type="button" data-v="1" data-t="on"></button></div></div>
+    </div>
+    <!-- Play with friends, peer to peer: no game server (src/online.js). -->
+    <div class="friends" id="friends" hidden>
+      <div class="fr-title">Play with friends</div>
+      <div class="fr-row" id="frOut">
+        <input id="frName" maxlength="16" placeholder="Your name" autocomplete="off" spellcheck="false">
+        <button type="button" id="frCreate" class="ghost">Create room</button>
+        <input id="frCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false">
+        <button type="button" id="frJoin" class="ghost">Join</button>
+      </div>
+      <div class="fr-row" id="frIn" hidden><span id="frInfo"></span><button type="button" id="frCopy" class="ghost">Copy link</button><button type="button" id="frLeave" class="ghost">Leave room</button></div>
+      <div class="fr-msg" id="frMsg"></div>
+      <!-- The by-hand way in, for when a room code will not connect: an invite text and its reply. -->
+      <button type="button" class="fr-link" id="frAltBtn"></button>
+      <div class="fr-alt" id="frAlt" hidden>
+        <div class="fr-step" id="frAltOutLabel"></div>
+        <div class="fr-row" id="frAltOutRow"><textarea id="frAltOut" rows="2" readonly spellcheck="false"></textarea><button type="button" id="frAltCopy" class="ghost">Copy</button></div>
+        <div class="fr-step" id="frAltInLabel"></div>
+        <div class="fr-row" id="frAltInRow"><textarea id="frAltIn" rows="2" autocomplete="off" spellcheck="false"></textarea><button type="button" id="frAltGo" class="ghost"></button></div>
+      </div>
     </div>
     <div class="menu-btns">
       <button type="button" id="btnRandom" class="ghost" data-t="random"></button>
@@ -151,9 +161,9 @@
    after these, from src/body.js. */
 (function () {
   var FILES = ["vendor/three.min.js", "src/util.js?v=1", "src/strings.js?v=2", "src/rules.js?v=1", "src/bot.js?v=1",
-    "src/table.js?v=1", "src/net.js?v=1", "src/build.js?v=1", "src/cast.js?v=1", "src/clips.js?v=1", "src/body.js?v=1",
+    "src/table.js?v=1", "src/net.js?v=1", "src/online.js?v=2", "src/build.js?v=1", "src/cast.js?v=1", "src/clips.js?v=1", "src/body.js?v=1",
     "src/ocean.js?v=1", "src/villa.js?v=1", "src/view.js?v=1", "src/cards.js?v=3", "src/seats.js?v=1", "src/crowd.js?v=1", "src/portraits.js?v=1",
-    "src/audio.js?v=1", "src/hud.js?v=2", "src/tutorial.js?v=1", "src/main.js?v=3"];
+    "src/audio.js?v=1", "src/hud.js?v=2", "src/tutorial.js?v=1", "src/main.js?v=5"];
   function fail(src) {
     var el = document.getElementById("err");
     el.hidden = false;
