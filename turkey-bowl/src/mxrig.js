@@ -68,7 +68,11 @@
     turkey_07: { name: "Beanie", h: 0.94 }, turkey_07_w: { name: "Beanie Jr.", h: 0.94 },
     wildcat_01: { name: "Moose", h: 0.96 }, wildcat_02: { name: "Sarge", h: 1.02 }, wildcat_03: { name: "Slim" },
     wildcat_04: { name: "Ace", h: 0.97 }, wildcat_05: { name: "Grizz", h: 1.01 }, wildcat_06: { name: "Doc" },
-    wildcat_07: { name: "Jazz", h: 0.93, style: "f" }
+    wildcat_07: { name: "Jazz", h: 0.93, style: "f" },
+    // 2026-11-15: the 11v11 extras (Meshy, rigged by the user; G:/meshy/turkey-bowl/extras/sheet.jpg).
+    // The two big men anchor the right side of the line; the redhead and the young blond play fullback.
+    turkey_08: { name: "Red" }, turkey_09: { name: "Hoss", h: 0.95 }, turkey_10: { name: "Tater" }, turkey_11: { name: "Biscuit", style: "f" },
+    wildcat_08: { name: "Brick", h: 0.94 }, wildcat_09: { name: "Nina", style: "f" }, wildcat_10: { name: "Rocco" }, wildcat_11: { name: "Boulder" }
   };
   // Who plays where: each team wears its own colours, so its people are fixed to it. A slot
   // lists fallbacks (the first one loaded plays).
@@ -76,9 +80,11 @@
   // texture; wildcat_01 is rigged now, so the turkey_07_w stand-in is gone.
   const CAST = {
     turkeys: { lineman: ["turkey_02"], lineman_2: ["turkey_07"], tight_end: ["turkey_06"], utility_1: ["turkey_04"],
-      utility_2: ["turkey_03"], utility_3: ["turkey_05"], utility_4: ["turkey_01"] },
+      utility_2: ["turkey_03"], utility_3: ["turkey_05"], utility_4: ["turkey_01"],
+      lineman_3: ["turkey_09"], lineman_4: ["turkey_10"], lineman_5: ["turkey_11"], fullback: ["turkey_08"] },
     wildcats: { lineman: ["wildcat_01"], lineman_2: ["wildcat_02"], tight_end: ["wildcat_05"], utility_1: ["wildcat_06"],
-      utility_2: ["wildcat_03"], utility_3: ["wildcat_04"], utility_4: ["wildcat_07"] }
+      utility_2: ["wildcat_03"], utility_3: ["wildcat_04"], utility_4: ["wildcat_07"],
+      lineman_3: ["wildcat_08"], lineman_4: ["wildcat_09"], lineman_5: ["wildcat_11"], fullback: ["wildcat_10"] }
   };
 
   // Clip fixes, applied once to TBChars.clips before any body uses them.

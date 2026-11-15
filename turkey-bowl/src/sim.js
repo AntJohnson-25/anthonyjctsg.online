@@ -99,7 +99,9 @@
   function lbShade(gs, f) {
     if (f.ai !== "LB") return 0;
     const te = D.FORMATION.offense.find(function (o) { return o.slot === "TE"; });
-    return Math.sign(te.dx * (gs.cpuFlip ? -1 : 1) * (gs.humanFlip ? -1 : 1)) * D.LB_SHADE;
+    // 11v11: a unit's `shade` (-1 weak side, 0 middle) spreads the three linebackers.
+    const k = f.shade === undefined ? 1 : f.shade;
+    return Math.sign(te.dx * (gs.cpuFlip ? -1 : 1) * (gs.humanFlip ? -1 : 1)) * D.LB_SHADE * k;
   }
 
   // A flipped human call mirrors the whole formation, so the corners swap
@@ -1542,11 +1544,12 @@
       if (e.side !== "off") return;
       e.hx = e.x;
       e.hy = e.y;
-      const order = ["QB", "RB", "WR1", "TE", "OL", "OL2", "WR2"].indexOf(e.slot);
+      const ORDER = ["QB", "RB", "WR1", "OL4", "OL2", "OL", "OL3", "OL5", "TE", "FB", "WR2"];
+      const order = ORDER.indexOf(e.slot);
       // The QB stands on the downfield side of the ring, calling the play.
-      const a = Math.PI / 2 + ((order === -1 ? i : order) / 7) * Math.PI * 2;
-      e.x = D.FIELD_MID + Math.cos(a) * 1.35;
-      e.y = huddleY + Math.sin(a) * 1.35;
+      const a = Math.PI / 2 + ((order === -1 ? i : order) / ORDER.length) * Math.PI * 2;
+      e.x = D.FIELD_MID + Math.cos(a) * 2.1;
+      e.y = huddleY + Math.sin(a) * 2.1;
       e.px = e.x;
       e.py = e.y;
       e.action = "huddle";

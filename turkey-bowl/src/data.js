@@ -157,9 +157,14 @@
         { role: "rb", slot: "RB", char: "utility_2", dx: -2.5, dy: -5 },
         { role: "wr", slot: "WR1", char: "utility_3", dx: -13, dy: 0 },
         { role: "wr", slot: "WR2", char: "utility_4", dx: 14, dy: 0 },
-        { role: "te", slot: "TE", char: "tight_end", dx: 6, dy: 0 },
+        { role: "te", slot: "TE", char: "tight_end", dx: 7.4, dy: 0 },
         { role: "ol", slot: "OL", char: "lineman", dx: 0, dy: -0.35 },
-        { role: "ol", slot: "OL2", char: "lineman_2", dx: -2.4, dy: -0.35 }
+        { role: "ol", slot: "OL2", char: "lineman_2", dx: -2.4, dy: -0.35 },
+        // 2026-11-15: 11 on 11. Right guard, two tackles and a lead-blocking fullback.
+        { role: "ol", slot: "OL3", char: "lineman_3", dx: 2.4, dy: -0.35 },
+        { role: "ol", slot: "OL4", char: "lineman_4", dx: -4.8, dy: -0.45 },
+        { role: "ol", slot: "OL5", char: "lineman_5", dx: 4.8, dy: -0.45 },
+        { role: "ol", slot: "FB", char: "fullback", dx: 2.5, dy: -5 }
       ]
     },
 
@@ -265,14 +270,18 @@
     // spending a body on the blitz did. `tag` is the call-screen category.
     DEFENSES: [
       {
-        id: "base", name: "BASE 2-3", tag: "BASE",
-        hint: "Two rushers on the count, man corners, a linebacker and two safeties. Sound against anything.",
+        id: "base", name: "BASE 4-2", tag: "BASE",
+        hint: "Two rushers on the count, two ends setting the edge, man corners, two linebackers and three deep. Sound against anything.",
         units: [
-          { ai: "PURSUE", char: "lineman", dx: -2.5, dy: 1.5 },
-          { ai: "PURSUE", char: "lineman_2", dx: 2.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman", dx: -1.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman_2", dx: 1.5, dy: 1.5 },
+          { ai: "CONTAIN", char: "lineman_3", dx: -7, dy: 1.5 },
+          { ai: "CONTAIN", char: "lineman_4", dx: 7, dy: 1.5 },
           { ai: "COVER", char: "utility_3", dx: -11, dy: 7, covers: "WR1" },
           { ai: "COVER", char: "utility_4", dx: 11, dy: 7, covers: "WR2" },
-          { ai: "LB", char: "tight_end", dx: 0, dy: 7.5 },
+          { ai: "LB", char: "tight_end", dx: 0, dy: 6.5 },
+          { ai: "LB", char: "fullback", dx: 0, dy: 6.5, shade: -1 },
+          { ai: "CONTAIN", char: "lineman_5", dx: 0, dy: 13 },
           { ai: "CONTAIN", char: "utility_2", dx: -8, dy: 17 },
           { ai: "CONTAIN", char: "utility_1", dx: 8, dy: 17 }
         ]
@@ -282,38 +291,50 @@
         hint: "The rush comes early and everyone creeps up. Get home before he finds someone.",
         rushCount: 0.8,
         units: [
-          { ai: "PURSUE", char: "lineman", dx: -3, dy: 1.5 },
-          { ai: "PURSUE", char: "lineman_2", dx: 3, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman", dx: -1.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman_2", dx: 1.5, dy: 1.5 },
+          { ai: "CONTAIN", char: "lineman_3", dx: -7, dy: 1.5 },
+          { ai: "CONTAIN", char: "lineman_4", dx: 7, dy: 1.5 },
           { ai: "COVER", char: "utility_3", dx: -11, dy: 6, covers: "WR1" },
           { ai: "COVER", char: "utility_4", dx: 11, dy: 6, covers: "WR2" },
-          { ai: "LB", char: "tight_end", dx: 0, dy: 5.5 },
+          { ai: "LB", char: "tight_end", dx: 0, dy: 5 },
+          { ai: "LB", char: "fullback", dx: 0, dy: 5, shade: -1 },
+          { ai: "CONTAIN", char: "lineman_5", dx: 0, dy: 11 },
           { ai: "CONTAIN", char: "utility_2", dx: -7, dy: 13 },
           { ai: "CONTAIN", char: "utility_1", dx: 7, dy: 13 }
         ]
       },
       {
         id: "deep", name: "COVER 3", tag: "COVERAGE",
-        hint: "One rusher on a long count, three deep. Nothing gets behind you; the run is open.",
+        hint: "Two rushers on a long count, four deep. Nothing gets behind you; the run is open.",
         rushCount: 2.8,
         units: [
-          { ai: "PURSUE", char: "lineman", dx: 0, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman", dx: -1.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman_2", dx: 1.5, dy: 1.5 },
           { ai: "COVER", char: "utility_3", dx: -11, dy: 8, covers: "WR1" },
           { ai: "COVER", char: "utility_4", dx: 11, dy: 8, covers: "WR2" },
-          { ai: "LB", char: "tight_end", dx: 0, dy: 10 },
-          { ai: "CONTAIN", char: "lineman_2", dx: -9, dy: 18 },
+          { ai: "LB", char: "tight_end", dx: 0, dy: 9 },
+          { ai: "LB", char: "fullback", dx: 0, dy: 9, shade: -1 },
+          { ai: "LB", char: "lineman_5", dx: 0, dy: 6, shade: 0 },
+          { ai: "CONTAIN", char: "lineman_3", dx: -12, dy: 16 },
+          { ai: "CONTAIN", char: "lineman_4", dx: 12, dy: 16 },
           { ai: "CONTAIN", char: "utility_2", dx: 0, dy: 20 },
-          { ai: "CONTAIN", char: "utility_1", dx: 9, dy: 18 }
+          { ai: "CONTAIN", char: "utility_1", dx: -6, dy: 19 }
         ]
       },
       {
         id: "press", name: "PRESS MAN", tag: "BASE",
         hint: "Corners in the receivers' faces at the line. Jams quick throws; a step lost is a big play.",
         units: [
-          { ai: "PURSUE", char: "lineman", dx: -2.5, dy: 1.5 },
-          { ai: "PURSUE", char: "lineman_2", dx: 2.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman", dx: -1.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman_2", dx: 1.5, dy: 1.5 },
+          { ai: "CONTAIN", char: "lineman_3", dx: -7, dy: 1.5 },
+          { ai: "CONTAIN", char: "lineman_4", dx: 7, dy: 1.5 },
           { ai: "COVER", char: "utility_3", dx: -13, dy: 2.2, covers: "WR1" },
           { ai: "COVER", char: "utility_4", dx: 14, dy: 2.2, covers: "WR2" },
           { ai: "LB", char: "tight_end", dx: 0, dy: 6 },
+          { ai: "LB", char: "fullback", dx: 0, dy: 6, shade: -1 },
+          { ai: "CONTAIN", char: "lineman_5", dx: 0, dy: 13 },
           { ai: "CONTAIN", char: "utility_2", dx: -9, dy: 15 },
           { ai: "CONTAIN", char: "utility_1", dx: 9, dy: 15 }
         ]
@@ -323,27 +344,35 @@
         hint: "The rush goes almost at the snap and the safeties come down. All or nothing.",
         rushCount: 0.4,
         units: [
-          { ai: "PURSUE", char: "lineman", dx: -2.5, dy: 1.3 },
-          { ai: "PURSUE", char: "lineman_2", dx: 2.5, dy: 1.3 },
+          { ai: "PURSUE", char: "lineman", dx: -1.5, dy: 1.3 },
+          { ai: "PURSUE", char: "lineman_2", dx: 1.5, dy: 1.3 },
+          { ai: "CONTAIN", char: "lineman_3", dx: -7, dy: 1.3 },
+          { ai: "CONTAIN", char: "lineman_4", dx: 7, dy: 1.3 },
+          { ai: "PURSUE", char: "lineman_5", dx: 0, dy: 3 },
           { ai: "COVER", char: "utility_3", dx: -12, dy: 4, covers: "WR1" },
           { ai: "COVER", char: "utility_4", dx: 12, dy: 4, covers: "WR2" },
           { ai: "LB", char: "tight_end", dx: 0, dy: 4 },
+          { ai: "LB", char: "fullback", dx: 0, dy: 4, shade: -1 },
           { ai: "CONTAIN", char: "utility_2", dx: -6, dy: 11 },
           { ai: "CONTAIN", char: "utility_1", dx: 6, dy: 11 }
         ]
       },
       {
         id: "prevent", name: "PREVENT", tag: "COVERAGE",
-        hint: "One slow rusher, everyone else deep. Give up the short stuff, never the touchdown.",
+        hint: "Two slow rushers, everyone else deep. Give up the short stuff, never the touchdown.",
         rushCount: 3.6,
         units: [
-          { ai: "PURSUE", char: "lineman", dx: 0, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman", dx: -1.5, dy: 1.5 },
+          { ai: "PURSUE", char: "lineman_2", dx: 1.5, dy: 1.5 },
           { ai: "COVER", char: "utility_3", dx: -12, dy: 11, covers: "WR1" },
           { ai: "COVER", char: "utility_4", dx: 12, dy: 11, covers: "WR2" },
-          { ai: "LB", char: "tight_end", dx: 0, dy: 13 },
-          { ai: "CONTAIN", char: "lineman_2", dx: -11, dy: 22 },
+          { ai: "LB", char: "tight_end", dx: 0, dy: 12 },
+          { ai: "LB", char: "fullback", dx: 0, dy: 12, shade: -1 },
+          { ai: "LB", char: "lineman_5", dx: 0, dy: 8, shade: 0 },
+          { ai: "CONTAIN", char: "lineman_3", dx: -14, dy: 20 },
+          { ai: "CONTAIN", char: "lineman_4", dx: 14, dy: 20 },
           { ai: "CONTAIN", char: "utility_2", dx: 0, dy: 25 },
-          { ai: "CONTAIN", char: "utility_1", dx: 11, dy: 22 }
+          { ai: "CONTAIN", char: "utility_1", dx: -7, dy: 23 }
         ]
       }
     ],
@@ -387,7 +416,7 @@
         accent: "#e8d9b5",
         pants: "#8a8e95",
         stripe: "#e9e6de",
-        numbers: { QB: 7, RB: 22, WR1: 84, WR2: 11, TE: 88, OL: 66, OL2: 64 },
+        numbers: { QB: 7, RB: 22, WR1: 84, WR2: 11, TE: 88, OL: 66, OL2: 64, OL3: 62, OL4: 74, OL5: 77, FB: 44 },
         mascot: "assets/mascot-paw.png"
       },
       {
@@ -398,7 +427,7 @@
         accent: "#5b3417",
         pants: "#4d3526",
         stripe: "#d9782c",
-        numbers: { QB: 9, RB: 28, WR1: 80, WR2: 15, TE: 87, OL: 71, OL2: 75 },
+        numbers: { QB: 9, RB: 28, WR1: 80, WR2: 15, TE: 87, OL: 71, OL2: 75, OL3: 63, OL4: 72, OL5: 79, FB: 32 },
         mascot: "assets/mascot-turkey.png"
       }
     ],
@@ -407,7 +436,8 @@
     // on both sides of the ball — it is his sweatshirt, not a position.
     CHAR_SLOT: {
       utility_1: "QB", utility_2: "RB", utility_3: "WR1", utility_4: "WR2",
-      tight_end: "TE", lineman: "OL", lineman_2: "OL2"
+      tight_end: "TE", lineman: "OL", lineman_2: "OL2",
+      lineman_3: "OL3", lineman_4: "OL4", lineman_5: "OL5", fullback: "FB"
     },
 
     // The fourteen people, read off the 2D art (Source/reference/). Builds are
@@ -423,6 +453,10 @@
         utility_1: { label: "Curls", skin: "#b27b55", hair: "big_curly", hairColor: "#21160f", beard: "full", beardColor: "#21160f", brows: "#21160f", eyes: "#3a2616", height: 1.0, width: 1.02, belly: 0, face: "oval" },
         utility_2: { label: "Smoke", skin: "#7b4f35", hair: "buzz", hairColor: "#18120e", brows: "#18120e", eyes: "#2a1a10", height: 0.98, width: 1.0, belly: 0, face: "long" },
         utility_3: { label: "Sami", skin: "#b88562", hair: "short", hairColor: "#1c1612", beard: "full", beardColor: "#1c1612", beardShort: true, brows: "#1c1612", eyes: "#2e1e12", height: 1.0, width: 0.97, belly: 0, face: "oval" },
+        lineman_3: { label: "Hoss", skin: "#c48d68", hair: "buzz", hairColor: "#2a1c12", brows: "#2a1c12", eyes: "#3a2616", height: 1.0, width: 1.28, belly: 0.5, face: "broad" },
+        lineman_4: { label: "Tater", skin: "#8a5a3c", hair: "short", hairColor: "#130e0b", brows: "#130e0b", eyes: "#24160d", height: 1.02, width: 1.3, belly: 0.4, face: "broad" },
+        lineman_5: { label: "Biscuit", skin: "#efc3a0", hair: "messy", hairColor: "#6a5645", brows: "#6a5645", eyes: "#4a6272", height: 1.01, width: 1.32, belly: 0.6, face: "round" },
+        fullback: { label: "Bruno", skin: "#5a3827", hair: "flattop", hairColor: "#17110e", brows: "#17110e", eyes: "#26170f", height: 0.98, width: 1.12, belly: 0, face: "oval" },
         utility_4: { label: "Stretch", skin: "#efc8a6", hair: "receding", hairColor: "#6a5645", brows: "#6a5645", eyes: "#4a5a66", height: 1.02, width: 0.88, belly: 0, face: "long", ears: 1.4 }
       },
       wildcats: {
@@ -432,6 +466,10 @@
         utility_1: { label: "Slim", skin: "#8a5a3c", hair: "buzz", hairColor: "#130e0b", brows: "#130e0b", eyes: "#24160d", height: 1.04, width: 0.94, belly: 0, face: "long" },
         utility_2: { label: "Beau", skin: "#e0ad89", hair: "swept", hairColor: "#5b3b24", beard: "full", beardColor: "#5b3b24", brows: "#4c311e", eyes: "#3e5a3a", height: 1.0, width: 1.06, belly: 0, face: "broad" },
         utility_3: { label: "Fro", skin: "#3a2419", hair: "afro", hairColor: "#0d0907", brows: "#0d0907", eyes: "#1c120b", height: 1.01, width: 0.98, belly: 0, face: "oval" },
+        lineman_3: { label: "Brick", skin: "#dfab86", hair: "buzz", hairColor: "#2b1c13", brows: "#2b1c13", eyes: "#3a2a1c", height: 1.0, width: 1.28, belly: 0.5, face: "broad" },
+        lineman_4: { label: "Ox", skin: "#3e271b", hair: "short", hairColor: "#0e0a08", brows: "#0e0a08", eyes: "#1e130c", height: 1.03, width: 1.3, belly: 0.4, face: "broad" },
+        lineman_5: { label: "Boulder", skin: "#efc3a0", hair: "swept", hairColor: "#c6a063", brows: "#b08c55", eyes: "#4a6272", height: 1.01, width: 1.32, belly: 0.6, face: "round" },
+        fullback: { label: "Rocco", skin: "#b88562", hair: "short_curly", hairColor: "#1c1612", brows: "#1c1612", eyes: "#2e1e12", height: 0.98, width: 1.12, belly: 0, face: "oval" },
         utility_4: { label: "Sunny", skin: "#f3cfb0", hair: "shaggy", hairColor: "#dcb86c", brows: "#b8944e", eyes: "#4f7fa6", height: 0.94, width: 0.86, belly: 0, face: "young" }
       }
     },

@@ -32,7 +32,7 @@
   }
   function damp(k, dt) { return 1 - Math.exp(-k * dt); }
 
-  const CHARS = ["lineman", "lineman_2", "tight_end", "utility_1", "utility_2", "utility_3", "utility_4"];
+  const CHARS = Object.keys(D.CHAR_SLOT);   // 11 per team since 2026-11-15
   const STANCE = {
     stance_qb: "qb", stance_rb: "rb", stance_wr: "wr", stance_te: "te", stance_ol: "ol",
     stance_rush: "rush", stance_cover: "cover", stance_lb: "lb", stance_contain: "contain"
@@ -303,8 +303,8 @@
 
   const LINEUP_X = 4.3;
   const PHOTO = {
-    wildcats: { back: ["lineman_2", "utility_1", "tight_end", "lineman"], front: ["utility_4", "utility_3", "utility_2"], ball: "utility_3" },
-    turkeys: { back: ["lineman", "lineman_2", "tight_end", "utility_3"], front: ["utility_1", "utility_2", "utility_4"], ball: "utility_2" }
+    wildcats: { back: ["lineman_4", "lineman_2", "utility_1", "tight_end", "lineman", "lineman_5"], front: ["lineman_3", "utility_4", "utility_3", "utility_2", "fullback"], ball: "utility_3" },
+    turkeys: { back: ["lineman_4", "lineman", "lineman_2", "tight_end", "utility_3", "lineman_5"], front: ["fullback", "utility_1", "utility_2", "utility_4", "lineman_3"], ball: "utility_2" }
   };
 
   View.prototype.showLineup = function (on) {
@@ -317,12 +317,12 @@
       const cx = ti === 0 ? -LINEUP_X : LINEUP_X;
       p.back.forEach(function (c, i) {
         const st = self.rigs[ti][c];
-        st.pos.set(cx + (i - 1.5) * 1.05, 0, -1.1);
+        st.pos.set(cx + (i - (p.back.length - 1) / 2) * 0.8, 0, -1.1);
         st.lineupPose = "idle";
       });
       p.front.forEach(function (c, i) {
         const st = self.rigs[ti][c];
-        st.pos.set(cx + (i - 1) * 1.15, 0, 0.1);
+        st.pos.set(cx + (i - (p.front.length - 1) / 2) * 0.85, 0, 0.1);
         st.lineupPose = c === p.ball ? "kneelBall" : "kneel";
       });
     });

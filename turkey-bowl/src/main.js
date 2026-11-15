@@ -65,27 +65,32 @@
     if (e.key === " " || e.code === "Space") return " ";
     return e.key.length === 1 ? e.key.toLowerCase() : e.key;
   }
-  window.addEventListener("keydown", function (e) {
-    const k = keyName(e);
+  // The keyboard and the gamepad both come through here (the pad sends the same
+  // key names), so a pad press gets exactly the keyboard's gating and rules.
+  let padActive = false;   // the last thing the player touched was a gamepad (hints say A/B/X/Y)
+  function handleKeyDown(k, e) {
+    const stop = function () { if (e) e.preventDefault(); };
     // The replay eats its keys too.
-    if (mode === "game" && replay.on && replayKey(k)) { e.preventDefault(); return; }
+    if (mode === "game" && replay.on && replayKey(k)) { stop(); return; }
     // The call screen eats its keys whole, so the Enter or 1 that makes a call
     // can never also snap the ball or throw it.
-    if (mode === "game" && !paused && callKey(k)) { e.preventDefault(); return; }
+    if (mode === "game" && !paused && callKey(k)) { stop(); return; }
     if (!keys[k] && (k === "1" || k === "2" || k === "3")) throwDown(parseInt(k, 10));
     if (!keys[k]) pressed[k] = true;
     keys[k] = true;
-    if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].indexOf(k) !== -1) e.preventDefault();
+    if ([" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].indexOf(k) !== -1) stop();
     if (k === "p" || k === "Escape") { if (mode === "game") setPaused(!paused); }
     if (k === "c" && mode === "game") cycleCamera();
     if (k === "m") toggleSound();
     if (k === "r" && mode === "game" && !paused && canReplay()) startReplay(false);
-  });
-  window.addEventListener("keyup", function (e) {
-    const k = keyName(e);
+  }
+  function handleKeyUp(k) {
     keys[k] = false;
     if (k === "1" || k === "2" || k === "3") throwUp(parseInt(k, 10));
-  });
+  }
+  window.addEventListener("keydown", function (e) { padActive = false; handleKeyDown(keyName(e), e); });
+  window.addEventListener("keyup", function (e) { handleKeyUp(keyName(e)); });
+  window.addEventListener("pointerdown", function () { padActive = false; });
 
   // Passing, Madden-style: TAP a target for a touch pass, HOLD it (D.THROW_HOLD)
   // for a bullet. The bullet goes the moment the hold is long enough; a touch
@@ -114,7 +119,8 @@
     tap["throw" + n] = true;
     throwKind = kind;
   }
-  window.addEventListener("blur", function () { for (const k in keys) keys[k] = false; stick.x = stick.y = 0; resetKnob(); throwHold = null; });
+  const padMove = { x: 0, y: 0 };   // gamepad stick / D-pad, same space as `stick` (see the gamepad section)
+  window.addEventListener("blur", function () { for (const k in keys) keys[k] = false; stick.x = stick.y = 0; padMove.x = padMove.y = 0; resetKnob(); throwHold = null; });
 
   // The joystick: pointer events, so it also works with a mouse.
   const joy = $("joy");
@@ -143,8 +149,8 @@
 
   function readInput() {
     const held = function (a, b) { return (keys[a] || keys[b]) ? 1 : 0; };
-    const sx = Math.max(-1, Math.min(1, held("ArrowRight", "d") - held("ArrowLeft", "a") + stick.x));
-    const sy = Math.max(-1, Math.min(1, held("ArrowUp", "w") - held("ArrowDown", "s") + stick.y));
+    const sx = Math.max(-1, Math.min(1, held("ArrowRight", "d") - held("ArrowLeft", "a") + stick.x + padMove.x));
+    const sy = Math.max(-1, Math.min(1, held("ArrowUp", "w") - held("ArrowDown", "s") + stick.y + padMove.y));
     // Camera-relative: up on the stick is up the screen, whichever camera.
     const b = view.inputBasis();
     const play = pendingPlay;
@@ -254,7 +260,10 @@
     let zones = "", lines = "", marks = "";
     def.units.forEach(function (u) {
       const x = sx(u.dx), y = sy(u.dy);
-      if (u.ai === "CONTAIN") {
+      if (u.ai === "CONTAIN" && u.dy < 4) {
+        // 11v11 edge ends: hold the outside, drawn as a short hook toward the sideline.
+        lines += '<line x1="' + x + '" y1="' + y + '" x2="' + sx(u.dx + Math.sign(u.dx) * 4) + '" y2="' + sy(u.dy - 2) + '" stroke="#7cc0ff" stroke-width="2"/>';
+      } else if (u.ai === "CONTAIN") {
         zones += '<ellipse cx="' + x + '" cy="' + sy(Math.max(u.dy, 15) + 3) + '" rx="17" ry="6.5" fill="#3d8fe0" fill-opacity="0.38" stroke="#7cc0ff" stroke-width="1.2"/>';
         lines += '<line x1="' + x + '" y1="' + y + '" x2="' + x + '" y2="' + sy(Math.max(u.dy, 15) + 3) + '" stroke="#7cc0ff" stroke-width="1.6"/>';
       } else if (u.ai === "LB") {
@@ -396,7 +405,7 @@
     const side = call.side;
     const items = pageItems();
     const cur = currentCall(side);
-    const key = [side, call.tab, call.page, call.focus, cur, (gs.suggest || []).join("."), humanTeam, gs.humanFlip, canReplay()].join("|");
+    const key = [side, call.tab, call.page, call.focus, cur, (gs.suggest || []).join("."), humanTeam, gs.humanFlip, canReplay(), padActive].join("|");
     if (key === call.drawn) return;
     call.drawn = key;
     // FLIP mirrors the play art; REPLAY shows the last play again.
@@ -439,7 +448,8 @@
     cs.prev.style.visibility = call.page > 0 ? "visible" : "hidden";
     cs.next.style.visibility = call.page < pages - 1 ? "visible" : "hidden";
     cs.dots.innerHTML = pages > 1 ? new Array(pages).fill(0).map(function (_, i) { return "<i" + (i === call.page ? ' class="on"' : "") + "></i>"; }).join("") : "";
-    cs.keys.textContent = isTouch ? "Tap a play to call it" + (call.audible ? " · tap outside to keep the call" : "")
+    cs.keys.textContent = padActive ? "D-PAD choose  ·  LB RB category  ·  " + PADN.a + " call" + (side === "off" ? "  ·  " + PADN.x + " flip" : "") + (canReplay() ? "  ·  " + PADN.y + " replay" : "") + (call.audible ? "  ·  " + PADN.b + " keep the call" : "")
+      : isTouch ? "Tap a play to call it" + (call.audible ? " · tap outside to keep the call" : "")
       : "← → choose  ·  ↑ ↓ category  ·  1–3 or ENTER call" + (side === "off" ? "  ·  X flip" : "") + (canReplay() ? "  ·  R replay" : "") + (call.audible ? "  ·  B keep the call" : "");
   }
 
@@ -468,7 +478,7 @@
       const side = gs.offense === humanTeam ? "off" : "def";
       cs.chipSide.textContent = side === "off" ? "PLAY" : "DEFENSE";
       cs.chipName.textContent = book(side)[currentCall(side)].name;
-      cs.chipKey.textContent = canAudible() ? (isTouch ? "TAP · AUDIBLE" : "B · AUDIBLE") : "";
+      cs.chipKey.textContent = canAudible() ? (padActive ? PADN.b + " · AUDIBLE" : isTouch ? "TAP · AUDIBLE" : "B · AUDIBLE") : "";
       cs.chip.classList.toggle("def", side === "def");
     }
   }
@@ -522,9 +532,21 @@
     let hint;
     const mine = gs.offense === humanTeam;
     const rp = !isTouch && canReplay() ? "  ·  R replay" : "";
+    const P = PADN;
     if (replay.on) hint = "";
     else if (humanTeam < 0) hint = "Demo — CPU vs CPU";
     else if (call.open) hint = "";
+    else if (padActive) {
+      const rpp = canReplay() ? "  ·  " + P.y + " replay" : "";
+      if (gs.phase === PH.PRE_SNAP && mine) hint = P.a + " snap  ·  " + P.x + " flip  ·  " + P.b + " audible  ·  BACK camera" + rpp;
+      else if (gs.phase === PH.PRE_SNAP || gs.phase === PH.HUDDLE || gs.phase === PH.HUDDLE_BREAK) hint = mine ? "" : P.b + " audible  ·  you'll steer the defender closest to the ball" + rpp;
+      else if (gs.phase === PH.LIVE && mine && gs.loose) hint = "FUMBLE! Run to the ball";
+      else if (gs.phase === PH.LIVE && mine && gs.ball.inFlight) hint = "Stick steers the receiver  ·  " + P.x + " high-point";
+      else if (gs.phase === PH.LIVE && mine && Sim.canHumanThrow(gs)) hint = "TAP " + P.a + " / " + P.b + " / " + P.x + " touch pass  ·  HOLD bullet  ·  " + P.y + " pitch  ·  RB juke  ·  LB spin";
+      else if (gs.phase === PH.LIVE && mine) hint = "Stick runs  ·  " + P.x + " juke  ·  " + P.b + " spin  ·  " + P.a + " hurdle (twice: corkscrew)";
+      else if (gs.phase === PH.LIVE) hint = "Steer the cyan-ring defender  ·  " + P.a + " dive (near a pass: play the ball)";
+      else hint = rpp ? rpp.slice(5) : "";
+    }
     else if (gs.phase === PH.PRE_SNAP && mine) hint = isTouch ? "" : "SPACE snap  ·  X flip  ·  B audible  ·  C camera" + rp;
     else if (gs.phase === PH.PRE_SNAP || gs.phase === PH.HUDDLE || gs.phase === PH.HUDDLE_BREAK) hint = mine ? "" : (isTouch ? "" : "B audible  ·  you'll steer the defender closest to the ball" + rp);
     else if (gs.phase === PH.LIVE && mine && gs.loose) hint = "FUMBLE! Run to the ball";
@@ -560,8 +582,11 @@
   function syncBadges() {
     const show = humanTeam >= 0 && gs.offense === humanTeam && !paused && !call.open && !replay.on &&
       (gs.phase === PH.PRE_SNAP || Sim.canHumanThrow(gs));
-    ["WR1", "WR2", "TE"].forEach(function (slot) {
+    ["WR1", "WR2", "TE"].forEach(function (slot, bi) {
       const b = badgeEls[slot];
+      // The badge names the button that throws to him: A / B / X on a pad.
+      const want = padActive ? [PADN.a, PADN.b, PADN.x][bi] : String(bi + 1);
+      if (b.textContent !== want) b.textContent = want;
       const e = show ? gs.entities.find(function (x) { return x.slot === slot; }) : null;
       if (!e || e === gs.carrier) { b.hidden = true; return; }
       const st = view.rigs[e.team][e.char];
@@ -897,7 +922,9 @@
       l.el.style.left = p.x + "px";
       l.el.style.top = (kneel ? p.y + 4 : p.y - 30) + "px";
       const onScreen = p.x > 20 && p.x < window.innerWidth - 20 && !p.behind;
-      l.el.style.opacity = onScreen ? "1" : "0";
+      // 11 a side (2026-11-15): 22 tags overlap, so only the team being picked (hover/focus) shows names.
+      const focus = view.lineup ? view.lineup.focus : -1;
+      l.el.style.opacity = onScreen && focus === l.st.team ? "1" : "0";
     });
   }
   document.querySelectorAll(".team-btn").forEach(function (b) {
@@ -1185,12 +1212,176 @@
     if (avg > 1 / 38 && view.pixelRatio > 0.7) view.setPixelRatio(Math.max(0.7, view.pixelRatio - 0.2));
   }
 
+  // ---- gamepad ----------------------------------------------------------------------------
+  // Standard mapping (Xbox, PlayStation, Switch Pro, 8BitDo...). The pad does nothing the
+  // keyboard can't: sticks feed padMove, and every button sends the key the keyboard would, picked
+  // by what is happening (see padKey), so all the rules and gating stay in one place.
+  //   Stick / D-pad  run (call screen, replay and menus: move the cursor)
+  //   A  snap / hurdle / call / dive      B  audible / spin / throw 2       X  flip / juke / throw 3
+  //   Y  replay / pitch                   A,B,X  while the QB can throw: touch pass 1/2/3, hold for a bullet
+  //   LB spin  RB juke  LT/RT hurdle (or dive)     LB/RB  call screen: category
+  //   START pause   BACK camera   R3 replay   L3 sound
+  let PADN = { a: "A", b: "B", x: "X", y: "Y" };   // button names for the hints
+  const PAD_BTN = { a: 0, b: 1, x: 2, y: 3, lb: 4, rb: 5, lt: 6, rt: 7, back: 8, start: 9, l3: 10, r3: 11 };
+  const padHeld = Object.create(null);   // button name -> the key it sent down
+  const padPrev = Object.create(null);
+  const nav = { dir: "", next: 0 };
+  let padClock = 0, padWas = false, padId = "";
+  let menuCtx = "", menuIdx = -1, menuT = 0;
+
+  function getPad() {
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (let i = 0; i < list.length; i++) if (list[i] && list[i].connected) return list[i];
+    return null;
+  }
+  function padContext() {
+    if (!$("splash").hidden) return "splash";
+    if (mode === "select") return "select";
+    if (mode === "mvp") return "final";
+    if (mode === "game") return paused ? "pause" : replay.on ? "replay" : call.open ? "call" : "play";
+    return "none";
+  }
+  function padKey(n, ctx) {
+    if (n === "start") return "Escape";
+    if (n === "back") return "c";
+    if (n === "r3") return "r";
+    if (n === "l3") return "m";
+    if (ctx === "call") return ({ a: "Enter", b: "b", x: "x", y: "r", lb: "ArrowUp", rb: "ArrowDown" })[n] || null;
+    if (ctx === "replay") return ({ a: " ", b: "b", x: "r", y: "s", lb: "c", rb: "s" })[n] || null;
+    if (gs.phase === PH.LIVE) {
+      if (humanTeam >= 0 && gs.offense === humanTeam) {
+        if (gs.ball.inFlight) return ({ a: "e", x: "e", y: "e", rb: "e" })[n] || null;   // high-point
+        if (!gs.loose && Sim.canHumanThrow(gs)) return ({ a: "1", b: "2", x: "3", y: "4", lb: "q", rb: "e", lt: "h", rt: "h" })[n] || null;
+        return ({ a: "h", b: "q", x: "e", y: "h", lb: "q", rb: "e", lt: "h", rt: "h" })[n] || null;
+      }
+      return "f";   // defense: any face or trigger button dives
+    }
+    return ({ a: " ", b: "b", x: "x", y: "r" })[n] || null;
+  }
+
+  // Menus (splash, team select, pause, postgame) are plain buttons: the pad moves a focus ring
+  // over them and A clicks.
+  function menuList(ctx) {
+    const sel = ctx === "splash" ? "#spPlay" : ctx === "select" ? ".team-btn" : ctx === "pause" ? "#pause .panel button" : ctx === "final" ? "#final .mvp-btns button" : "";
+    if (!sel) return [];
+    return Array.prototype.filter.call(document.querySelectorAll(sel), function (el) { return !el.closest("[hidden]"); });
+  }
+  function clearMenuFocus() {
+    Array.prototype.forEach.call(document.querySelectorAll(".padfocus"), function (el) { el.classList.remove("padfocus"); });
+    const a = document.activeElement;
+    if (a && a !== document.body && a.closest && a.closest("#select,#pause,#final,#splash")) a.blur();
+    menuIdx = -1;
+  }
+  function menuFocus(i) {
+    const list = menuList(menuCtx);
+    if (!list.length) return;
+    menuIdx = (i + list.length) % list.length;
+    list.forEach(function (el, j) { el.classList.toggle("padfocus", j === menuIdx); });
+    try { list[menuIdx].focus({ preventScroll: true }); } catch (_) { /* ignore */ }
+  }
+  function menuMove(d) {
+    const list = menuList(menuCtx);
+    if (!list.length) return;
+    if (menuIdx < 0) menuFocus(d > 0 ? 0 : list.length - 1); else menuFocus(menuIdx + d);
+  }
+  function menuClick() {
+    const list = menuList(menuCtx);
+    if (!list.length) return;
+    // Choosing a team or "play again" needs a deliberate look first, and a brief pause after the
+    // screen appears so the A that dismissed the last one can't pick for you.
+    if (menuIdx < 0 && (menuCtx === "select" || menuCtx === "final")) { menuFocus(0); return; }
+    if (padClock - menuT < 0.35) return;
+    if (menuIdx < 0) menuFocus(0);
+    list[menuIdx].click();
+  }
+  function tapKey(k) { handleKeyDown(k); handleKeyUp(k); }
+  function navFire(ctx, dir) {
+    padActive = true;
+    if (ctx === "call" || ctx === "replay") tapKey({ left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown" }[dir]);
+    else menuMove(dir === "left" || dir === "up" ? -1 : 1);
+  }
+  function padPress(n, ctx) {
+    padActive = true;
+    if (ctx === "splash" || ctx === "select" || ctx === "final" || ctx === "pause") {
+      if (n === "a" || (n === "start" && ctx === "splash")) menuClick();
+      else if ((n === "start" || n === "b") && ctx === "pause") tapKey("Escape");   // resume
+      return;
+    }
+    if (ctx === "none" || !gs) return;
+    const k = padKey(n, ctx);
+    if (!k) return;
+    padHeld[n] = k;
+    handleKeyDown(k);
+  }
+  function padReleaseAll() {
+    Object.keys(padHeld).forEach(function (n) { const k = padHeld[n]; delete padHeld[n]; handleKeyUp(k); });
+    padMove.x = padMove.y = 0;
+  }
+
+  function padPoll(dt) {
+    padClock += dt;
+    const g = getPad();
+    if (!g) {
+      if (padWas) {
+        padWas = false;
+        padReleaseAll();
+        // A controller that drops out mid-play stops the clock instead of leaving the QB running.
+        if (mode === "game" && !paused && !replay.on && gs && gs.phase === PH.LIVE) setPaused(true);
+      }
+      return;
+    }
+    if (!padWas) {
+      padWas = true;
+      padActive = true;
+    }
+    if (g.id !== padId) {
+      padId = g.id;
+      // Same buttons, different names: PlayStation draws shapes, Nintendo swaps A/B and X/Y.
+      PADN = /054c|dualshock|dualsense|playstation/i.test(padId) ? { a: "✕", b: "○", x: "□", y: "△" }
+        : /057e|nintendo|switch/i.test(padId) ? { a: "B", b: "A", x: "Y", y: "X" } : { a: "A", b: "B", x: "X", y: "Y" };
+    }
+    const ctx = padContext();
+    if (ctx !== menuCtx) { clearMenuFocus(); menuCtx = ctx; menuT = padClock; }
+    const bt = function (i) { const b = g.buttons[i]; return !!(b && (b.pressed || b.value > 0.5)); };
+
+    // Left stick, radial dead zone, then the D-pad on top.
+    let lx = g.axes[0] || 0, ly = g.axes[1] || 0;
+    const m = Math.hypot(lx, ly);
+    if (m < 0.2) { lx = ly = 0; } else { const s = Math.min(1, (m - 0.2) / 0.55) / m; lx *= s; ly *= s; }
+    const dx = (bt(15) ? 1 : 0) - (bt(14) ? 1 : 0);
+    const dy = (bt(12) ? 1 : 0) - (bt(13) ? 1 : 0);   // up = +
+
+    if (ctx === "play") {
+      padMove.x = Math.max(-1, Math.min(1, lx + dx));
+      padMove.y = Math.max(-1, Math.min(1, -ly + dy));
+      if (Math.hypot(padMove.x, padMove.y) > 0.4) padActive = true;
+    } else { padMove.x = padMove.y = 0; }
+
+    // Cursor movement in the menus: first push fires, then it repeats while held.
+    let dir = "";
+    if (dx || dy) dir = dx ? (dx > 0 ? "right" : "left") : (dy > 0 ? "up" : "down");
+    else if (Math.hypot(lx, ly) > 0.6) dir = Math.abs(lx) > Math.abs(ly) ? (lx > 0 ? "right" : "left") : (ly > 0 ? "down" : "up");
+    if (ctx === "play" || ctx === "none") nav.dir = dir;
+    else if (dir !== nav.dir) { nav.dir = dir; nav.next = padClock + 0.4; if (dir) navFire(ctx, dir); }
+    else if (dir && padClock >= nav.next) { nav.next = padClock + 0.14; navFire(ctx, dir); }
+
+    Object.keys(PAD_BTN).forEach(function (n) {
+      const down = bt(PAD_BTN[n]);
+      const was = !!padPrev[n];
+      padPrev[n] = down;
+      if (down && !was) padPress(n, ctx);
+      else if (!down && was) { const k = padHeld[n]; if (k !== undefined) { delete padHeld[n]; handleKeyUp(k); } }
+    });
+  }
+  window.addEventListener("gamepadconnected", function () { padActive = true; });
+
   // ---- the loop ----
   function frame(now) {
     requestAnimationFrame(frame);
     let dt = (now - last) / 1000;
     last = now;
     dt = Math.min(Math.max(dt, 0), D.MAX_DT);
+    padPoll(dt);
     if (mode === "select") {
       view.renderLineup(dt);
       syncLabels();
