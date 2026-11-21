@@ -50,8 +50,14 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
   text-shadow: 0 4px 0 #07101f; }
 .ld-title span, h1 span { color: var(--amber); }
 .ld-sub { margin-top: 10px; opacity: 0.85; }
-#results { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; padding: 16px;
+/* Results and the friends board scroll when the panel is taller than the screen (phones, short
+   windows). margin: auto centres the panel without cutting off its top the way align-items would. */
+#results, #friends { position: fixed; inset: 0; display: flex; z-index: 20; overflow-x: hidden; overflow-y: auto;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(10, 16, 32, 0.05), rgba(10, 16, 32, 0.55)); }
+#results > .panel, #friends > .panel { margin: auto; }
+#friends { z-index: 30; background: rgba(6, 10, 22, 0.78); }
 .panel { background: linear-gradient(180deg, rgba(29, 50, 99, 0.95), rgba(19, 33, 63, 0.96)); border: 3px solid #07101f; border-radius: 14px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 2px var(--edge); padding: 20px 24px; max-width: 520px; width: 100%; text-align: center; }
 
@@ -181,21 +187,34 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #r-stats div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding: 2px 0; }
 #r-stats span { opacity: 0.75; letter-spacing: 1px; font-size: 11px; }
 .r-btns { display: flex; gap: 8px; }
-/* online leaderboard on the results panel */
-#r-lb { margin: 0 0 12px; padding: 8px 10px; background: rgba(0, 0, 0, 0.25); border-radius: 10px; text-align: left; }
-.lb-head { display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 2px; opacity: 0.85; margin-bottom: 4px; }
-.lb-head b { color: #47e06a; letter-spacing: 1px; }
-#lb-list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
-#lb-list li { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-#lb-list li i { font-style: normal; width: 22px; opacity: 0.7; }
-#lb-list li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#lb-list li b { font-family: "Courier New", monospace; color: var(--amber); }
-#lb-list li.me span, #lb-list li.me i { color: #47e06a; opacity: 1; font-weight: 700; }
+/* friends board: on the results panel (#r-lb) and the select screen's board (#friends) */
+.lb-box { margin: 0 0 12px; padding: 8px 10px; background: rgba(0, 0, 0, 0.25); border-radius: 10px; text-align: left; }
+.lb-head { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; letter-spacing: 2px; opacity: 0.85; margin-bottom: 4px; }
+.lb-head b { color: #47e06a; letter-spacing: 1px; text-align: right; }
+.lb-list { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.lb-list li { display: flex; gap: 8px; padding: 2px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.lb-list li i { font-style: normal; width: 22px; opacity: 0.7; }
+.lb-list li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-list li b { font-family: "Courier New", monospace; color: var(--amber); }
+.lb-list li.me span, .lb-list li.me i { color: #47e06a; opacity: 1; font-weight: 700; }
 .lb-name { display: flex; gap: 6px; margin-top: 7px; }
-.lb-name input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: #fff; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--edge); border-radius: 7px; padding: 6px 9px; }
+.lb-name input { flex: 1; min-width: 0; font: inherit; font-size: 14px; color: #fff; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--edge); border-radius: 7px; padding: 6px 9px;
+  -webkit-user-select: text; user-select: text; }
 .lb-name button { font: 700 11px/1 inherit; letter-spacing: 1px; color: #fff; background: rgba(255, 255, 255, 0.12); border: 1px solid var(--edge); border-radius: 7px; padding: 0 10px; cursor: pointer; }
-#lb-share { display: block; width: 100%; margin-top: 7px; padding: 9px 10px; font: 700 12px/1 inherit; letter-spacing: 1.5px; color: #10210f; background: #47e06a; border: 0; border-radius: 7px; cursor: pointer; }
-#lb-share.hidden { display: none; }
+.lb-share { display: block; width: 100%; margin-top: 7px; padding: 9px 10px; font: 700 12px/1 inherit; letter-spacing: 1.5px; color: #10210f; background: #47e06a; border: 0; border-radius: 7px; cursor: pointer; }
+.lb-note { margin: 7px 0 0; font-size: 12px; opacity: 0.8; }
+.lb-note:empty { display: none; }
+.lb-how { margin: 0 0 12px; font-size: 12px; line-height: 1.4; opacity: 0.7; }
+/* speed tabs on the select screen's board */
+#fb-levels { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin: 10px 0; }
+#fb-levels button { font: 700 11px/1 inherit; letter-spacing: 1px; padding: 7px 9px; color: #fff; background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 7px; }
+#fb-levels button.on { background: rgba(255, 176, 0, 0.18); border-color: var(--amber); color: var(--amber); }
+/* "Friends board" button on the select screen, under the machine speeds */
+.fb-open { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; margin: -4px 0 12px; padding: 9px 12px;
+  text-align: left; background: rgba(71, 224, 106, 0.12); border: 2px solid rgba(71, 224, 106, 0.55); border-radius: 8px; }
+.fb-open b { font-size: 14px; letter-spacing: 1.5px; color: #47e06a; white-space: nowrap; }
+.fb-open em { font-style: normal; font-size: 12px; opacity: 0.85; text-align: right; }
 /* "Ant challenged you" note on the select screen (arrived by a friend's link) */
 #challenge { margin: 0 0 10px; padding: 8px 10px; font-size: 13px; font-weight: 700; color: #10210f; background: #47e06a; border-radius: 8px; }
 #challenge.hidden { display: none; }
@@ -270,6 +289,7 @@ addEventListener("unhandledrejection", function (e) { var m = document.getElemen
         <div id="challenge" class="hidden"></div>
         <div class="pick">MACHINE SPEED</div>
         <div id="levels"></div>
+        <button id="fb-open" type="button" class="fb-open hidden"><b>FRIENDS BOARD</b><em id="fb-open-sub"></em></button>
         <div class="controls"><b class="key-only">SPACE</b><b class="touch-only">TAP</b> to swing &middot; <b class="key-only">&larr; &rarr;</b><span class="key-only"> batter &middot; </span><b>M</b> sound</div>
         <button id="start" class="big-btn">PLAY BALL</button>
       </aside>
@@ -307,17 +327,35 @@ addEventListener("unhandledrejection", function (e) { var m = document.getElemen
       <div id="r-stats"></div>
     </div>
     <!-- Friends board for this machine speed: kept in this browser, traded by challenge links (js/friends.js). -->
-    <div id="r-lb" class="hidden">
+    <div id="r-lb" class="lb-box hidden">
       <div class="lb-head"><span>FRIENDS BOARD</span><b id="lb-rank"></b></div>
-      <ol id="lb-list"></ol>
+      <ol id="lb-list" class="lb-list"></ol>
       <div class="lb-name"><input id="lb-name" maxlength="16" placeholder="Your name" autocomplete="off" spellcheck="false"><button id="lb-save" type="button">SAVE NAME</button></div>
-      <button id="lb-share" type="button" class="hidden">CHALLENGE A FRIEND</button>
+      <button id="lb-share" type="button" class="lb-share hidden">CHALLENGE A FRIEND</button>
     </div>
     <div class="r-btns">
       <button id="r-again" class="big-btn">ANOTHER BUCKET</button>
       <button id="r-up" class="big-btn alt">FASTER MACHINE</button>
     </div>
     <button id="r-menu" class="ghost-btn">Change batter or speed</button>
+  </div>
+</div>
+
+<!-- Friends board from the select screen: every machine speed, no bucket needed first (js/friends.js). -->
+<div id="friends" class="hidden">
+  <div class="panel">
+    <div class="kicker">GOING, GOING, GONE</div>
+    <div class="r-head">FRIENDS BOARD</div>
+    <div id="fb-levels"></div>
+    <div class="lb-box">
+      <div class="lb-head"><span id="fb-level"></span><b id="fb-rank"></b></div>
+      <ol id="fb-list" class="lb-list"></ol>
+      <div class="lb-name"><input id="fb-name" maxlength="16" placeholder="Your name" autocomplete="off" spellcheck="false"><button id="fb-save" type="button">SAVE NAME</button></div>
+      <button id="fb-share" type="button" class="lb-share hidden">CHALLENGE A FRIEND</button>
+      <p id="fb-note" class="lb-note"></p>
+    </div>
+    <p class="lb-how">Scores stay in this browser. A challenge link carries your board: whoever opens it gets your score on their board and is asked to beat it.</p>
+    <button id="fb-close" type="button" class="big-btn">BACK</button>
   </div>
 </div>
 
@@ -874,6 +912,7 @@ function endRound() {
     $("r-level").textContent = LEVELS[level].name + " · " + LEVELS[level].mph + " MPH";
     $("r-up").classList.toggle("hidden", level >= LEVELS.length - 1);
     $("results").classList.remove("hidden");
+    $("results").scrollTop = 0;
   }, 1800);
   showBoard(level, R.score);
 }
@@ -887,49 +926,93 @@ function showBoard(lv, score) {
   if (score > 0) Board.submit(lv, score);
   drawBoard(lv);
 }
-function drawBoard(lv) {
+// The same board is drawn in two places: the results panel ("lb-" ids, the speed just played) and
+// the select screen's friends board ("fb-" ids, any speed, no bucket needed first).
+const boardLevel = (p) => (p === "fb" ? fbLevel : level);
+function drawBoard(lv, p = "lb") {
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const top = Board.top(lv, 5), rank = Board.rank(lv), n = Board.size(lv), ch = Board.challenge;
   // Arrived by a friend's link for this speed: say how it stands between the two of you.
   const mine = top.find((r) => r.player_id === Board.playerId);
   let head = rank ? "YOUR RANK #" + rank + (n > 1 ? " OF " + n : "") : "";
   if (ch && ch.level === lv && mine) head = mine.score > ch.score ? "YOU BEAT " + ch.name.toUpperCase() + "!" : ch.name.toUpperCase() + " LEADS BY " + (ch.score - mine.score);
-  $("lb-rank").textContent = head;
-  $("lb-list").innerHTML = top.length
+  $(p + "-rank").textContent = head;
+  $(p + "-list").innerHTML = top.length
     ? top.map((r) => `<li class="${r.player_id === Board.playerId ? "me" : ""}"><i>${r.pos}</i><span>${esc(r.name || (r.player_id === Board.playerId ? "You" : "Player"))}</span><b>${r.score}</b></li>`).join("")
     : "<li><span>No scores yet. Hit a few and challenge a friend.</span></li>";
-  if (document.activeElement !== $("lb-name")) $("lb-name").value = Board.name || save.name || "";
-  $("lb-share").classList.toggle("hidden", !rank);
-  $("lb-share").textContent = "CHALLENGE A FRIEND";
-  $("r-lb").classList.remove("hidden");
+  if (document.activeElement !== $(p + "-name")) $(p + "-name").value = Board.name || save.name || "";
+  $(p + "-share").classList.toggle("hidden", !rank);
+  $(p + "-share").textContent = "CHALLENGE A FRIEND";
+  if (p === "lb") $("r-lb").classList.remove("hidden");
 }
-function saveName() {
-  const name = $("lb-name").value.trim();
+function saveName(p = "lb") {
+  const name = $(p + "-name").value.trim();
   if (!name) return;
   const saved = Board.setName(name);
   if (!saved) return;
   save.name = saved; persist();
-  $("lb-name").blur();
-  drawBoard(level);
+  $(p + "-name").blur();
+  drawBoard(boardLevel(p), p);
 }
-$("lb-save").addEventListener("click", saveName);
-$("lb-name").addEventListener("keydown", (e) => { if (e.key === "Enter") saveName(); });
 // "Challenge a friend": a link that carries this board. The phone's share sheet when there is one,
 // otherwise the link is copied.
-async function challengeFriend() {
-  if ($("lb-name").value.trim() && $("lb-name").value.trim() !== Board.name) saveName();
-  const url = Board.link(level);
+async function challengeFriend(p = "lb") {
+  const lv = boardLevel(p), btn = $(p + "-share");
+  if ($(p + "-name").value.trim() && $(p + "-name").value.trim() !== Board.name) saveName(p);
+  const url = Board.link(lv);
   if (!url) return;
-  const best = (Board.top(level, 50).find((r) => r.player_id === Board.playerId) || {}).score || 0;
-  const text = `I scored ${best} on ${LEVELS[level].name} (${LEVELS[level].mph} mph) in Going, Going, Gone. Beat it:`;
-  const done = (msg) => { $("lb-share").textContent = msg; setTimeout(() => { $("lb-share").textContent = "CHALLENGE A FRIEND"; }, 2200); };
+  const best = (Board.top(lv, 50).find((r) => r.player_id === Board.playerId) || {}).score || 0;
+  const text = `I scored ${best} on ${LEVELS[lv].name} (${LEVELS[lv].mph} mph) in Going, Going, Gone. Beat it:`;
+  const done = (msg) => { btn.textContent = msg; setTimeout(() => { btn.textContent = "CHALLENGE A FRIEND"; }, 2200); };
   if (navigator.share && document.body.classList.contains("touch")) {
     try { await navigator.share({ title: "Going, Going, Gone", text, url }); return; } catch (e) { if (e && e.name === "AbortError") return; }
   }
   const old = () => { const ta = document.createElement("textarea"); ta.value = url; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand("copy"); } catch (e) { ok = false; } ta.remove(); done(ok ? "LINK COPIED" : "COULD NOT COPY"); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => done("LINK COPIED"), old); else old();
 }
-$("lb-share").addEventListener("click", challengeFriend);
+for (const p of ["lb", "fb"]) {
+  $(p + "-save").addEventListener("click", () => saveName(p));
+  $(p + "-name").addEventListener("keydown", (e) => { if (e.key === "Enter") saveName(p); });
+  $(p + "-share").addEventListener("click", () => challengeFriend(p));
+}
+// Friends board from the select screen. It opens on the picked machine speed; the tabs look at the
+// others without changing what you will play.
+let fbLevel = 0, fbOpen = false;
+function updateFriendsButton() {
+  const b = $("fb-open");
+  b.classList.toggle("hidden", !Board.enabled);
+  if (!Board.enabled) return;
+  // (For the speed picked just above it.)
+  const rank = Board.rank(level), n = Board.size(level);
+  $("fb-open-sub").textContent = rank ? `You're #${rank} of ${n}` : n ? `${n} to beat` : "Challenge a friend";
+}
+function drawFriends() {
+  $("fb-levels").innerHTML = LEVELS.map((L, i) => `<button type="button" data-i="${i}" class="${i === fbLevel ? "on" : ""}">${L.name}</button>`).join("");
+  $("fb-level").textContent = LEVELS[fbLevel].name + " · " + LEVELS[fbLevel].mph + " MPH";
+  drawBoard(fbLevel, "fb");
+  $("fb-note").textContent = Board.rank(fbLevel) ? "" : `Play a bucket on ${LEVELS[fbLevel].name} to challenge a friend.`;
+}
+function openFriends() {
+  if (!Board.enabled) return;
+  unlockAudio(); sfx("click");
+  fbOpen = true; fbLevel = level;
+  drawFriends();
+  $("friends").classList.remove("hidden");
+  $("friends").scrollTop = 0;
+}
+function closeFriends() {
+  fbOpen = false;
+  $("friends").classList.add("hidden");
+  updateFriendsButton();
+}
+$("fb-open").addEventListener("click", openFriends);
+$("fb-close").addEventListener("click", () => { sfx("click"); closeFriends(); });
+$("friends").addEventListener("click", (e) => { if (e.target === $("friends")) closeFriends(); });
+$("fb-levels").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-i]");
+  if (!b) return;
+  fbLevel = +b.dataset.i; sfx("click"); drawFriends();
+});
 // Arrived by a friend's challenge link: start on their machine speed and say who to beat.
 function showChallenge() {
   const ch = Board.challenge, el = $("challenge");
@@ -1027,6 +1110,8 @@ function resolveMiss() {
 
 // ---- input ---------------------------------------------------------------------------------------
 addEventListener("keydown", (e) => {
+  // The friends board is open over the select screen: Escape closes it, other keys stay with it.
+  if (fbOpen) { if (e.code === "Escape") closeFriends(); return; }
   if (e.target && e.target.tagName === "INPUT") return;   // typing a leaderboard name is not a swing
   if (e.code === "Space" || e.code === "Enter") {
     e.preventDefault();
@@ -1056,7 +1141,7 @@ $("r-menu").addEventListener("click", () => {
   play("deck", "onDeck", { root: DECK, loop: true, blend: 0.5 });
   showSelect();
 });
-function pickLevel(i) { level = i; sfx("click"); buildLevels(); }
+function pickLevel(i) { level = i; sfx("click"); buildLevels(); updateFriendsButton(); }
 
 // ---- menus: cover art, then the slugger select (cards with live batters) -------------------------
 // The menus cover the whole screen, so the ballpark isn't rendered behind them.
@@ -1072,6 +1157,7 @@ function showSelect() {
   $("select").classList.remove("hidden");
   choose(chosen, true);
   buildLevels();
+  updateFriendsButton();
   showChallenge();
   picker.show(cards.map((c) => ({ id: c.dataset.char, stage: c.querySelector(".stage") })));
 }
