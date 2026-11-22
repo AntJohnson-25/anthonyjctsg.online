@@ -59,9 +59,11 @@
       <div class="fr-row" id="frOut">
         <input id="frName" maxlength="16" placeholder="Your name" autocomplete="off" spellcheck="false">
         <button type="button" id="frCreate" class="ghost">Create room</button>
-        <input id="frCode" maxlength="6" placeholder="CODE" autocomplete="off" spellcheck="false">
+        <input id="frCode" maxlength="14" placeholder="CODE" autocomplete="off" spellcheck="false">
         <button type="button" id="frJoin" class="ghost">Join</button>
       </div>
+      <!-- Your friend code, and people you have played with (tap one to call them). -->
+      <div class="fr-me" id="frMe" hidden><span>Your friend code <b id="frMine"></b></span><button type="button" class="fr-link" id="frMineCopy">copy</button><span class="fr-list" id="frList"></span></div>
       <div class="fr-row" id="frIn" hidden><span id="frInfo"></span><button type="button" id="frCopy" class="ghost">Copy link</button><button type="button" id="frLeave" class="ghost">Leave room</button></div>
       <div class="fr-msg" id="frMsg"></div>
       <!-- The by-hand way in, for when a room code will not connect: an invite text and its reply. -->
@@ -90,6 +92,8 @@
 <div id="prompt" class="prompt" hidden></div>
 <div id="stick" class="stick" hidden><div id="stickKnob" class="stick-knob"></div></div>
 
+<!-- A friend is calling (by your friend code): shown wherever you are in the game. -->
+<div id="callBar" class="call-bar" hidden><span id="callWho"></span><button type="button" id="callYes" class="play">Play</button><button type="button" id="callNo" class="ghost">Not now</button></div>
 <div id="hud" class="hud" hidden>
   <div id="scores" class="scores"></div>
   <div id="status" class="status"><svg class="ring" viewBox="0 0 36 36" id="ring"><circle cx="18" cy="18" r="15.5" class="ring-bg"></circle><circle cx="18" cy="18" r="15.5" class="ring-fg" id="ringFg"></circle><text x="18" y="22.5" id="ringTxt"></text></svg><span id="statusTxt"></span></div>

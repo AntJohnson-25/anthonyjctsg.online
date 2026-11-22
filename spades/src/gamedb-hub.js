@@ -1,8 +1,8 @@
-// GameDB hub — the multiplayer core: accounts, rooms, seats, game rules, relay, live leaderboards.
-// It has no network code of its own. Anything that can pass text both ways plugs in with
-// hub.connect(conn), so the same hub runs:
-//   - inside the host player's browser, with friends connected peer to peer (gamedb-p2p.js);
-//   - under Node behind a WebSocket server (gamedb-server.js), for those who want one.
+// GameDB hub — the multiplayer core: players, rooms, seats, game rules, relay, live leaderboards.
+// It runs inside the host player's browser (gamedb-p2p.js) and has no network code of its own:
+// anything that can pass text both ways plugs in with hub.connect(conn).
+// Players bring their own identity (made on their device, gamedb-id.js): an id and a key that
+// signs each sign-in. The hub remembers a player's key the first time it meets them.
 // Zero dependencies; nothing here needs Node.
 import { GameDBError } from './gamedb.js';
 
@@ -47,16 +47,12 @@ export const toHex = bytes => { let s = ''; for (const b of bytes) s += (b < 16 
 export const sha256Hex = text => toHex(sha256(utf8(text)));
 /** n random bytes. */
 export function randomBytes(n) { return globalThis.crypto.getRandomValues(new Uint8Array(n)); }
-/** A random id in the usual 8-4-4-4-12 form (works on plain http pages, unlike crypto.randomUUID). */
-export function randomId() {
-  const b = randomBytes(16); b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
-  const h = toHex(b);
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
 export const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no look-alikes (0/O, 1/I)
 /** A random code of n easy-to-read characters. */
 export function randomCode(n) { let c = ''; for (const b of randomBytes(n)) c += CODE_CHARS[b % CODE_CHARS.length]; return c; }
 const sameText = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+/** The bytes to sign for one purpose: a hash of the purpose and its parts, joined unambiguously. */
+export function signable(purpose, ...parts) { return sha256(utf8(JSON.stringify([purpose, ...parts]))); }
 
 // ───────────────────────── the hub ─────────────────────────
 
@@ -66,6 +62,7 @@ CREATE TABLE IF NOT EXISTS gk_rooms (code TEXT PRIMARY KEY, mode TEXT NOT NULL, 
 CREATE INDEX IF NOT EXISTS gk_rooms_open ON gk_rooms (status, mode);
 CREATE TABLE IF NOT EXISTS gk_room_players (code TEXT NOT NULL, player_id TEXT NOT NULL, seat INT NOT NULL, ready BOOL NOT NULL DEFAULT FALSE, connected BOOL NOT NULL DEFAULT TRUE, PRIMARY KEY (code, player_id));
 CREATE UNIQUE INDEX IF NOT EXISTS gk_rp_player ON gk_room_players (player_id);
+CREATE TABLE IF NOT EXISTS gk_keys (player_id TEXT PRIMARY KEY, key TEXT NOT NULL);
 `;
 
 /**
@@ -74,30 +71,33 @@ CREATE UNIQUE INDEX IF NOT EXISTS gk_rp_player ON gk_room_players (player_id);
  *   modes          { name: { minPlayers, maxPlayers, autoStart, init, onInput, view, result, onEnd, tickMs, onTick, onLeave } }
  *   actions        { name(ctx, args) }  functions players may call; ctx = { db, kit, player, server }
  *   clientBoards   leaderboard ids players may submit scores to (and sync) directly (default none)
- *   openSignup     true: players bring their own id and secret (made on their device) and the hub
- *                  remembers them on first sight. Used peer to peer, where there is no central
- *                  place to hand out accounts. false: the hub hands out ids ('register').
  *   roomCodes      true: createRoom may ask for a particular code (the host of a peer-to-peer room
  *                  uses the code friends were given)
+ *   verify(keyHex, bytes, sigHex)   checks sign-in signatures (gamedb-id.js verifyHex); without it
+ *                  only the older id-and-secret sign-in works
+ *   seatGraceMs    a player who drops out of a lobby keeps the seat this long (default 20 s)
  *   maxMessagesPerSecond   flood limit per connection
  */
-export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = [], openSignup = false, roomCodes = false, log = console.log, maxMessagesPerSecond = 60 }) {
+export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = [], roomCodes = false, verify = null, seatGraceMs = 20000, log = console.log, maxMessagesPerSecond = 60 }) {
   db.exec(SCHEMA);
   db.run('UPDATE gk_room_players SET connected = FALSE'); // nobody is connected at boot
   const now = () => kit.now();
   const online = new Map();   // player id -> session
   const watchers = new Map(); // board id -> Map(session -> n)
+  const allowed = new Map();  // room code -> Set of keys and player ids that may sit there (friend calls)
+  const grace = new Map();    // player id -> timer that frees their lobby seat
   const timers = [];
   const hub = { db, kit, sendTo, broadcast, connect, online };
 
   // ── helpers ──
   const str = (v, what, max = 64) => { if (typeof v !== 'string' || !v || v.length > max) fail('BAD_INPUT', `${what} must be text (1 to ${max} characters)`); return v; };
   function sendTo(playerId, msg) { const s = online.get(playerId); if (s) s.conn.send(JSON.stringify(msg)); }
-  const members = code => db.query('SELECT rp.player_id AS id, p.name, rp.seat, rp.ready, rp.connected FROM gk_room_players rp LEFT JOIN gk_players p ON p.id = rp.player_id WHERE rp.code = ? ORDER BY rp.seat', [code]);
+  const members = code => db.query('SELECT rp.player_id AS id, p.name, rp.seat, rp.ready, rp.connected, k.key FROM gk_room_players rp LEFT JOIN gk_players p ON p.id = rp.player_id LEFT JOIN gk_keys k ON k.player_id = rp.player_id WHERE rp.code = ? ORDER BY rp.seat', [code]);
   function broadcast(code, msg, exceptId) { const text = JSON.stringify(msg); for (const m of members(code)) { if (m.id === exceptId) continue; const s = online.get(m.id); if (s) s.conn.send(text); } }
   const getRoom = code => db.get('SELECT * FROM gk_rooms WHERE code = ?', [code]);
   const roomOf = playerId => { const r = db.get('SELECT code FROM gk_room_players WHERE player_id = ?', [playerId]); return r ? getRoom(r.code) : null; };
-  const snapshot = room => ({ code: room.code, mode: room.mode, host: room.host, status: room.status, private: room.private, maxPlayers: room.max_players, tick: room.tick, players: members(room.code) });
+  const snapshot = room => ({ code: room.code, mode: room.mode, host: room.host, status: room.status, private: room.private, maxPlayers: room.max_players, options: room.options ?? null, tick: room.tick, players: members(room.code) });
+  const dropRoom = code => { db.run('DELETE FROM gk_room_players WHERE code = ?', [code]); db.run('DELETE FROM gk_rooms WHERE code = ?', [code]); allowed.delete(code); };
   const viewFor = (room, seat) => { const m = modes[room.mode]; return m && m.view ? m.view(room.state, seat) : room.state; };
   const pushRoom = code => { const room = getRoom(code); if (room) broadcast(code, { ev: 'room', room: snapshot(room) }); };
   function pushState(code) {
@@ -116,7 +116,8 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
     for (let tries = 0; tries < 50; tries++) { const c = randomCode(5); if (!getRoom(c)) return c; }
     fail('INTERNAL', 'could not allocate a room code');
   }
-  function createRoom(me, { mode, maxPlayers, private: priv = false, options = null, code: wanted }) {
+  function createRoom(me, { mode, maxPlayers, private: priv = false, options = null, code: wanted, allow = null }) {
+    if (allow !== null && (!Array.isArray(allow) || allow.length > 16 || allow.some(a => typeof a !== 'string' || !a || a.length > 64))) fail('BAD_INPUT', 'allow must be a list of up to 16 player keys');
     const m = modes[str(mode, 'mode')]; if (!m) fail('NO_MODE', `unknown game mode "${mode}"`);
     if (roomOf(me)) fail('IN_ROOM', 'leave your current room first');
     const cap = m.maxPlayers ?? 8, max = maxPlayers ?? cap;
@@ -133,12 +134,15 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
       db.run('INSERT INTO gk_rooms (code, mode, host, status, private, max_players, options, tick, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)', [code, mode, me, 'lobby', !!priv, max, options, t, t]);
       db.run('INSERT INTO gk_room_players (code, player_id, seat) VALUES (?, ?, 0)', [code, me]);
     });
+    if (allow) allowed.set(code, new Set(allow));
     maybeStart(code);
     return code;
   }
-  function joinRoom(me, code) {
+  function joinRoom(me, code, key = null) {
     const room = getRoom(str(code, 'room code', 12).toUpperCase()); if (!room) fail('NO_ROOM', 'no room has that code');
     if (roomOf(me)) fail('IN_ROOM', 'leave your current room first');
+    const only = allowed.get(room.code);
+    if (only && !only.has(me) && !(key && only.has(key))) fail('FORBIDDEN', 'that room is only for the friend who was invited');
     if (room.status !== 'lobby') fail('BAD_STATE', 'that game has already started');
     const taken = new Set(members(room.code).map(m => m.seat));
     if (taken.size >= room.max_players) fail('FULL', 'that room is full');
@@ -196,7 +200,7 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
     const seat = seatOf(room.code, me), m = modes[room.mode];
     db.run('DELETE FROM gk_room_players WHERE code = ? AND player_id = ?', [room.code, me]);
     const left = members(room.code);
-    if (!left.length) { db.run('DELETE FROM gk_rooms WHERE code = ?', [room.code]); return; }
+    if (!left.length) { dropRoom(room.code); return; }
     if (room.host === me) db.run('UPDATE gk_rooms SET host = ? WHERE code = ?', [left[0].id, room.code]);
     if (room.status === 'playing' && m && m.onLeave) {
       const draft = structuredClone(room.state), next = m.onLeave(draft, seat);
@@ -228,7 +232,7 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
     unwatchBoard: (s, a) => { const w = watchers.get(a.board); if (w) w.delete(s); return true; },
     action: (s, a) => { const fn = Object.hasOwn(actions, a.name) ? actions[a.name] : null; if (!fn) fail('NO_ACTION', `unknown action "${a.name}"`); return fn({ db, kit, player: s.player, server: hub }, a.args ?? {}); },
     createRoom: (s, a) => { const code = createRoom(s.player, a); return snapshot(getRoom(code)); },
-    joinRoom: (s, a) => snapshot(getRoom(joinRoom(s.player, a.code))),
+    joinRoom: (s, a) => snapshot(getRoom(joinRoom(s.player, a.code, s.key))),
     quickMatch: (s, a) => snapshot(getRoom(quickMatch(s.player, a.mode))),
     leaveRoom: s => { leave(s.player); return true; },
     room: s => { const room = roomOf(s.player); return room ? { room: snapshot(room), state: room.status === 'lobby' ? null : viewFor(room, seatOf(room.code, s.player)) } : null; },
@@ -253,6 +257,7 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
   };
 
   function login(s, playerId) {
+    clearTimeout(grace.get(playerId)); grace.delete(playerId);
     const old = online.get(playerId);
     if (old && old !== s) { old.player = null; old.conn.send(JSON.stringify({ ev: 'kicked', reason: 'signed in somewhere else' })); old.conn.close(); }
     s.player = playerId; online.set(playerId, s);
@@ -263,26 +268,40 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
   }
   function handle(s, msg) {
     const a = msg.a && typeof msg.a === 'object' ? msg.a : {};
-    if (msg.op === 'register') {
-      if (s.player) fail('BAD_STATE', 'already signed in');
-      const id = randomId(), secret = toHex(randomBytes(24));
-      db.transaction(() => { kit.player(id, a.name ?? null); db.run('INSERT INTO gk_auth VALUES (?, ?)', [id, sha256Hex(secret)]); });
-      return { ...login(s, id), secret };
-    }
+    // Sign-in: ask for a challenge, then say hello with it signed by your key.
+    if (msg.op === 'challenge') { s.nonce = toHex(randomBytes(16)); return { nonce: s.nonce }; }
     if (msg.op === 'hello') {
-      const id = str(a.playerId, 'playerId'), given = sha256Hex(str(a.secret, 'secret', 128));
-      const row = db.get('SELECT secret_hash FROM gk_auth WHERE player_id = ?', [id]);
-      if (!row && openSignup) {
-        // First time this hub meets this player: remember the secret they came with.
-        if (!/^[0-9a-f-]{16,64}$/.test(id) || a.secret.length < 16) fail('AUTH', 'that is not a valid player id and secret');
-        db.transaction(() => { kit.player(id, a.name ?? null); db.run('INSERT INTO gk_auth VALUES (?, ?)', [id, given]); });
+      const id = str(a.playerId, 'playerId');
+      if (!/^[0-9a-f-]{16,64}$/.test(id)) fail('AUTH', 'that is not a valid player id');
+      const keyRow = db.get('SELECT key FROM gk_keys WHERE player_id = ?', [id]);
+      const secretRow = db.get('SELECT secret_hash FROM gk_auth WHERE player_id = ?', [id]);
+      const secretOk = () => typeof a.secret === 'string' && !!secretRow && sameText(sha256Hex(str(a.secret, 'secret', 128)), secretRow.secret_hash);
+      if (a.key !== undefined) {
+        const key = str(a.key, 'key'), nonce = s.nonce; s.nonce = null;
+        if (!verify || !/^[0-9a-f]{64}$/.test(key) || !nonce || typeof a.sig !== 'string' || !verify(key, signable('gamedb-hello', nonce, id, key), a.sig)) fail('AUTH', 'that sign-in was not signed properly');
+        if (keyRow) { if (keyRow.key !== key) fail('AUTH', 'that player signs in with a different key'); }
+        else if (secretRow) {
+          // Met before keys existed: the old secret proves it is them, once; from then on the key does.
+          if (a.secret === undefined) fail('KEY_UNBOUND', 'this host knows you by your old secret: send it once with your key');
+          if (!secretOk()) fail('AUTH', 'unknown player or wrong secret');
+          db.run('INSERT INTO gk_keys VALUES (?, ?)', [id, key]);
+        } else db.run('INSERT INTO gk_keys VALUES (?, ?)', [id, key]); // first time this hub meets them
+        s.key = key;
+        kit.player(id, a.name ?? null);
         return login(s, id);
       }
-      if (!row || !sameText(given, row.secret_hash)) fail('AUTH', 'unknown player or wrong secret');
+      // An older game, without keys: the id and secret it made on its device.
+      if (keyRow) fail('AUTH', 'that player signs in with a key');
+      if (!secretRow) {
+        if (typeof a.secret !== 'string' || a.secret.length < 16) fail('AUTH', 'that is not a valid player id and secret');
+        db.transaction(() => { kit.player(id, a.name ?? null); db.run('INSERT INTO gk_auth VALUES (?, ?)', [id, sha256Hex(str(a.secret, 'secret', 128))]); });
+        return login(s, id);
+      }
+      if (!secretOk()) fail('AUTH', 'unknown player or wrong secret');
       kit.player(id, a.name ?? null);
       return login(s, id);
     }
-    if (!s.player) fail('AUTH', 'sign in first (register or hello)');
+    if (!s.player) fail('AUTH', 'sign in first');
     const fn = Object.hasOwn(ops, msg.op) ? ops[msg.op] : null;
     if (!fn) fail('NO_OP', `unknown request "${msg.op}"`);
     return fn(s, a);
@@ -315,12 +334,39 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
       online.delete(s.player);
       try {
         const room = roomOf(s.player); if (!room) return;
-        if (room.status === 'lobby') leave(s.player); // free the seat for someone else
-        else { db.run('UPDATE gk_room_players SET connected = FALSE WHERE code = ? AND player_id = ?', [room.code, s.player]); pushRoom(room.code); }
+        db.run('UPDATE gk_room_players SET connected = FALSE WHERE code = ? AND player_id = ?', [room.code, s.player]); pushRoom(room.code);
+        // In a lobby the seat is freed for someone else, unless they come straight back.
+        if (room.status === 'lobby') {
+          const id = s.player; clearTimeout(grace.get(id));
+          const t = setTimeout(() => { grace.delete(id); try { const r = roomOf(id); if (!online.has(id) && r && r.status === 'lobby') leave(id); } catch (e) { log('gamedb hub error freeing a seat', e); } }, seatGraceMs);
+          if (t.unref) t.unref(); grace.set(id, t);
+        }
       } catch (e) { log('gamedb hub error on disconnect', e); }
     };
     return s;
   }
+
+  /**
+   * Take over a room from a host who left (gamedb-p2p.js handoff): the same code, seats and
+   * players, with `hostId` (this device's player) as the new host. `state` = the last state seen.
+   */
+  hub.restoreRoom = (snap, hostId, state = null) => {
+    if (!snap || !Array.isArray(snap.players) || !snap.code || !snap.mode) fail('BAD_INPUT', 'that is not a room snapshot');
+    const t = now();
+    db.transaction(() => {
+      dropRoom(snap.code);
+      db.run('INSERT INTO gk_rooms (code, mode, host, status, private, max_players, options, state, tick, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [snap.code, snap.mode, hostId, ['lobby', 'playing', 'done'].includes(snap.status) ? snap.status : 'lobby', !!snap.private, snap.maxPlayers || snap.players.length, snap.options ?? null, state, snap.tick || 0, t, t]);
+      for (const p of snap.players) {
+        if (typeof p.id !== 'string' || !Number.isInteger(p.seat)) continue;
+        db.run('DELETE FROM gk_room_players WHERE player_id = ?', [p.id]);
+        db.run('INSERT INTO gk_room_players (code, player_id, seat, ready, connected) VALUES (?, ?, ?, ?, FALSE)', [snap.code, p.id, p.seat, !!p.ready]);
+        kit.player(p.id, p.name ?? null);
+        // Their keys come along, so only the real players can take those seats back.
+        if (typeof p.key === 'string' && /^[0-9a-f]{64}$/.test(p.key) && !db.get('SELECT key FROM gk_keys WHERE player_id = ?', [p.id])) db.run('INSERT INTO gk_keys VALUES (?, ?)', [p.id, p.key]);
+      }
+    });
+  };
 
   // ── live leaderboards: push the new top-N when scores change ──
   const dirtyBoards = new Set(); let boardTimer = null;
@@ -353,9 +399,7 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
     const t = now();
     for (const r of db.query('SELECT code, status, updated FROM gk_rooms')) {
       const anyone = members(r.code).some(m => m.connected);
-      if ((r.status === 'done' && t - r.updated > 600000) || (!anyone && t - r.updated > 120000)) {
-        db.transaction(() => { db.run('DELETE FROM gk_room_players WHERE code = ?', [r.code]); db.run('DELETE FROM gk_rooms WHERE code = ?', [r.code]); });
-      }
+      if ((r.status === 'done' && t - r.updated > 600000) || (!anyone && t - r.updated > 120000)) db.transaction(() => dropRoom(r.code));
     }
   }, 30000));
   for (const t of timers) if (t && t.unref) t.unref();
@@ -363,6 +407,7 @@ export function createHub({ db, kit, modes = {}, actions = {}, clientBoards = []
   /** Stop the hub's timers and disconnect everyone. */
   hub.close = () => {
     for (const t of timers) clearInterval(t);
+    for (const t of grace.values()) clearTimeout(t); grace.clear();
     if (boardTimer) clearTimeout(boardTimer);
     stopWatching();
     for (const s of [...online.values()]) s.conn.close(1001);

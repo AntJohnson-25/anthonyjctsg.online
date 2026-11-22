@@ -44,7 +44,21 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; }
 .fr-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .fr-row[hidden] { display: none; }
 .fr-row input { flex: 1 1 110px; min-width: 0; padding: 9px 11px; border-radius: 10px; color: inherit; font: inherit; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); }
-.fr-row #frCode { flex: 0 1 92px; text-transform: uppercase; letter-spacing: 0.12em; }
+.fr-row #frCode { flex: 0 1 150px; text-transform: uppercase; letter-spacing: 0.12em; }
+/* Your friend code, and people you have played with */
+.fr-me { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12.5px; color: var(--dim); }
+.fr-me[hidden] { display: none; }
+.fr-me b { color: var(--gold); letter-spacing: 0.08em; }
+.fr-me .fr-link { margin: 0; }
+.fr-list { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.fr-list:empty { display: none; }
+.fr-chip { padding: 4px 10px; border-radius: 999px; color: inherit; font: inherit; font-size: 12.5px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line); cursor: pointer; }
+.fr-chip:hover { background: rgba(255, 255, 255, 0.14); }
+/* A friend is calling: shown wherever you are in the game */
+.call-bar { position: fixed; z-index: 60; left: 50%; top: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; width: max-content; max-width: calc(100vw - 32px); padding: 10px 12px 10px 16px; border-radius: 14px; background: rgba(12, 16, 24, 0.94); border: 1px solid var(--line); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45); }
+.call-bar[hidden] { display: none; }
+.call-bar span { flex: 1 1 auto; min-width: 0; }
+.call-bar button { flex: 0 0 auto; padding: 8px 14px; }
 .fr-row .ghost { flex: 0 0 auto; padding: 9px 12px; }
 .fr-row .ghost:disabled { opacity: 0.5; }
 #frInfo { flex: 1; } #frInfo b { letter-spacing: 0.14em; color: var(--gold); }

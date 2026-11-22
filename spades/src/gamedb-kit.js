@@ -253,12 +253,39 @@ export class GameKit {
    * the sender's own). Put it in a link to your game ("beat my score"); the friend's game calls acceptShare.
    */
   shareBoard(boardId, playerId, n = 8) {
+    return encodeShare({ v: 1, from: playerId, ...this._exportWith(boardId, playerId, n) });
+  }
+  // exportBoard, plus the player's own entry when it is not among the best n.
+  _exportWith(boardId, playerId, n) {
     const data = this.exportBoard(boardId, n);
     if (!data.rows.some(r => r[0] === playerId)) {
       const mine = this.db.get('SELECT s.score, s.at, p.name FROM gk_scores s LEFT JOIN gk_players p ON p.id = s.player_id WHERE s.board = ? AND s.period_key = ? AND s.player_id = ?', [boardId, data.period, playerId]);
       if (mine) data.rows.push([playerId, mine.name, mine.score, mine.at]);
     }
-    return encodeShare({ v: 1, from: playerId, ...data });
+    return data;
+  }
+  /**
+   * Several boards at once, as a value (not text): what a player mails to friends (gamedb-mail.js).
+   * { v: 1, from, boards: [exportBoard...] }, each with the player's own entry; null if the player
+   * has no score on any of them yet.
+   */
+  shareBoards(boardIds, playerId, n = 8) {
+    this._id(playerId);
+    const boards = boardIds.map(id => this._exportWith(id, playerId, n));
+    return boards.some(b => b.rows.some(r => r[0] === playerId)) ? { v: 1, from: playerId, boards } : null;
+  }
+  /**
+   * Merge a value made by shareBoards on another device. Boards this game does not have are skipped.
+   * Returns { merged, from } (merged = scores added or beaten), or null if it is not such a value.
+   */
+  acceptBoards(data, { self = null } = {}) {
+    if (!data || typeof data !== 'object' || data.v !== 1 || !Array.isArray(data.boards) || data.boards.length > 50) return null;
+    let merged = 0;
+    for (const b of data.boards) {
+      if (!b || typeof b.board !== 'string' || !this.db.get('SELECT id FROM gk_boards WHERE id = ?', [b.board])) continue;
+      try { merged += this.mergeBoard(b, { self }); } catch (e) { if (!(e instanceof GameDBError)) throw e; }
+    }
+    return { merged, from: typeof data.from === 'string' ? data.from : null };
   }
   /**
    * Take in text made by shareBoard. Returns { board, merged, from: { id, name, score } | null } where

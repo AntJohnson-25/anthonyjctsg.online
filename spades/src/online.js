@@ -2,16 +2,19 @@
 // There is no game server. The player who creates the room is the host: their browser holds
 // the GameDB database (accounts, the room, results, the wins board) and friends connect
 // straight to it. See src/gamedb-p2p.js for how two browsers find each other:
-//   - a room code (one click; the handshake goes through free public relays), or
+//   - a room code (one click; the handshake goes through free public meeting points),
+//   - a friend code (call someone you have played with; only they get the seat), or
 //   - an invite text passed by hand (depends on nothing; for when the code will not connect).
+// GameDB keeps the link up by itself: it repairs a dropped link, and if two networks will not
+// connect directly the game goes through the meeting points instead (slower, still private).
 //
 // net.js already knows how to run a table for several people: it was written for a
 // "lobby" object (HopLobby) that passes messages between players and says who is host.
 // This file gives it that same object, built on a GameDB room:
 //   - HS.Online.create() / join(code) put you in a room and set globalThis.HopLobby;
 //   - HopLobby.send(data, to) goes through the room's relay (to one player, or everyone);
-//   - the room's host is the lobby host. If the host leaves, the room closes (their browser
-//     was the database) and everyone carries on solo.
+//   - the room's host is the lobby host. If the host leaves, the next player in seat order
+//     takes the room over on their own device, and net.js carries the game on there.
 globalThis.HS = globalThis.HS || {};
 (function (HS) {
   "use strict";
@@ -19,10 +22,13 @@ globalThis.HS = globalThis.HS || {};
   const O = {
     lib: null, kit: null, host: null, client: null, session: null,
     room: null, code: "", lobby: null, offset: 0, table: -1, hostTable: -1, pendingInvite: null,
-    p2p: null,      // test hook: extra options for hostRoom / joinRoom (a stand-in network)
+    ident: null, ear: null, slowSaid: false,
+    p2p: null,      // test hook: extra options for hostRoom / joinRoom / listen / callFriend (a stand-in network)
     storage: null,  // test hook: where the host's database is kept
-    on: {}          // joined(ctx), left(reason), room(room), table(k), error(message), dropped()
+    on: {}          // joined(ctx), left(reason), room(room), table(k), error(message), dropped(), back(), slow(),
+                    // calling(friendCode), call({ name, known, accept(name), decline() })
   };
+  const MODES = { spades: { minPlayers: 1, maxPlayers: 4 } };
   O.enabled = typeof RTCPeerConnection !== "undefined";
   // ?p=2 in the address is a second player on the same computer (for trying it out in two tabs).
   O.profile = typeof location === "undefined" ? "" : (new URLSearchParams(location.search).get("p") || "");
@@ -33,10 +39,15 @@ globalThis.HS = globalThis.HS || {};
     if (!O.lib) {
       const at = function (f) { return new URL("src/" + f, document.baseURI).href; };
       const m = await Promise.all([import(at("gamedb.js")), import(at("gamedb-kit.js")), import(at("gamedb-p2p.js"))]);
-      O.lib = { GameDB: m[0].GameDB, GameDBError: m[0].GameDBError, localStorageStorage: m[0].localStorageStorage, GameKit: m[1].GameKit, hostRoom: m[2].hostRoom, joinRoom: m[2].joinRoom, answerInvite: m[2].answerInvite };
+      O.lib = { GameDB: m[0].GameDB, GameDBError: m[0].GameDBError, localStorageStorage: m[0].localStorageStorage, GameKit: m[1].GameKit, hostRoom: m[2].hostRoom, joinRoom: m[2].joinRoom, answerInvite: m[2].answerInvite,
+        listen: m[2].listen, callFriend: m[2].callFriend, deviceIdentity: m[2].deviceIdentity, cleanFriendCode: m[2].cleanFriendCode };
     }
     return O.lib;
   }
+  // This device's player (id, key, friend code, friends list): one for good, kept in the same storage.
+  function me(L) { return O.ident || (O.ident = L.deviceIdentity(O.store || undefined, O.profile || "")); }
+  // If the host leaves, this device may take the room over: with its own database and the same rules.
+  function handoffFor(L) { return function () { const kit = openKit(L); return { db: kit.db, kit: kit, modes: MODES, actions: ACTIONS, log: function () {}, maxMessagesPerSecond: O.maxRate || 60 }; }; }
   // The host's database: kept on this device, so the wins board and match history build up over time.
   function openKit(L) {
     if (O.kit) return O.kit;
@@ -94,7 +105,9 @@ globalThis.HS = globalThis.HS || {};
     O.room = room; O.code = room.code;
     const L = O.lobby;
     if (!L) return;
-    L.players = room.players.map(function (p) { return { id: p.id, name: p.name || "Player", isHost: p.id === room.host }; });
+    // Only the players connected right now: a bot covers anyone who dropped until they are back
+    // (GameDB keeps their seat in the room meanwhile, so they come back as themselves).
+    L.players = room.players.filter(function (p) { return p.connected !== false; }).map(function (p) { return { id: p.id, name: p.name || "Player", isHost: p.id === room.host }; });
     const me = L.players.find(function (p) { return p.id === L.me.id; });
     if (me) L.me.name = me.name;
     L.context.hostId = room.host;
@@ -114,46 +127,59 @@ globalThis.HS = globalThis.HS || {};
     O.lobby = makeLobby();
     globalThis.HopLobby = O.lobby;
     setRoom(room);
+    if (!O.answering) hangUpEar(); // in a room: friends' calls wait until we are out again
     emit("joined", O.lobby.context);
   }
   // Out of the room, back to the solo game. `reason` is shown to the player when it was not their choice.
+  // A host who leaves hands the room on: the others keep playing, the next in seat order hosting.
   function exit(reason) {
     const c = O.client, h = O.host;
     O.client = null; O.host = null; O.session = null;
-    O.room = null; O.code = ""; O.lobby = null; O.table = -1; O.hostTable = -1;
+    O.room = null; O.code = ""; O.lobby = null; O.table = -1; O.hostTable = -1; O.slowSaid = false;
     delete globalThis.HopLobby;
-    if (h) h.close(); else if (c) c.close();
+    if (h) h.close({ handoff: true }); else if (c) c.close();
     emit("left", reason || "");
+    O.listen();
+  }
+  // Re-time the table by the host's clock (after joining, and after a new host takes over).
+  async function timeTo(client) {
+    if (O.host) { O.offset = 0; return; }
+    try { const t0 = Date.now(), ts = await client.time(); if (O.client === client) O.offset = ts - (t0 + Date.now()) / 2; } catch (e) { /* keep the old offset */ }
   }
   // Take a connected client (ours as host, or one that reached a friend's room) and step into the room.
   async function adopt(client, room, host) {
     O.client = client; O.host = host || null; O.session = client.me; O.offset = 0;
+    let away = false;
     client.on("room", function (e) { if (O.client === client && O.room && e.room.code === O.room.code) setRoom(e.room); });
     client.on("relay", function (m) { if (O.client === client) onRelay(m); });
-    client.on("close", function () { if (O.client === client && !host) emit("dropped"); });
+    client.on("close", function () { if (O.client === client && !O.host) { away = true; emit("dropped"); } });
+    // The host left and this device took the room over (net.js sees us become host and carries on).
+    client.on("host", function (h) { if (O.client === client) { O.host = h; O.offset = 0; } });
     client.on("open", function (s) {
       if (O.client !== client) return;
       O.session = s;
-      // Back after a dropped connection: the host freed our seat, so take one again.
-      if (O.code && !s.room) client.joinRoom(O.code).then(function (r) { if (O.client !== client) return; setRoom(r); if (O.lobby) O.lobby._fire("relay", "open"); }, function () { if (O.client === client) exit("The room is no longer open."); });
+      const back = function (r) { if (O.client !== client) return; setRoom(r); timeTo(client); if (O.lobby) O.lobby._fire("relay", "open"); if (away) { away = false; emit("back"); } slowNote(client); };
+      // Back after a dropped connection: still seated (same host, or the one who took over), or seat again if it was freed.
+      if (O.code && s.room && s.room.code === O.code) back(s.room);
+      else if (O.code) client.joinRoom(O.code).then(back, function () { if (O.client === client) exit("The room is no longer open."); });
     });
     client.on("lost", function () { if (O.client === client) exit("The host left, so the room has closed."); });
     client.on("kicked", function () { if (O.client === client) exit("You joined this room from another tab."); });
-    if (!host) {
-      // Everyone times the table by the host's clock.
-      try { const t0 = Date.now(), ts = await client.time(); O.offset = ts - (t0 + Date.now()) / 2; } catch (e) { O.offset = 0; }
-      if (O.client !== client) return false;
-    }
+    // Everyone times the table by the host's clock.
+    if (!host) { await timeTo(client); if (O.client !== client) return false; }
     enter(room);
+    slowNote(client);
     return true;
   }
+  // Say once per room when the game goes through the meeting points (the networks would not link directly).
+  function slowNote(client) { if (client.lane === "relay" && !O.slowSaid) { O.slowSaid = true; emit("slow"); } }
 
   O.isHost = function () { return !!(O.room && O.session && O.room.host === O.session.playerId); };
   O.inRoom = function () { return !!O.room; };
   /** A link friends can open to land in this room. */
   O.link = function () { return typeof location === "undefined" || !O.code ? "" : location.origin + location.pathname + "?room=" + O.code; };
 
-  function common(name) { return Object.assign({ app: APP, name: name || null, store: O.store, profile: O.profile || "" }, O.p2p || {}); }
+  function common(name) { const L = O.lib; return Object.assign({ app: APP, name: name || null, store: O.store, profile: O.profile || "", identity: L ? me(L) : null }, O.p2p || {}); }
   async function go(fn) {
     if (!O.enabled) return false;
     try {
@@ -163,23 +189,60 @@ globalThis.HS = globalThis.HS || {};
       return await fn(L);
     } catch (e) { emit("error", say(e, "That didn't work. Try again.")); return false; }
   }
-  /** Open a room on this device. Share O.code (or O.link()) with friends. */
-  O.create = function (name) {
+  /** Open a room on this device. Share O.code (or O.link()) with friends. `allow`: only these players' keys may sit (a friend's call). */
+  O.create = function (name, allow) {
     return go(async function (L) {
       const kit = openKit(L);
-      const host = await L.hostRoom(Object.assign(common(name), { db: kit.db, kit: kit, modes: { spades: { minPlayers: 1, maxPlayers: 4 } }, actions: ACTIONS, mode: "spades", log: function () {}, maxMessagesPerSecond: O.maxRate || 60 }));
+      const host = await L.hostRoom(Object.assign(common(name), { db: kit.db, kit: kit, modes: MODES, actions: ACTIONS, mode: "spades", log: function () {}, maxMessagesPerSecond: O.maxRate || 60 }, allow ? { allow: allow } : {}));
       return adopt(host.client, host.room, host);
     });
   };
-  /** Join a friend's room by its code. */
+  /** Join a friend's room by its room code, or call a friend by their friend code (they get asked; if they say yes, you're in). */
   O.join = function (code, name) {
     return go(async function (L) {
-      const r = await L.joinRoom(Object.assign(common(name), { code: code, maxRetries: 2 }));
+      let hostKey = null;
+      const fc = L.cleanFriendCode(code);
+      if (fc) {
+        emit("calling", fc);
+        const call = await L.callFriend(Object.assign(common(name), { friendCode: fc }));
+        code = call.code; hostKey = call.hostKey;
+      }
+      const r = await L.joinRoom(Object.assign(common(name), { code: code, hostKey: hostKey, handoff: handoffFor(L) }));
       return adopt(r.client, r.room, null);
     });
   };
-  /** Leave the room (back to the solo game). The host leaving closes the room for everyone. */
+  /** Leave the room (back to the solo game). A host leaving hands the room to the next player. */
   O.leave = function () { if (O.room) exit(); };
+
+  // ---- friends: call people you have played with by their friend code ----
+  /** This device's friend code (a friend types it where a room code goes to call you). */
+  O.friendCode = async function () { if (!O.enabled) return ""; return me(await lib()).friendCode; };
+  /** People this device has played with: [{ friendCode, name, seen }], newest first. */
+  O.friends = async function () { if (!O.enabled) return []; return me(await lib()).friends.list(); };
+  /** Be reachable by friend code while not in a room (only once there is someone who might call). */
+  O.listen = async function () {
+    if (!O.enabled || O.ear || O.room) return;
+    const L = await lib(), ident = me(L);
+    if (O.ear || O.room || !ident.friends.list().length) return;
+    O.ear = L.listen(Object.assign(common(null), { onCall: function (call) {
+      if (O.room) { call.decline(); return; } // busy: already playing with someone
+      emit("call", {
+        name: call.from.name || "A friend", known: call.from.known,
+        // Say yes: open a room only the caller can sit in, and tell them its code.
+        accept: function (name) {
+          O.answering = true;
+          return O.create(name, [call.from.key]).then(function (ok) {
+            O.answering = false;
+            if (ok && O.code) call.accept(O.code); else call.decline();
+            if (O.room) hangUpEar(); // (the answer still goes out in full)
+            return ok;
+          });
+        },
+        decline: function () { call.decline(); }
+      });
+    } }));
+  };
+  function hangUpEar() { const e = O.ear; O.ear = null; if (e) e.close(); }
 
   // ---- the by-hand handshake, for when a room code will not connect ----
   /** Host: how many public relays are carrying the room code (0 = friends need an invite text). */

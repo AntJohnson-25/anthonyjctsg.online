@@ -231,6 +231,7 @@ globalThis.HS = globalThis.HS || {};
   function friendsSync() {
     const inRoom = On.inRoom();
     $("frOut").hidden = inRoom; $("frIn").hidden = !inRoom;
+    $("frMe").hidden = inRoom || !$("frMine").textContent; // calls wait until you are out of the room
     if (!inRoom) return;
     const names = On.room.players.map(function (p) { return p.id === On.session.playerId ? "you" : (p.name || "Player"); });
     $("frInfo").innerHTML = "Room <b>" + H.esc(On.room.code) + "</b> · " + H.esc(names.join(", "));
@@ -265,7 +266,35 @@ globalThis.HS = globalThis.HS || {};
     const name = function () { const n = $("frName").value.trim().slice(0, 16); try { localStorage.setItem("villaspades.name", n); } catch (e) { /* ignore */ } return n || null; };
     const busy = function (on) { ["frCreate", "frJoin"].forEach(function (id) { $(id).disabled = on; }); if (on) $("frMsg").textContent = "Connecting…"; };
     $("frCreate").onclick = function () { busy(true); On.create(name()).then(function () { busy(false); }); };
-    $("frJoin").onclick = function () { if (!$("frCode").value.trim()) { friendsMsg("Type the room code your friend gave you."); return; } busy(true); On.join($("frCode").value, name()).then(function () { busy(false); }); };
+    // The box takes a room code (join it) or a friend code (call them: they get asked, and seat you if they say yes).
+    $("frJoin").onclick = function () { if (!$("frCode").value.trim()) { friendsMsg("Type the room code your friend gave you, or their friend code."); return; } busy(true); On.join($("frCode").value, name()).then(function () { busy(false); }); };
+    $("frMineCopy").onclick = function () { copyText($("frMine").textContent, function () { friendsMsg("Friend code copied. Friends type it where the room code goes to call you."); }); };
+    // Your friend code, and the people you have played with: tap one to call them.
+    const meSync = function () {
+      On.friendCode().then(function (c) { if (!c) return; $("frMine").textContent = c; $("frMe").hidden = false; });
+      On.friends().then(function (list) {
+        const box = $("frList"); box.textContent = "";
+        list.filter(function (f) { return f.name; }).slice(0, 4).forEach(function (f) {
+          const b = document.createElement("button"); b.type = "button"; b.className = "fr-chip"; b.textContent = "Call " + f.name; b.title = f.friendCode;
+          b.onclick = function () { $("frCode").value = f.friendCode; $("frJoin").onclick(); };
+          box.appendChild(b);
+        });
+      });
+    };
+    meSync();
+    On.on.calling = function () { friendsMsg("Calling your friend… They need Spades open to answer."); };
+    // A friend calls: ask, wherever you are.
+    let callTimer = null;
+    On.on.call = function (c) {
+      clearTimeout(callTimer);
+      $("callWho").textContent = c.name + " wants to play Spades with you.";
+      $("callBar").hidden = false;
+      const done = function () { clearTimeout(callTimer); $("callBar").hidden = true; };
+      $("callYes").onclick = function () { done(); c.accept(name()).then(function (ok) { if (ok) friendsMsg(c.name + " is on the way. Sit at a table and they're dealt in."); }); };
+      $("callNo").onclick = function () { done(); c.decline(); };
+      callTimer = setTimeout(function () { done(); c.decline(); }, 60000);
+    };
+    On.listen();
     $("frLeave").onclick = function () { On.leave(); };
     $("frCopy").onclick = function () { copyText(On.link(), function () { friendsMsg("Link copied. Anyone who opens it joins this room."); }); };
     $("frAltCopy").onclick = function () { copyText($("frAltOut").value, function () { friendsMsg("Copied."); }); };
@@ -295,6 +324,8 @@ globalThis.HS = globalThis.HS || {};
     altSync();
     On.on.error = function (m) { friendsMsg(m); };
     On.on.dropped = function () { friendsMsg("Connection lost. Reconnecting…"); };
+    On.on.back = function () { friendsMsg("Back online."); };
+    On.on.slow = function () { friendsMsg("Your networks won't link directly, so this game goes through the relays: a little slower, still private."); };
     On.on.room = function () { friendsSync(); altSync(); };
     // Opened from a friend's link (?room=CODE): join that room straight away.
     const linked = (new URLSearchParams(location.search).get("room") || "").trim().slice(0, 6);
@@ -319,7 +350,7 @@ globalThis.HS = globalThis.HS || {};
       const wasPlaying = G.mode === "play";
       Net.stop(); Net.role = "solo"; Net.ctx = null; Net.rehand = null; Net.pendingAct = null;
       if (wasPlaying) unseat();
-      friendsSync(); altSync(); $("frAlt").hidden = true;
+      friendsSync(); altSync(); $("frAlt").hidden = true; meSync();
       friendsMsg(reason || (wasPlaying ? "You left the room." : ""));
     };
     // The host changed tables while we were walking about.

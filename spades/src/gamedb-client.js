@@ -1,41 +1,34 @@
-// GameDB client — connects a game (browser or Node) to a GameDB hub: the host player's
-// browser (peer to peer, see gamedb-p2p.js, which builds these for you) or a GameDB server.
-// Zero dependencies. Handles sign-in (a guest account remembered on the device),
-// requests with replies, pushed events and automatic reconnects.
+// GameDB client — a game's connection to a room's hub: the host player's browser, reached peer
+// to peer (gamedb-p2p.js builds these for you). Zero dependencies. Handles sign-in with this
+// device's key, requests with replies, pushed events and automatic reconnects.
 //
-//   const game = new GameClient('ws://localhost:8830');
-//   const me = await game.connect();
-//   game.on('state', ({ state }) => draw(state));
-//   await game.quickMatch('tictactoe');
-//   await game.input({ cell: 4 });
+//   const { client } = await joinRoom({ app: 'spades', code });
+//   client.on('state', ({ state }) => draw(state));
+//   await client.input({ cell: 4 });
+import { signable } from './gamedb-hub.js';
 
 export class GameClientError extends Error {
   constructor(code, msg) { super(msg); this.name = 'GameClientError'; this.code = code; }
 }
 
-function defaultStore() {
-  try { const ls = globalThis.localStorage; if (ls) return { get: k => ls.getItem(k), set: (k, v) => ls.setItem(k, v) }; } catch { /* storage blocked */ }
-  const m = new Map(); return { get: k => m.get(k) ?? null, set: (k, v) => { m.set(k, v); } };
-}
-
 export class GameClient {
   /**
-   * @param url  ws:// or wss:// address of the server (any label when `transport` is given)
-   * @param opts name (display name for a new player), store ({ get, set } for the saved login),
-   *             profile (use different values to keep several players on one device), reconnect (true),
-   *             transport: async () => an open link { send(text), close(), readyState: 1 } on which this
-   *               client sets onmessage({ data }) and onclose(); used instead of a WebSocket,
-   *             ownIdentity: true = this device makes its own player id and secret and keeps them for
-   *               every hub it meets (peer to peer); false = the server hands out the account.
+   * @param label    a name for this connection (shown in messages only)
+   * @param opts     transport: async () => an open link { send(text), close(), readyState: 1 } on which this
+   *                   client sets onmessage({ data }) and onclose();
+   *                 identity: this device's player (gamedb-id.js deviceIdentity);
+   *                 name (display name), reconnect (true), retryForMs (keep trying this long after a
+   *                 drop, default 60 s), maxRetries, timeoutMs (per request)
    */
-  constructor(url, { name = null, store = defaultStore(), profile = '', reconnect = true, timeoutMs = 10000, transport = null, ownIdentity = false, maxRetries = Infinity } = {}) {
-    this.url = url; this.name = name; this.store = store; this.key = ownIdentity ? `gamedb:me:${profile}` : `gamedb:${url}:${profile}`;
-    this.transport = transport; this.ownIdentity = ownIdentity; this.maxRetries = maxRetries;
-    this.reconnect = reconnect; this.timeoutMs = timeoutMs;
-    this.ws = null; this.me = null; this._id = 0; this._pending = new Map(); this._handlers = new Map(); this._closed = false; this._retry = 0;
+  constructor(label, { transport, identity, name = null, reconnect = true, timeoutMs = 10000, maxRetries = Infinity, retryForMs = 60000 } = {}) {
+    if (typeof transport !== 'function' || !identity) throw new GameClientError('BAD_INPUT', 'a GameClient needs a transport and an identity');
+    this.url = label; this.transport = transport; this.identity = identity; this.name = name;
+    this.reconnect = reconnect; this.timeoutMs = timeoutMs; this.maxRetries = maxRetries; this.retryForMs = retryForMs;
+    this.ws = null; this.me = null; this._id = 0; this._pending = new Map(); this._handlers = new Map(); this._closed = false; this._retry = 0; this._lostAt = 0;
   }
 
-  /** Listen for an event: 'room', 'state', 'relay', 'board', 'kicked', 'open' (connected or reconnected), 'close', 'lost' (gave up reconnecting). Returns an unsubscribe function. */
+  /** Listen for an event: 'room', 'state', 'relay', 'board', 'kicked', 'open' (connected or reconnected), 'close',
+   *  'reconnecting' ({ attempt, since }), 'lost' (gave up reconnecting), 'host' (this device took over the room). Returns an unsubscribe function. */
   on(ev, fn) { if (!this._handlers.has(ev)) this._handlers.set(ev, new Set()); this._handlers.get(ev).add(fn); return () => this._handlers.get(ev).delete(fn); }
   _emit(ev, data) { const hs = this._handlers.get(ev); if (hs) for (const fn of [...hs]) { try { fn(data); } catch (e) { console.error(e); } } }
 
@@ -44,70 +37,53 @@ export class GameClient {
     this._closed = false;
     await this._open();
     this.me = await this._signIn();
-    this._retry = 0;
+    this._retry = 0; this._lostAt = 0;
     this._emit('open', this.me);
     return this.me;
   }
-  _open() {
-    const wire = (ws, wasOpen) => {
-      ws.onmessage = ev => this._message(ev.data);
-      ws.onclose = () => {
-        if (this.ws !== ws) return;
-        for (const p of this._pending.values()) { clearTimeout(p.timer); p.rej(new GameClientError('CLOSED', 'connection closed')); }
-        this._pending.clear();
-        if (!wasOpen()) return;
-        this._emit('close');
-        if (this.reconnect && !this._closed && !this._kicked) this._again();
-      };
+  async _open() {
+    const link = await this.transport();
+    if (this._closed) { link.close(); throw new GameClientError('CLOSED', 'closed while connecting'); }
+    this.ws = link;
+    link.onmessage = ev => this._message(ev.data);
+    link.onclose = () => {
+      if (this.ws !== link) return;
+      for (const p of this._pending.values()) { clearTimeout(p.timer); p.rej(new GameClientError('CLOSED', 'connection closed')); }
+      this._pending.clear();
+      this._emit('close');
+      if (this.reconnect && !this._closed && !this._kicked) this._again();
     };
-    if (this.transport) {
-      return Promise.resolve(this.transport()).then(link => {
-        if (this._closed) { link.close(); throw new GameClientError('CLOSED', 'closed while connecting'); }
-        this.ws = link; wire(link, () => true);
-      });
-    }
-    return new Promise((res, rej) => {
-      const ws = new WebSocket(this.url); this.ws = ws; let opened = false;
-      ws.onopen = () => { opened = true; res(); };
-      ws.onerror = () => { if (!opened) rej(new GameClientError('CONNECT', `could not connect to ${this.url}`)); };
-      wire(ws, () => opened);
-    });
   }
   /** True while the link is up. */
   get connected() { return !!this.ws && this.ws.readyState === 1; }
-  /** This device's own player id and secret (made on first use), when ownIdentity is on. */
-  identity() {
-    let saved = null; try { saved = JSON.parse(this.store.get(this.key)); } catch { /* none yet */ }
-    if (!saved || !saved.playerId || !saved.secret) {
-      const hex = n => Array.from(globalThis.crypto.getRandomValues(new Uint8Array(n)), b => (b < 16 ? '0' : '') + b.toString(16)).join('');
-      saved = { playerId: `${hex(4)}-${hex(2)}-${hex(2)}-${hex(2)}-${hex(6)}`, secret: hex(24) };
-      this.store.set(this.key, JSON.stringify(saved));
-    }
-    return saved;
-  }
+  /** How this device reaches the host right now: 'direct', 'relay' (slower, through the meeting points) or 'host' (this device is the host). */
+  get lane() { return this.ws && this.ws.readyState === 1 ? this.ws.lane || 'direct' : null; }
   _again() {
-    const wait = Math.min(10000, 500 * 2 ** this._retry++);
-    // Gives up (event 'lost') when the link can never come back ('GONE') or after maxRetries tries.
-    if (this._retry > this.maxRetries) { this._closed = true; this._emit('lost'); return; }
+    if (!this._lostAt) this._lostAt = Date.now();
+    const n = this._retry++;
+    // Gives up (event 'lost') when the link can never come back ('GONE'), or after retryForMs / maxRetries.
+    if (n >= this.maxRetries || Date.now() - this._lostAt > this.retryForMs) { this._closed = true; this._emit('lost'); return; }
+    this._emit('reconnecting', { attempt: n + 1, since: this._lostAt });
     setTimeout(() => {
       if (this._closed) return;
       this.connect().catch(e => {
         if (this._closed) return;
         if (e && e.code === 'GONE') { this._closed = true; this._emit('lost'); } else this._again();
       });
-    }, wait);
+    }, n === 0 ? 0 : Math.min(5000, 250 * 2 ** n));
   }
   async _signIn() {
-    if (this.ownIdentity) { const me = this.identity(); return this.call('hello', { playerId: me.playerId, secret: me.secret, name: this.name }); }
-    let saved = null; try { saved = JSON.parse(this.store.get(this.key)); } catch { /* none yet */ }
-    if (saved && saved.playerId) {
-      try { return await this.call('hello', { playerId: saved.playerId, secret: saved.secret, name: this.name }); }
-      catch (e) { if (e.code !== 'AUTH') throw e; } // the server no longer knows us: start fresh
+    const me = this.identity, hello = extra => this.call('hello', { playerId: me.playerId, name: this.name, ...extra });
+    let nonce = null;
+    try { nonce = (await this.call('challenge')).nonce; } catch (e) { if (e.code !== 'NO_OP' && e.code !== 'AUTH') throw e; } // an older host has no keys yet
+    if (!nonce) return hello({ secret: me.secret });
+    const signed = n => ({ key: me.key, sig: me.sign(signable('gamedb-hello', n, me.playerId, me.key)) });
+    try { return await hello(signed(nonce)); }
+    catch (e) {
+      if (e.code !== 'KEY_UNBOUND') throw e;
+      // This host met us before keys existed: show the old secret once so it learns our key.
+      return hello({ ...signed((await this.call('challenge')).nonce), secret: me.secret });
     }
-    const r = await this.call('register', { name: this.name });
-    this.store.set(this.key, JSON.stringify({ playerId: r.playerId, secret: r.secret }));
-    delete r.secret;
-    return r;
   }
   _message(text) {
     let m; try { m = JSON.parse(text); } catch { return; }
@@ -117,7 +93,7 @@ export class GameClient {
     if (m.ok) p.res(m.r); else p.rej(new GameClientError(m.e.code, m.e.message));
   }
 
-  /** Send a request and wait for its reply. Rejects with a GameClientError carrying the server's error code. */
+  /** Send a request and wait for its reply. Rejects with a GameClientError carrying the hub's error code. */
   call(op, a = {}) {
     return new Promise((res, rej) => {
       if (!this.ws || this.ws.readyState !== 1) return rej(new GameClientError('CLOSED', 'not connected'));
@@ -158,12 +134,12 @@ export class GameClient {
   start() { return this.call('start'); }
   /** Host only: play again in a finished room with the same people. */
   rematch() { return this.call('rematch'); }
-  /** Send a move; the server runs the game rules and pushes the new state to the room. */
+  /** Send a move; the host's hub runs the game rules and pushes the new state to the room. */
   input(data) { return this.call('input', { data }); }
   /** Send fast, unsaved data (positions, aim) straight to the others in the room, or to one player with `to`. */
   relay(data, to) { return this.call('relay', to === undefined ? { data } : { data, to }); }
-  /** The server's clock in milliseconds. */
+  /** The host's clock in milliseconds. */
   time() { return this.call('time'); }
-  /** Run one of the server's custom actions. */
+  /** Run one of the host's custom actions. */
   action(name, args = {}) { return this.call('action', { name, args }); }
 }
