@@ -91,6 +91,7 @@
     <footer class="mfoot">
       <p id="controls"></p>
       <button class="btn" id="btn-play">RIDE! <small>SPACE</small></button>
+      <button class="btn alt" id="btn-mp">RACE A FRIEND</button>
     </footer>
     <div class="row2 mrow"><span id="menu-best"></span><button class="q" id="btn-q">GRAPHICS <b id="q-label">ULTRA</b> <small>◀ ▶</small></button></div>
   </div>
@@ -113,6 +114,21 @@
     <div class="kicker">PAUSED</div>
     <button class="btn" id="btn-resume">RESUME <small>SPACE</small></button>
     <button class="btn alt" id="btn-quit">QUIT RACE</button>
+  </div>
+</div>
+
+<div id="screen-lobby" class="screen">
+  <div class="panel lobby">
+    <div class="kicker">RACE A FRIEND <span id="lb-code"></span></div>
+    <div id="lb-status"></div>
+    <div id="lb-share"><input id="lb-link" readonly aria-label="Room link"><button id="lb-copy">COPY LINK</button></div>
+    <div id="lb-ev"><button id="lb-ev-l" class="arr" aria-label="Previous event">◀</button><div><b id="lb-ev-name"></b><small id="lb-ev-sub"></small></div><button id="lb-ev-r" class="arr" aria-label="Next event">▶</button></div>
+    <div id="lb-players"></div>
+    <div id="lb-me"><button id="lb-me-l" class="arr" aria-label="Previous rider">◀</button><div><small>YOUR RIDER</small><b id="lb-me-name"></b></div><button id="lb-me-r" class="arr" aria-label="Next rider">▶</button></div>
+    <div id="lb-slow">SLOW LINK: YOUR NETWORKS WOULDN'T CONNECT DIRECTLY, SO RIDERS MAY LAG</div>
+    <button class="btn" id="lb-start">START RACE <small>SPACE</small></button>
+    <div id="lb-wait">THE HOST STARTS THE RACE</div>
+    <button class="btn alt" id="lb-leave">LEAVE ROOM</button>
   </div>
 </div>
 
@@ -140,6 +156,7 @@
 <script src="src/rider.js"></script>
 <script src="src/fx.js"></script>
 <script src="src/audio.js"></script>
+<script src="src/net.js"></script>
 <script src="src/main.js"></script>
 </body>
 </html>

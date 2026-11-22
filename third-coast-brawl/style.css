@@ -264,3 +264,38 @@ html.portrait .screen, html.portrait #loading, html.portrait #hud, html.portrait
 
 .rider[data-id] { background-size: auto, 135%; background-position: center, 50% 38%; }
 @media (min-width: 641px) { #screen-menu .row2 { right: 260px; } }
+
+/* ---------- racing friends: menu button + lobby ---------- */
+#screen-menu #btn-mp { width: auto; padding: 12px 22px; font-size: 22px; animation: none; white-space: nowrap; }
+#screen-lobby { align-items: center; justify-content: center; background: rgba(26,16,36,.45); }
+.lobby { width: min(520px, 100%); text-align: center; }
+#lb-code { margin-left: 6px; color: var(--sun); }
+#lb-status { margin: 8px 0 10px; font-family: var(--font); font-size: 24px; line-height: 1.1; color: #fff; -webkit-text-stroke: 1.2px var(--ink); paint-order: stroke fill; }
+#lb-share { display: flex; gap: 8px; margin-bottom: 12px; }
+#lb-link { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); background: rgba(0,0,0,.35); color: #fff; font: 700 13px "Nunito", sans-serif; }
+#lb-copy { flex: none; padding: 0 16px; border: 0; border-radius: 12px; background: linear-gradient(180deg, #ffd25a, #ff8a2a); color: var(--ink); font-family: var(--font); font-size: 16px; box-shadow: 0 4px 0 #b34a10; }
+#lb-ev, #lb-me { --c: #fff; display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 10px; border-radius: 14px; background: rgba(255,255,255,.07); border-left: 5px solid var(--c); }
+#lb-ev > div, #lb-me > div { flex: 1; min-width: 0; }
+#lb-ev b, #lb-me b { display: block; font-family: var(--font); font-weight: normal; font-size: 22px; color: #fff; -webkit-text-stroke: 1.2px var(--ink); paint-order: stroke fill; }
+#lb-ev small, #lb-me small { display: block; font-size: 10px; letter-spacing: 2px; font-weight: 900; color: var(--c); }
+#lb-ev .arr { visibility: hidden; }
+#lb-ev.host .arr { visibility: visible; }
+.arr { flex: none; width: 40px; height: 40px; border: 0; border-radius: 12px; background: rgba(255,255,255,.14); font-size: 16px; }
+#lb-players { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.lp { --c: #fff; padding: 8px 10px; border-radius: 12px; background: linear-gradient(165deg, color-mix(in srgb, var(--c) 28%, #140c1e), #140c1e 85%); border: 2px solid color-mix(in srgb, var(--c) 60%, transparent); text-align: left; }
+.lp.me { box-shadow: 0 0 0 2px var(--ink), 0 0 16px var(--c); }
+.lp b { display: block; font-family: var(--font); font-weight: normal; font-size: 20px; color: #fff; -webkit-text-stroke: 1.1px var(--ink); paint-order: stroke fill; }
+.lp small { font-size: 10px; letter-spacing: 1.5px; opacity: .75; font-weight: 900; }
+.lp.bots { background: rgba(255,255,255,.05); border-style: dashed; border-color: rgba(255,255,255,.25); }
+#lb-slow { margin: 6px 0; font-size: 11px; letter-spacing: 1px; color: var(--sun); }
+#lb-wait { margin: 12px 0 4px; font-family: var(--font); letter-spacing: 2px; opacity: .8; }
+#lb-start:disabled { filter: grayscale(.8) brightness(.7); }
+@media (max-height: 520px) {
+  .lobby { padding: 12px 14px; }
+  #lb-status { font-size: 18px; margin: 4px 0 6px; }
+  #lb-players { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0; }
+  .lp b { font-size: 15px; } #lb-ev, #lb-me { margin: 4px 0; padding: 4px 8px; }
+  .lobby .btn { display: inline-block; width: calc(50% - 5px); padding: 8px; font-size: 20px; margin-top: 6px; vertical-align: top; }
+  #lb-share { margin-bottom: 6px; } #lb-link { padding: 7px 10px; }
+  #lb-wait { margin: 6px 0 0; }
+}
