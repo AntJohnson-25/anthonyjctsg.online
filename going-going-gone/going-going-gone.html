@@ -326,7 +326,7 @@ addEventListener("unhandledrejection", function (e) { var m = document.getElemen
       <canvas id="r-spray" width="260" height="220"></canvas>
       <div id="r-stats"></div>
     </div>
-    <!-- Friends board for this machine speed: kept in this browser, traded by challenge links (js/friends.js). -->
+    <!-- Friends board for this machine speed: kept in this browser; friends met by a challenge link stay in step by GameDB mailboxes (js/friends.js). -->
     <div id="r-lb" class="lb-box hidden">
       <div class="lb-head"><span>FRIENDS BOARD</span><b id="lb-rank"></b></div>
       <ol id="lb-list" class="lb-list"></ol>
@@ -354,7 +354,7 @@ addEventListener("unhandledrejection", function (e) { var m = document.getElemen
       <button id="fb-share" type="button" class="lb-share hidden">CHALLENGE A FRIEND</button>
       <p id="fb-note" class="lb-note"></p>
     </div>
-    <p class="lb-how">Scores stay in this browser. A challenge link carries your board: whoever opens it gets your score on their board and is asked to beat it.</p>
+    <p class="lb-how">Send a friend a challenge link once. After that, each of you sees the other's new best scores here by themselves, no link back needed.</p>
     <button id="fb-close" type="button" class="big-btn">BACK</button>
   </div>
 </div>
@@ -1005,6 +1005,12 @@ function closeFriends() {
   $("friends").classList.add("hidden");
   updateFriendsButton();
 }
+// A friend's scores arrived (their game left them in this player's mailbox): redraw what is showing.
+Board.onChange(() => {
+  if (fbOpen) drawFriends();
+  if (!$("r-lb").classList.contains("hidden") && !$("results").classList.contains("hidden")) drawBoard(level);
+  if (!$("select").classList.contains("hidden")) updateFriendsButton();
+});
 $("fb-open").addEventListener("click", openFriends);
 $("fb-close").addEventListener("click", () => { sfx("click"); closeFriends(); });
 $("friends").addEventListener("click", (e) => { if (e.target === $("friends")) closeFriends(); });
@@ -2761,11 +2767,17 @@ __defs["js/friends.js"] = function () {
 //   - "Challenge a friend" makes a link that carries your board. Whoever opens it gets your
 //     scores merged into theirs and is asked to beat you; their link back does the same for you.
 //   - A merge keeps each player's best, so links can be opened in any order, any number of times.
+//   - After that the boards keep themselves up to date (GameDB mailboxes, js/gamedb-mail.js): every
+//     friend's game leaves its scores in your mailbox on free public meeting points, so a bucket your
+//     friend plays shows on your board the next time you open the game (or straight away if it is open),
+//     with no link back needed. Friends = whoever sent you a link you opened, whoever writes to you, and
+//     (the first time) everyone already on your boards.
 // Scores are taken on trust (it is a board among friends). If the browser blocks storage the
 // board still works until the page is closed.
-// js/gamedb.js and js/gamedb-kit.js are copies: re-copy from gamedb/Source when they change.
+// js/gamedb*.js are copies: re-copy from gamedb/Source when they change.
 const { GameDB, localStorageStorage } = __pb.req("js/gamedb.js");
 const { GameKit } = __pb.req("js/gamedb-kit.js");
+const { syncBoards } = __pb.req("js/gamedb-mail.js");
 
 const LEVELS = 5, MAX_SCORE = 200000, ME_KEY = "ggg.me", CHALLENGE_KEY = "ggg.challenge";
 // Where a challenge link points when the game is not running from a website (the double-click file).
@@ -2793,13 +2805,33 @@ function ready() {
 const safe = (fn, otherwise = null) => { try { return ready() ? fn() : otherwise; } catch (e) { return otherwise; } };
 const board = (level) => "ggg_" + level;
 
+// Keeping the boards in step with friends' games. (Started before a challenge link is merged, so
+// only its sender becomes a friend, not everyone else the link carries.)
+let sync = null;
+const listeners = [];
+function startSync() {
+  if (sync !== null || !ready()) return sync;
+  try {
+    sync = syncBoards({
+      kit, app: "going-going-gone", self: me, boards: Array.from({ length: LEVELS }, (_, i) => board(i)),
+      onChange: () => { for (const fn of listeners) { try { fn(); } catch (e) { console.error(e); } } }
+    });
+  } catch (e) { console.error(e); sync = false; }
+  return sync;
+}
+const tellFriends = () => { try { if (startSync()) sync.changed(); } catch (e) { console.error(e); } };
+
 const Board = {
   get enabled() { return ready(); },
   /** My player id on this device. */
   get playerId() { return ready() ? me : null; },
   get name() { return safe(() => kit.getPlayer(me).name); },
-  /** Record a bucket score. Returns { best, improved, rank } or null. */
-  submit: (level, score) => safe(() => kit.submitScore(board(level), me, score)),
+  /** Record a bucket score. Returns { best, improved, rank } or null. A new best goes to friends' boards. */
+  submit: (level, score) => safe(() => { const r = kit.submitScore(board(level), me, score); if (r.improved) tellFriends(); return r; }),
+  /** Call fn whenever a friend's scores arrive (redraw the board). */
+  onChange(fn) { listeners.push(fn); },
+  /** For checks: how many meeting points are up and how many friends are kept in step. */
+  get mailState() { return sync ? { up: sync.mail.relaysUp(), friends: sync.friends().length } : null; },
   /** The best n scores for a machine speed: [{ pos, player_id, name, score }]. */
   top: (level, n) => safe(() => kit.top(board(level), n || 5), []),
   /** My rank on a board (1 = best), or null if I have no score there. */
@@ -2807,7 +2839,7 @@ const Board = {
   /** How many players are on a board. */
   size: (level) => safe(() => kit.boardSize(board(level)), 0),
   /** Change the name shown on the boards. Returns the saved name or null. */
-  setName: (name) => safe(() => kit.player(me, name).name),
+  setName: (name) => safe(() => { const saved = kit.player(me, name).name; tellFriends(); return saved; }),
   /** A link that carries my board for this machine speed to a friend (null until I have a score on it). */
   link(level) {
     return safe(() => {
@@ -2819,8 +2851,11 @@ const Board = {
   /** Take in the text from a challenge link. Returns { level, name, score } for the friend who sent it, or null. */
   accept(text) {
     return safe(() => {
+      startSync();
       const got = kit.acceptShare(text, { self: me }), m = got && /^ggg_([0-4])$/.exec(got.board);
       if (!m || !got.from || got.from.id === me) return null;
+      // Whoever sent the link is a friend from now on: your scores go to their board without a link back.
+      try { if (sync) sync.addFriend(got.from.id); } catch (e) { console.error(e); }
       return { level: +m[1], name: got.from.name || "A friend", score: got.from.score };
     });
   },
@@ -2841,6 +2876,8 @@ try {
     try { Board.challenge = JSON.parse(sessionStorage.getItem(CHALLENGE_KEY) || "null"); } catch (e) { Board.challenge = null; }
   }
 } catch (e) { Board.challenge = null; }
+// Pick up friends' scores waiting in the mailbox, and send ours where they have not gone yet.
+startSync();
 
 
 
@@ -4125,12 +4162,39 @@ class GameKit {
    * the sender's own). Put it in a link to your game ("beat my score"); the friend's game calls acceptShare.
    */
   shareBoard(boardId, playerId, n = 8) {
+    return encodeShare({ v: 1, from: playerId, ...this._exportWith(boardId, playerId, n) });
+  }
+  // exportBoard, plus the player's own entry when it is not among the best n.
+  _exportWith(boardId, playerId, n) {
     const data = this.exportBoard(boardId, n);
     if (!data.rows.some(r => r[0] === playerId)) {
       const mine = this.db.get('SELECT s.score, s.at, p.name FROM gk_scores s LEFT JOIN gk_players p ON p.id = s.player_id WHERE s.board = ? AND s.period_key = ? AND s.player_id = ?', [boardId, data.period, playerId]);
       if (mine) data.rows.push([playerId, mine.name, mine.score, mine.at]);
     }
-    return encodeShare({ v: 1, from: playerId, ...data });
+    return data;
+  }
+  /**
+   * Several boards at once, as a value (not text): what a player mails to friends (gamedb-mail.js).
+   * { v: 1, from, boards: [exportBoard...] }, each with the player's own entry; null if the player
+   * has no score on any of them yet.
+   */
+  shareBoards(boardIds, playerId, n = 8) {
+    this._id(playerId);
+    const boards = boardIds.map(id => this._exportWith(id, playerId, n));
+    return boards.some(b => b.rows.some(r => r[0] === playerId)) ? { v: 1, from: playerId, boards } : null;
+  }
+  /**
+   * Merge a value made by shareBoards on another device. Boards this game does not have are skipped.
+   * Returns { merged, from } (merged = scores added or beaten), or null if it is not such a value.
+   */
+  acceptBoards(data, { self = null } = {}) {
+    if (!data || typeof data !== 'object' || data.v !== 1 || !Array.isArray(data.boards) || data.boards.length > 50) return null;
+    let merged = 0;
+    for (const b of data.boards) {
+      if (!b || typeof b.board !== 'string' || !this.db.get('SELECT id FROM gk_boards WHERE id = ?', [b.board])) continue;
+      try { merged += this.mergeBoard(b, { self }); } catch (e) { if (!(e instanceof GameDBError)) throw e; }
+    }
+    return { merged, from: typeof data.from === 'string' ? data.from : null };
   }
   /**
    * Take in text made by shareBoard. Returns { board, merged, from: { id, name, score } | null } where
@@ -4179,6 +4243,1123 @@ class GameKit {
 }
 
 return { encodeShare, decodeShare, GameKit };
+};
+__defs["js/gamedb-mail.js"] = function () {
+// GameDB mailboxes — leave something for a friend who is not online. No server of ours, nothing to sign up for.
+//
+// Every player has a mailbox, named from their player id. A letter is left in it on the free public
+// meeting points that keep messages for later (gamedb-relays.js):
+//   - MQTT brokers: a "retained" message, handed to whoever subscribes to it later
+//   - Nostr relays: a stored event (NIP-78 app data), replaced by the next one from the same sender
+// Every sender has one slot in each mailbox, so a new letter replaces the last one. Letters are sealed
+// with keys made from the owner's id: only someone who knows that id (a friend it was shared with) can
+// find, read or write that mailbox; the meeting points see unreadable text under a hash. Raced across
+// all of them like everything else: any one being down does not matter.
+// (WebTorrent trackers keep nothing, so they are not used for mail.)
+//
+//   const mail = openMail({ app: 'my-game', onLetter: (from, body) => ... });
+//   mail.watch(myId);                     // the letters waiting for me now, then new ones as they come
+//   mail.send(friendId, myId, { ... });   // leave (or replace) my letter in a friend's mailbox
+//
+// syncBoards (below) builds friends leaderboards that keep themselves up to date on it.
+// Zero dependencies.
+const { sha256, sha256Hex, utf8, toHex } = __pb.req("js/gamedb-hub.js");
+const { publicKey, schnorrSign, fromHex } = __pb.req("js/gamedb-id.js");
+const { DEFAULT_RELAYS, MAIL_KIND, relayKind, mqttOpen, nostrOpen, concat, seal, unseal } = __pb.req("js/gamedb-relays.js");
+
+/** The meeting points that keep letters: the default ones less the trackers (checked by tests/check_mail.js). */
+const MAIL_RELAYS = DEFAULT_RELAYS.filter(s => relayKind(s).kind !== 'bt');
+const MAX_LETTER = 60000; // characters of sealed text
+
+/** A player's mailbox: { box (the topic, a hash), enc, mac }. */
+function mailKeys(app, ownerId) {
+  const k = sha256(utf8(`gamedb-mail|${app}|${ownerId}`)), part = label => sha256(concat([utf8(label), k]));
+  return { box: toHex(part('box')).slice(0, 32), enc: part('enc'), mac: part('mac') };
+}
+const slotOf = (app, fromId) => sha256Hex(`gamedb-mail-slot|${app}|${fromId}`).slice(0, 16);
+// The Nostr key a sender writes into one mailbox with: the same every time for that pair (so the
+// relay replaces the older letter), different for every pair (so relays cannot link the mailboxes).
+function authorKey(app, box, fromId) {
+  let sk = sha256(utf8(`gamedb-mail-author|${app}|${box}|${fromId}`));
+  for (;;) { try { return { sk, pub: toHex(publicKey(sk)) }; } catch { sk = sha256(sk); } }
+}
+function letterEvent(author, box, slot, text, createdAt) {
+  const tags = [['d', `gdbm/${box}/${slot}`], ['x', box]];
+  const id = toHex(sha256(utf8(JSON.stringify([0, author.pub, createdAt, MAIL_KIND, tags, text]))));
+  return { id, pubkey: author.pub, created_at: createdAt, kind: MAIL_KIND, tags, content: text, sig: toHex(schnorrSign(fromHex(id), author.sk)) };
+}
+
+// ── post offices: one per meeting point, all the same shape { put(letter), watch(box), close() } ──
+// onLetter(box, slot, text) for every letter seen in a watched mailbox (stored ones first).
+
+function mqttPost(url, { WS, onLetter, onClose }) {
+  return mqttOpen(url, { WS, onClose, onMessage: (topic, text) => { const p = topic.split('/'); if (p.length === 3 && p[0] === 'gdbm') onLetter(p[1], p[2], text); } })
+    .then(l => ({ put: e => l.publish(`gdbm/${e.box}/${e.slot}`, e.text, true), watch: box => l.subscribe(`gdbm/${box}/+`), close: () => l.close() }));
+}
+function nostrPost(url, { WS, onLetter, onClose }) {
+  return nostrOpen(url, { WS, onClose, sign: null, onMessage: (box, text, ev) => {
+    const d = ev && ev.kind === MAIL_KIND && ev.tags.find(t => Array.isArray(t) && t[0] === 'd');
+    const p = d && typeof d[1] === 'string' ? d[1].split('/') : [];
+    if (p.length === 3 && p[0] === 'gdbm' && p[1] === box) onLetter(box, p[2], text);
+  } }).then(l => ({ put: e => l.put(e.event), watch: box => l.subscribe(box, { stored: true }), close: () => l.close() }));
+}
+
+/**
+ * Mailboxes that live inside one process, for tests: pass `post: memoryPost()` to openMail (or
+ * syncBoards). It keeps letters the way the real meeting points do. post.down = true loses everything sent.
+ */
+function memoryPost() {
+  const letters = new Map(), offices = new Set(); // box -> Map(slot -> text)
+  const later = (o, box, slot, text) => setTimeout(() => { if (offices.has(o)) o.onLetter(box, slot, text); }, 0);
+  const factory = ({ onLetter }) => {
+    const me = { boxes: new Set(), onLetter }; offices.add(me);
+    return Promise.resolve({
+      put(e) {
+        if (factory.down) return;
+        let m = letters.get(e.box); if (!m) letters.set(e.box, (m = new Map())); m.set(e.slot, e.text);
+        for (const o of offices) if (o.boxes.has(e.box)) later(o, e.box, e.slot, e.text);
+      },
+      watch(box) { me.boxes.add(box); for (const [slot, text] of letters.get(box) || []) later(me, box, slot, text); },
+      close() { offices.delete(me); },
+    });
+  };
+  factory.letters = letters; factory.down = false;
+  return factory;
+}
+
+/**
+ * Open the mailboxes. onLetter(fromId, body, { to, at }) is called once per new letter in a watched
+ * mailbox (the stored ones when it is first watched, then new ones as they are left).
+ * onUp() is called each time a meeting point comes up (they keep being dialled until they do).
+ * Returns { watch(ownerId), send(toId, fromId, body), close(), relaysUp(), ready, settled }:
+ *   send returns how many meeting points the letter went out on right now; if that is 0 it waits
+ *   and goes out as soon as one connects (while the page stays open).
+ *   ready resolves (true) once the first meeting point is up, or (false) when none could be reached
+ *   on the first try; settled resolves with how many connected on the first try.
+ */
+function openMail({ app, relays = MAIL_RELAYS, WS = globalThis.WebSocket, post = null, onLetter = () => {}, onUp = () => {}, log = () => {}, retryMs = 5000 }) {
+  if (typeof app !== 'string' || !app) throw new Error('openMail needs an app name');
+  const watched = new Map(), outbox = new Map(), newest = new Map(), authors = new Map(), links = new Set();
+  let closed = false, isUp = null;
+  const ready = new Promise(res => { isUp = res; });
+  const got = (box, slot, text) => {
+    const keys = watched.get(box);
+    if (closed || !keys || typeof text !== 'string' || !text || text.length > MAX_LETTER) return;
+    const m = unseal(keys, text);
+    if (!m || m.v !== 1 || typeof m.from !== 'string' || !m.from || m.from.length > 64 || typeof m.at !== 'number' || slot !== slotOf(app, m.from)) return;
+    const k = box + '/' + slot;
+    if ((newest.get(k) || 0) >= m.at) return; // the same letter from another meeting point, or an older copy
+    newest.set(k, m.at);
+    try { onLetter(m.from, m.body, { to: keys.owner, at: m.at }); } catch (e) { console.error(e); }
+  };
+  // (post: one memoryPost, or several to stand for several meeting points.)
+  const offices = post ? [].concat(post).map((p, i) => ['memory' + i, p]) : relays.map(spec => {
+    const { kind, url } = relayKind(spec);
+    return kind === 'mqtt' ? [spec, o => mqttPost(url, o)] : kind === 'nostr' ? [spec, o => nostrPost(url, o)] : null;
+  }).filter(Boolean);
+  // Every meeting point is dialled again and again (5 s, 10 s ... up to a minute apart) until it is up,
+  // and again whenever it drops: a page that was busy loading can see its first tries time out.
+  const first = new Set(offices.map(o => o[0])); let firstUp = 0, settle;
+  const settled = new Promise(res => { settle = res; });
+  const firstDone = (spec, ok) => { if (!first.delete(spec)) return; if (ok) firstUp++; if (!first.size) { settle(firstUp); isUp(firstUp > 0); } };
+  const retry = (spec, open, wait) => { if (!closed) setTimeout(() => dial(spec, open, Math.min(wait * 2, 12 * retryMs)), wait); };
+  const dial = (spec, open, wait = retryMs) => {
+    if (closed) return;
+    open({ WS, onLetter: got, onClose: () => {
+      for (const l of links) if (l.spec === spec) links.delete(l);
+      retry(spec, open, retryMs);
+    } }).then(link => {
+      if (closed) { link.close(); return; }
+      link.spec = spec; links.add(link);
+      for (const box of watched.keys()) link.watch(box);
+      for (const e of outbox.values()) link.put(e);
+      isUp(true); firstDone(spec, true);
+      try { onUp(); } catch (e) { console.error(e); }
+    }, e => { log('gamedb-mail: meeting point unavailable', spec, e && e.message); firstDone(spec, false); retry(spec, open, wait); });
+  };
+  if (post || WS) for (const [spec, open] of offices) dial(spec, open); else first.clear();
+  if (!first.size) { settle(0); isUp(false); }
+  return {
+    ready, settled, relaysUp: () => links.size,
+    watch(ownerId) {
+      const keys = { ...mailKeys(app, ownerId), owner: ownerId };
+      if (closed || watched.has(keys.box)) return;
+      watched.set(keys.box, keys); for (const l of links) l.watch(keys.box);
+    },
+    send(toId, fromId, body) {
+      if (closed) return 0;
+      const keys = mailKeys(app, toId), slot = slotOf(app, fromId), k = keys.box + '/' + slot, prev = outbox.get(k);
+      const at = Math.max(Date.now(), prev ? prev.at + 1 : 0);
+      const text = seal(keys, { v: 1, from: fromId, at, body });
+      if (text.length > MAX_LETTER) throw new Error(`letter is ${text.length} characters; the limit is ${MAX_LETTER}`);
+      let author = authors.get(k); if (!author) authors.set(k, (author = authorKey(app, keys.box, fromId)));
+      const e = { box: keys.box, slot, at, text, event: letterEvent(author, keys.box, slot, text, Math.max(Math.floor(at / 1000), prev ? prev.event.created_at + 1 : 0)) };
+      outbox.set(k, e);
+      for (const l of links) l.put(e);
+      return links.size;
+    },
+    close() { closed = true; for (const l of links) l.close(); links.clear(); isUp(false); },
+  };
+}
+
+// ───────────────────────── friends boards that keep themselves up to date ─────────────────────────
+// Every friend gets a letter with this player's boards (their best n, with the player's own entry)
+// whenever they change, and the letters waiting here are merged in when the game opens, then new
+// ones as they arrive. Friends are kept in the same database (gk_mail_friends). Scores are taken on
+// trust, the same as the kit's challenge links: this is for friends, not for prizes.
+
+const FRIENDS_SCHEMA = 'CREATE TABLE IF NOT EXISTS gk_mail_friends (id TEXT PRIMARY KEY, added TIMESTAMP NOT NULL, sent TEXT, sent_at TIMESTAMP)';
+/** An unchanged letter is left again after this long anyway (a meeting point may have lost it). */
+const RESEND_MS = 86400000;
+
+/**
+ * Keep friends leaderboards in step through the mailboxes.
+ *   kit     a GameKit;  app: the game's name;  boards: the board ids to keep in step;  self: this player's id
+ *   onChange({ from, merged }) after a friend's letter was merged (redraw the board)
+ *   maxFriends (50): friends beyond this are not written to;  n (8): entries per board in a letter
+ * Returns {
+ *   addFriend(id)   someone to keep in step with (e.g. whoever sent the challenge link that was opened);
+ *                   whoever writes to this player becomes a friend too. Returns true if they were new.
+ *   changed()       call after this player's scores or name changed: friends are written to
+ *   friends()       the friends' ids, newest first
+ *   close(), mail
+ * }
+ * Boards that existed before this (scores that came by challenge links): everyone already on them
+ * becomes a friend the first time, so those friends start getting letters too.
+ */
+function syncBoards({ kit, app, boards, self, n = 8, maxFriends = 50, relays, WS, post, retryMs, onChange = () => {}, log = () => {}, now = Date.now }) {
+  const db = kit.db;
+  if (!Array.isArray(boards) || !boards.length) throw new Error('syncBoards needs the board ids');
+  if (typeof self !== 'string' || !self) throw new Error('syncBoards needs this player\'s id');
+  db.exec(FRIENDS_SCHEMA);
+  const isId = id => typeof id === 'string' && id.length > 0 && id.length <= 64 && id !== self;
+  const count = () => db.get('SELECT COUNT(*) AS n FROM gk_mail_friends').n;
+  const add = id => {
+    if (!isId(id) || db.get('SELECT id FROM gk_mail_friends WHERE id = ?', [id]) || count() >= maxFriends) return false;
+    db.run('INSERT INTO gk_mail_friends (id, added) VALUES (?, ?) ON CONFLICT DO NOTHING', [id, now()]);
+    return true;
+  };
+  const friends = () => db.query('SELECT id FROM gk_mail_friends ORDER BY added DESC LIMIT ?', [maxFriends]).map(r => r.id);
+  if (count() === 0) {
+    const seen = new Set();
+    for (const b of boards) for (const r of db.query('SELECT player_id FROM gk_scores WHERE board = ?', [b])) if (isId(r.player_id)) seen.add(r.player_id);
+    for (const id of seen) add(id);
+  }
+  let closed = false;
+  // Write to these friends if what they last got from here is different (or old); force = write anyway.
+  const sendTo = (ids, force = false) => {
+    if (closed) return 0;
+    const card = kit.shareBoards(boards, self, n);
+    if (!card) return 0; // nothing to tell until this player has a score
+    const h = sha256Hex(JSON.stringify(card)).slice(0, 16), t = now(); let sent = 0;
+    for (const id of ids) {
+      const row = db.get('SELECT sent, sent_at FROM gk_mail_friends WHERE id = ?', [id]);
+      if (!row || (!force && row.sent === h && t - (row.sent_at || 0) < RESEND_MS)) continue;
+      // Marked as sent only once it went out somewhere; otherwise the next start tries again.
+      if (mail.send(id, self, card) > 0) db.run('UPDATE gk_mail_friends SET sent = ?, sent_at = ? WHERE id = ?', [h, t, id]);
+      sent++;
+    }
+    return sent;
+  };
+  // Each time a meeting point comes up, friends who have not had this player's latest boards get them
+  // (once it has gone out somewhere, the others pick it up from the outbox as they connect).
+  const mail = openMail({ app, relays, WS, post, log, retryMs, onUp: () => sendTo(friends()), onLetter: (from, body) => {
+    if (closed || !isId(from) || !body || body.from !== from) return; // (a letter only speaks for its sender)
+    const r = kit.acceptBoards(body, { self });
+    if (!r) return;
+    if (add(from)) sendTo([from], true); // a new friend: they get this player's boards back straight away
+    try { onChange({ from, merged: r.merged }); } catch (e) { console.error(e); }
+  } });
+  mail.watch(self);
+  return {
+    mail,
+    addFriend(id) { const fresh = add(id); if (fresh) sendTo([id], true); return fresh; },
+    changed: () => sendTo(friends()),
+    friends,
+    close() { closed = true; mail.close(); },
+  };
+}
+
+return { MAIL_RELAYS, mailKeys, memoryPost, openMail, RESEND_MS, syncBoards };
+};
+__defs["js/gamedb-hub.js"] = function () {
+// GameDB hub — the multiplayer core: players, rooms, seats, game rules, relay, live leaderboards.
+// It runs inside the host player's browser (gamedb-p2p.js) and has no network code of its own:
+// anything that can pass text both ways plugs in with hub.connect(conn).
+// Players bring their own identity (made on their device, gamedb-id.js): an id and a key that
+// signs each sign-in. The hub remembers a player's key the first time it meets them.
+// Zero dependencies; nothing here needs Node.
+const { GameDBError } = __pb.req("js/gamedb.js");
+
+const fail = (code, msg) => { throw new GameDBError(code, msg); };
+
+// ───────────────────────── small crypto helpers (pure JS, work on any page) ─────────────────────────
+
+const PRIMES = []; for (let n = 2; PRIMES.length < 64; n++) if (PRIMES.every(p => n % p)) PRIMES.push(n);
+const frac32 = x => Math.floor((x - Math.floor(x)) * 4294967296) >>> 0;
+const SHA_K = new Uint32Array(PRIMES.map(p => frac32(Math.cbrt(p))));
+const SHA_H = PRIMES.slice(0, 8).map(p => frac32(Math.sqrt(p)));
+const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+
+/** SHA-256 of a Uint8Array. Returns a 32-byte Uint8Array. */
+function sha256(bytes) {
+  const l = bytes.length, n = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(n);
+  m.set(bytes); m[l] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(n - 8, Math.floor(l / 0x20000000)); dv.setUint32(n - 4, (l << 3) >>> 0);
+  const h = new Uint32Array(SHA_H), w = new Uint32Array(64);
+  for (let o = 0; o < n; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getUint32(o + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const x = w[i - 15], y = w[i - 2];
+      w[i] = (w[i - 16] + (rotr(x, 7) ^ rotr(x, 18) ^ (x >>> 3)) + w[i - 7] + (rotr(y, 17) ^ rotr(y, 19) ^ (y >>> 10))) | 0;
+    }
+    let a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], k = h[7];
+    for (let i = 0; i < 64; i++) {
+      const t1 = (k + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + SHA_K[i] + w[i]) | 0;
+      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      k = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += k;
+  }
+  const out = new Uint8Array(32), ov = new DataView(out.buffer);
+  for (let i = 0; i < 8; i++) ov.setUint32(i * 4, h[i]);
+  return out;
+}
+const enc = new TextEncoder();
+const utf8 = s => enc.encode(s);
+const toHex = bytes => { let s = ''; for (const b of bytes) s += (b < 16 ? '0' : '') + b.toString(16); return s; };
+const sha256Hex = text => toHex(sha256(utf8(text)));
+/** n random bytes. */
+function randomBytes(n) { return globalThis.crypto.getRandomValues(new Uint8Array(n)); }
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no look-alikes (0/O, 1/I)
+/** A random code of n easy-to-read characters. */
+function randomCode(n) { let c = ''; for (const b of randomBytes(n)) c += CODE_CHARS[b % CODE_CHARS.length]; return c; }
+const sameText = (a, b) => { if (a.length !== b.length) return false; let d = 0; for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i); return d === 0; };
+/** The bytes to sign for one purpose: a hash of the purpose and its parts, joined unambiguously. */
+function signable(purpose, ...parts) { return sha256(utf8(JSON.stringify([purpose, ...parts]))); }
+
+// ───────────────────────── the hub ─────────────────────────
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS gk_auth (player_id TEXT PRIMARY KEY, secret_hash TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS gk_rooms (code TEXT PRIMARY KEY, mode TEXT NOT NULL, host TEXT NOT NULL, status TEXT NOT NULL, private BOOL NOT NULL, max_players INT NOT NULL, options JSON, state JSON, tick INT NOT NULL DEFAULT 0, created TIMESTAMP NOT NULL, updated TIMESTAMP NOT NULL);
+CREATE INDEX IF NOT EXISTS gk_rooms_open ON gk_rooms (status, mode);
+CREATE TABLE IF NOT EXISTS gk_room_players (code TEXT NOT NULL, player_id TEXT NOT NULL, seat INT NOT NULL, ready BOOL NOT NULL DEFAULT FALSE, connected BOOL NOT NULL DEFAULT TRUE, PRIMARY KEY (code, player_id));
+CREATE UNIQUE INDEX IF NOT EXISTS gk_rp_player ON gk_room_players (player_id);
+CREATE TABLE IF NOT EXISTS gk_keys (player_id TEXT PRIMARY KEY, key TEXT NOT NULL);
+`;
+
+/**
+ * Create a hub.
+ *   db, kit        an open GameDB and its GameKit
+ *   modes          { name: { minPlayers, maxPlayers, autoStart, init, onInput, view, result, onEnd, tickMs, onTick, onLeave } }
+ *   actions        { name(ctx, args) }  functions players may call; ctx = { db, kit, player, server }
+ *   clientBoards   leaderboard ids players may submit scores to (and sync) directly (default none)
+ *   roomCodes      true: createRoom may ask for a particular code (the host of a peer-to-peer room
+ *                  uses the code friends were given)
+ *   verify(keyHex, bytes, sigHex)   checks sign-in signatures (gamedb-id.js verifyHex); without it
+ *                  only the older id-and-secret sign-in works
+ *   seatGraceMs    a player who drops out of a lobby keeps the seat this long (default 20 s)
+ *   maxMessagesPerSecond   flood limit per connection
+ */
+function createHub({ db, kit, modes = {}, actions = {}, clientBoards = [], roomCodes = false, verify = null, seatGraceMs = 20000, log = console.log, maxMessagesPerSecond = 60 }) {
+  db.exec(SCHEMA);
+  db.run('UPDATE gk_room_players SET connected = FALSE'); // nobody is connected at boot
+  const now = () => kit.now();
+  const online = new Map();   // player id -> session
+  const watchers = new Map(); // board id -> Map(session -> n)
+  const allowed = new Map();  // room code -> Set of keys and player ids that may sit there (friend calls)
+  const grace = new Map();    // player id -> timer that frees their lobby seat
+  const timers = [];
+  const hub = { db, kit, sendTo, broadcast, connect, online };
+
+  // ── helpers ──
+  const str = (v, what, max = 64) => { if (typeof v !== 'string' || !v || v.length > max) fail('BAD_INPUT', `${what} must be text (1 to ${max} characters)`); return v; };
+  function sendTo(playerId, msg) { const s = online.get(playerId); if (s) s.conn.send(JSON.stringify(msg)); }
+  const members = code => db.query('SELECT rp.player_id AS id, p.name, rp.seat, rp.ready, rp.connected, k.key FROM gk_room_players rp LEFT JOIN gk_players p ON p.id = rp.player_id LEFT JOIN gk_keys k ON k.player_id = rp.player_id WHERE rp.code = ? ORDER BY rp.seat', [code]);
+  function broadcast(code, msg, exceptId) { const text = JSON.stringify(msg); for (const m of members(code)) { if (m.id === exceptId) continue; const s = online.get(m.id); if (s) s.conn.send(text); } }
+  const getRoom = code => db.get('SELECT * FROM gk_rooms WHERE code = ?', [code]);
+  const roomOf = playerId => { const r = db.get('SELECT code FROM gk_room_players WHERE player_id = ?', [playerId]); return r ? getRoom(r.code) : null; };
+  const snapshot = room => ({ code: room.code, mode: room.mode, host: room.host, status: room.status, private: room.private, maxPlayers: room.max_players, options: room.options ?? null, tick: room.tick, players: members(room.code) });
+  const dropRoom = code => { db.run('DELETE FROM gk_room_players WHERE code = ?', [code]); db.run('DELETE FROM gk_rooms WHERE code = ?', [code]); allowed.delete(code); };
+  const viewFor = (room, seat) => { const m = modes[room.mode]; return m && m.view ? m.view(room.state, seat) : room.state; };
+  const pushRoom = code => { const room = getRoom(code); if (room) broadcast(code, { ev: 'room', room: snapshot(room) }); };
+  function pushState(code) {
+    const room = getRoom(code); if (!room) return;
+    for (const m of members(code)) sendTo(m.id, { ev: 'state', code, tick: room.tick, state: viewFor(room, m.seat) });
+  }
+  function needRoom(me, status) {
+    const room = roomOf(me); if (!room) fail('NO_ROOM', 'you are not in a room');
+    if (status && room.status !== status) fail('BAD_STATE', `the room is ${room.status}, not ${status}`);
+    return room;
+  }
+  const seatOf = (code, me) => db.get('SELECT seat FROM gk_room_players WHERE code = ? AND player_id = ?', [code, me]).seat;
+
+  // ── rooms ──
+  function newCode() {
+    for (let tries = 0; tries < 50; tries++) { const c = randomCode(5); if (!getRoom(c)) return c; }
+    fail('INTERNAL', 'could not allocate a room code');
+  }
+  function createRoom(me, { mode, maxPlayers, private: priv = false, options = null, code: wanted, allow = null }) {
+    if (allow !== null && (!Array.isArray(allow) || allow.length > 16 || allow.some(a => typeof a !== 'string' || !a || a.length > 64))) fail('BAD_INPUT', 'allow must be a list of up to 16 player keys');
+    const m = modes[str(mode, 'mode')]; if (!m) fail('NO_MODE', `unknown game mode "${mode}"`);
+    if (roomOf(me)) fail('IN_ROOM', 'leave your current room first');
+    const cap = m.maxPlayers ?? 8, max = maxPlayers ?? cap;
+    if (!Number.isInteger(max) || max < (m.minPlayers ?? 1) || max > cap) fail('BAD_INPUT', `maxPlayers must be ${m.minPlayers ?? 1} to ${cap}`);
+    let code;
+    if (wanted !== undefined && wanted !== null) {
+      if (!roomCodes) fail('FORBIDDEN', 'room codes are chosen for you here');
+      code = str(wanted, 'room code', 12).toUpperCase();
+      if (!/^[A-Z0-9]{4,12}$/.test(code)) fail('BAD_INPUT', 'a room code is 4 to 12 letters and digits');
+      if (getRoom(code)) fail('IN_USE', 'that room code is already in use');
+    } else code = newCode();
+    const t = now();
+    db.transaction(() => {
+      db.run('INSERT INTO gk_rooms (code, mode, host, status, private, max_players, options, tick, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)', [code, mode, me, 'lobby', !!priv, max, options, t, t]);
+      db.run('INSERT INTO gk_room_players (code, player_id, seat) VALUES (?, ?, 0)', [code, me]);
+    });
+    if (allow) allowed.set(code, new Set(allow));
+    maybeStart(code);
+    return code;
+  }
+  function joinRoom(me, code, key = null) {
+    const room = getRoom(str(code, 'room code', 12).toUpperCase()); if (!room) fail('NO_ROOM', 'no room has that code');
+    if (roomOf(me)) fail('IN_ROOM', 'leave your current room first');
+    const only = allowed.get(room.code);
+    if (only && !only.has(me) && !(key && only.has(key))) fail('FORBIDDEN', 'that room is only for the friend who was invited');
+    if (room.status !== 'lobby') fail('BAD_STATE', 'that game has already started');
+    const taken = new Set(members(room.code).map(m => m.seat));
+    if (taken.size >= room.max_players) fail('FULL', 'that room is full');
+    let seat = 0; while (taken.has(seat)) seat++;
+    db.run('INSERT INTO gk_room_players (code, player_id, seat) VALUES (?, ?, ?)', [room.code, me, seat]);
+    db.run('UPDATE gk_rooms SET updated = ? WHERE code = ?', [now(), room.code]);
+    pushRoom(room.code); maybeStart(room.code);
+    return room.code;
+  }
+  function quickMatch(me, mode) {
+    if (!modes[str(mode, 'mode')]) fail('NO_MODE', `unknown game mode "${mode}"`);
+    for (const r of db.query("SELECT code, max_players FROM gk_rooms WHERE status = 'lobby' AND mode = ? AND private = FALSE", [mode])) {
+      if (members(r.code).length < r.max_players) return joinRoom(me, r.code);
+    }
+    return createRoom(me, { mode });
+  }
+  function maybeStart(code) {
+    const room = getRoom(code); if (!room || room.status !== 'lobby') return;
+    const m = modes[room.mode], ps = members(code);
+    if (ps.length < (m.minPlayers ?? 1)) return;
+    if ((m.autoStart && ps.length >= room.max_players) || ps.every(p => p.ready)) startRoom(room);
+  }
+  function startRoom(room) {
+    const m = modes[room.mode], ps = members(room.code);
+    if (ps.length < (m.minPlayers ?? 1)) fail('BAD_STATE', `needs at least ${m.minPlayers} players`);
+    const state = m.init ? m.init({ players: ps.map(p => ({ id: p.id, name: p.name, seat: p.seat })), options: room.options }) : {};
+    db.run("UPDATE gk_rooms SET status = 'playing', state = ?, tick = 0, updated = ? WHERE code = ?", [state, now(), room.code]);
+    pushRoom(room.code); pushState(room.code);
+  }
+  // Store a new state for a playing room; finish the match if the rules say it is over.
+  function commitState(room, state) {
+    const m = modes[room.mode];
+    const results = m.result ? m.result(state) : null;
+    db.transaction(() => {
+      db.run('UPDATE gk_rooms SET state = ?, tick = tick + 1, status = ?, updated = ? WHERE code = ?', [state, results ? 'done' : 'playing', now(), room.code]);
+      if (results) {
+        const bySeat = new Map(members(room.code).map(p => [p.seat, p.id]));
+        const players = results.filter(r => bySeat.has(r.seat)).map(r => ({ id: bySeat.get(r.seat), result: r.result ?? null, score: r.score ?? null, stats: r.stats ?? null }));
+        const matchId = kit.recordMatch({ mode: room.mode, started: room.created, players });
+        if (m.onEnd) m.onEnd({ db, kit, server: hub, room: getRoom(room.code), matchId, players });
+      }
+    });
+    pushState(room.code);
+    if (results) pushRoom(room.code);
+  }
+  function input(me, data) {
+    const room = needRoom(me, 'playing'), m = modes[room.mode];
+    if (!m.onInput) fail('BAD_STATE', 'this mode does not take inputs');
+    const draft = structuredClone(room.state);
+    const next = m.onInput(draft, { seat: seatOf(room.code, me), player: me, data });
+    commitState(room, next === undefined ? draft : next);
+  }
+  function leave(me) {
+    const room = roomOf(me); if (!room) return;
+    const seat = seatOf(room.code, me), m = modes[room.mode];
+    db.run('DELETE FROM gk_room_players WHERE code = ? AND player_id = ?', [room.code, me]);
+    const left = members(room.code);
+    if (!left.length) { dropRoom(room.code); return; }
+    if (room.host === me) db.run('UPDATE gk_rooms SET host = ? WHERE code = ?', [left[0].id, room.code]);
+    if (room.status === 'playing' && m && m.onLeave) {
+      const draft = structuredClone(room.state), next = m.onLeave(draft, seat);
+      commitState(getRoom(room.code), next === undefined ? draft : next);
+    }
+    pushRoom(room.code);
+  }
+
+  // ── what players may ask for ──
+  const ops = {
+    profile: s => kit.profile(s.player),
+    setName: (s, a) => { kit.player(s.player, str(a.name, 'name', 24)); const room = roomOf(s.player); if (room) pushRoom(room.code); return kit.getPlayer(s.player).name; },
+    save: (s, a) => kit.save(s.player, a.slot, a.data, a.expectedVersion === undefined ? {} : { expectedVersion: a.expectedVersion }),
+    load: (s, a) => kit.load(s.player, a.slot),
+    listSaves: s => kit.listSaves(s.player),
+    deleteSave: (s, a) => kit.deleteSave(s.player, a.slot),
+    top: (s, a) => kit.top(str(a.board, 'board'), a.n ?? 10, { offset: a.offset ?? 0 }),
+    rank: (s, a) => kit.rank(str(a.board, 'board'), s.player),
+    around: (s, a) => kit.around(str(a.board, 'board'), s.player, Math.min(a.radius ?? 2, 50)),
+    submitScore: (s, a) => { if (!clientBoards.includes(a.board)) fail('FORBIDDEN', 'scores for this leaderboard are set by the host'); return kit.submitScore(a.board, s.player, a.score); },
+    // Friends boards: a player hands over the scores their device knows and gets back the ones
+    // this device knows, so both end up with the same board. `rows` may be left out to only fetch.
+    syncBoard: (s, a) => {
+      const b = str(a.board, 'board');
+      if (a.rows !== undefined && a.rows !== null) { if (!clientBoards.includes(b)) fail('FORBIDDEN', 'this leaderboard is kept by the host'); kit.mergeBoard({ board: b, period: a.period, rows: a.rows }); }
+      return kit.exportBoard(b, Math.min(a.n ?? 50, 200));
+    },
+    watchBoard: (s, a) => { const b = str(a.board, 'board'), n = Math.min(a.n ?? 10, 100); const top = kit.top(b, n); if (!watchers.has(b)) watchers.set(b, new Map()); watchers.get(b).set(s, n); return top; },
+    unwatchBoard: (s, a) => { const w = watchers.get(a.board); if (w) w.delete(s); return true; },
+    action: (s, a) => { const fn = Object.hasOwn(actions, a.name) ? actions[a.name] : null; if (!fn) fail('NO_ACTION', `unknown action "${a.name}"`); return fn({ db, kit, player: s.player, server: hub }, a.args ?? {}); },
+    createRoom: (s, a) => { const code = createRoom(s.player, a); return snapshot(getRoom(code)); },
+    joinRoom: (s, a) => snapshot(getRoom(joinRoom(s.player, a.code, s.key))),
+    quickMatch: (s, a) => snapshot(getRoom(quickMatch(s.player, a.mode))),
+    leaveRoom: s => { leave(s.player); return true; },
+    room: s => { const room = roomOf(s.player); return room ? { room: snapshot(room), state: room.status === 'lobby' ? null : viewFor(room, seatOf(room.code, s.player)) } : null; },
+    ready: (s, a) => { const room = needRoom(s.player, 'lobby'); db.run('UPDATE gk_room_players SET ready = ? WHERE code = ? AND player_id = ?', [a.ready !== false, room.code, s.player]); pushRoom(room.code); maybeStart(room.code); return true; },
+    start: s => { const room = needRoom(s.player, 'lobby'); if (room.host !== s.player) fail('FORBIDDEN', 'only the host can start the game'); startRoom(room); return true; },
+    // Play again with the same people: the host of a finished room starts a fresh match in it.
+    rematch: s => { const room = needRoom(s.player, 'done'); if (room.host !== s.player) fail('FORBIDDEN', 'only the host can start a rematch'); db.run('UPDATE gk_rooms SET created = ? WHERE code = ?', [now(), room.code]); startRoom(room); return true; },
+    input: (s, a) => { input(s.player, a.data); return true; },
+    // Fast path for action games: passed straight to the rest of the room, never stored.
+    // With `to`, only that room member gets it (private data such as a hand of cards).
+    relay: (s, a) => {
+      const room = needRoom(s.player), msg = { ev: 'relay', from: s.player, data: a.data };
+      if (a.to === undefined || a.to === null) broadcast(room.code, msg, s.player);
+      else {
+        if (!db.get('SELECT seat FROM gk_room_players WHERE code = ? AND player_id = ?', [room.code, str(a.to, 'to')])) fail('BAD_INPUT', 'that player is not in your room');
+        sendTo(a.to, msg);
+      }
+      return true;
+    },
+    // The hub's clock, so every player in a room can agree on timings.
+    time: () => Date.now(),
+  };
+
+  function login(s, playerId) {
+    clearTimeout(grace.get(playerId)); grace.delete(playerId);
+    const old = online.get(playerId);
+    if (old && old !== s) { old.player = null; old.conn.send(JSON.stringify({ ev: 'kicked', reason: 'signed in somewhere else' })); old.conn.close(); }
+    s.player = playerId; online.set(playerId, s);
+    const room = roomOf(playerId);
+    if (room) { db.run('UPDATE gk_room_players SET connected = TRUE WHERE code = ? AND player_id = ?', [room.code, playerId]); pushRoom(room.code); }
+    const p = kit.getPlayer(playerId);
+    return { playerId, name: p.name, room: room ? snapshot(getRoom(room.code)) : null, state: room && room.status !== 'lobby' ? viewFor(room, seatOf(room.code, playerId)) : null };
+  }
+  function handle(s, msg) {
+    const a = msg.a && typeof msg.a === 'object' ? msg.a : {};
+    // Sign-in: ask for a challenge, then say hello with it signed by your key.
+    if (msg.op === 'challenge') { s.nonce = toHex(randomBytes(16)); return { nonce: s.nonce }; }
+    if (msg.op === 'hello') {
+      const id = str(a.playerId, 'playerId');
+      if (!/^[0-9a-f-]{16,64}$/.test(id)) fail('AUTH', 'that is not a valid player id');
+      const keyRow = db.get('SELECT key FROM gk_keys WHERE player_id = ?', [id]);
+      const secretRow = db.get('SELECT secret_hash FROM gk_auth WHERE player_id = ?', [id]);
+      const secretOk = () => typeof a.secret === 'string' && !!secretRow && sameText(sha256Hex(str(a.secret, 'secret', 128)), secretRow.secret_hash);
+      if (a.key !== undefined) {
+        const key = str(a.key, 'key'), nonce = s.nonce; s.nonce = null;
+        if (!verify || !/^[0-9a-f]{64}$/.test(key) || !nonce || typeof a.sig !== 'string' || !verify(key, signable('gamedb-hello', nonce, id, key), a.sig)) fail('AUTH', 'that sign-in was not signed properly');
+        if (keyRow) { if (keyRow.key !== key) fail('AUTH', 'that player signs in with a different key'); }
+        else if (secretRow) {
+          // Met before keys existed: the old secret proves it is them, once; from then on the key does.
+          if (a.secret === undefined) fail('KEY_UNBOUND', 'this host knows you by your old secret: send it once with your key');
+          if (!secretOk()) fail('AUTH', 'unknown player or wrong secret');
+          db.run('INSERT INTO gk_keys VALUES (?, ?)', [id, key]);
+        } else db.run('INSERT INTO gk_keys VALUES (?, ?)', [id, key]); // first time this hub meets them
+        s.key = key;
+        kit.player(id, a.name ?? null);
+        return login(s, id);
+      }
+      // An older game, without keys: the id and secret it made on its device.
+      if (keyRow) fail('AUTH', 'that player signs in with a key');
+      if (!secretRow) {
+        if (typeof a.secret !== 'string' || a.secret.length < 16) fail('AUTH', 'that is not a valid player id and secret');
+        db.transaction(() => { kit.player(id, a.name ?? null); db.run('INSERT INTO gk_auth VALUES (?, ?)', [id, sha256Hex(str(a.secret, 'secret', 128))]); });
+        return login(s, id);
+      }
+      if (!secretOk()) fail('AUTH', 'unknown player or wrong secret');
+      kit.player(id, a.name ?? null);
+      return login(s, id);
+    }
+    if (!s.player) fail('AUTH', 'sign in first');
+    const fn = Object.hasOwn(ops, msg.op) ? ops[msg.op] : null;
+    if (!fn) fail('NO_OP', `unknown request "${msg.op}"`);
+    return fn(s, a);
+  }
+
+  /**
+   * Plug a connection in. conn = { send(text), close(code) } and the hub sets conn.onmessage(text)
+   * and conn.onclose(), which the connection calls. `trusted` skips the flood limit (the host's own link).
+   */
+  function connect(conn, { trusted = false } = {}) {
+    const s = { conn, player: null, bucket: maxMessagesPerSecond, last: Date.now() };
+    conn.onmessage = text => {
+      if (!trusted) {
+        const t = Date.now(); s.bucket = Math.min(maxMessagesPerSecond, s.bucket + (t - s.last) / 1000 * maxMessagesPerSecond); s.last = t;
+        if (--s.bucket < 0) return conn.close(1008); // flooding
+      }
+      let msg; try { msg = JSON.parse(text); } catch { return conn.close(1007); }
+      if (!msg || typeof msg !== 'object' || typeof msg.op !== 'string') return conn.close(1007);
+      let reply;
+      try { reply = { id: msg.id, ok: true, r: handle(s, msg) ?? null }; }
+      catch (e) {
+        if (e instanceof GameDBError) reply = { id: msg.id, ok: false, e: { code: e.code, message: e.message } };
+        else { log('gamedb hub error in', msg.op, e); reply = { id: msg.id, ok: false, e: { code: 'INTERNAL', message: 'server error' } }; }
+      }
+      conn.send(JSON.stringify(reply));
+    };
+    conn.onclose = () => {
+      for (const w of watchers.values()) w.delete(s);
+      if (!s.player || online.get(s.player) !== s) return;
+      online.delete(s.player);
+      try {
+        const room = roomOf(s.player); if (!room) return;
+        db.run('UPDATE gk_room_players SET connected = FALSE WHERE code = ? AND player_id = ?', [room.code, s.player]); pushRoom(room.code);
+        // In a lobby the seat is freed for someone else, unless they come straight back.
+        if (room.status === 'lobby') {
+          const id = s.player; clearTimeout(grace.get(id));
+          const t = setTimeout(() => { grace.delete(id); try { const r = roomOf(id); if (!online.has(id) && r && r.status === 'lobby') leave(id); } catch (e) { log('gamedb hub error freeing a seat', e); } }, seatGraceMs);
+          if (t.unref) t.unref(); grace.set(id, t);
+        }
+      } catch (e) { log('gamedb hub error on disconnect', e); }
+    };
+    return s;
+  }
+
+  /**
+   * Take over a room from a host who left (gamedb-p2p.js handoff): the same code, seats and
+   * players, with `hostId` (this device's player) as the new host. `state` = the last state seen.
+   */
+  hub.restoreRoom = (snap, hostId, state = null) => {
+    if (!snap || !Array.isArray(snap.players) || !snap.code || !snap.mode) fail('BAD_INPUT', 'that is not a room snapshot');
+    const t = now();
+    db.transaction(() => {
+      dropRoom(snap.code);
+      db.run('INSERT INTO gk_rooms (code, mode, host, status, private, max_players, options, state, tick, created, updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [snap.code, snap.mode, hostId, ['lobby', 'playing', 'done'].includes(snap.status) ? snap.status : 'lobby', !!snap.private, snap.maxPlayers || snap.players.length, snap.options ?? null, state, snap.tick || 0, t, t]);
+      for (const p of snap.players) {
+        if (typeof p.id !== 'string' || !Number.isInteger(p.seat)) continue;
+        db.run('DELETE FROM gk_room_players WHERE player_id = ?', [p.id]);
+        db.run('INSERT INTO gk_room_players (code, player_id, seat, ready, connected) VALUES (?, ?, ?, ?, FALSE)', [snap.code, p.id, p.seat, !!p.ready]);
+        kit.player(p.id, p.name ?? null);
+        // Their keys come along, so only the real players can take those seats back.
+        if (typeof p.key === 'string' && /^[0-9a-f]{64}$/.test(p.key) && !db.get('SELECT key FROM gk_keys WHERE player_id = ?', [p.id])) db.run('INSERT INTO gk_keys VALUES (?, ?)', [p.id, p.key]);
+      }
+    });
+  };
+
+  // ── live leaderboards: push the new top-N when scores change ──
+  const dirtyBoards = new Set(); let boardTimer = null;
+  const stopWatching = db.onChange(opsList => {
+    for (const op of opsList) {
+      if (op[1] !== 'gk_scores') continue;
+      if (op[0] === 'd') for (const b of watchers.keys()) dirtyBoards.add(b); else dirtyBoards.add(op[3][0]);
+    }
+    if (dirtyBoards.size && !boardTimer) boardTimer = setTimeout(() => {
+      boardTimer = null;
+      for (const b of dirtyBoards) { const w = watchers.get(b); if (!w) continue; for (const [s, n] of w) { try { s.conn.send(JSON.stringify({ ev: 'board', board: b, top: kit.top(b, n) })); } catch (e) { log(e); } } }
+      dirtyBoards.clear();
+    }, 150);
+  });
+
+  // ── tick loops for real-time modes: state advances by SQL-stored steps ──
+  for (const [name, m] of Object.entries(modes)) {
+    if (!m.tickMs || !m.onTick) continue;
+    let last = Date.now();
+    timers.push(setInterval(() => {
+      const t = Date.now(), dt = t - last; last = t;
+      for (const { code } of db.query("SELECT code FROM gk_rooms WHERE status = 'playing' AND mode = ?", [name])) {
+        try { const room = getRoom(code), draft = structuredClone(room.state), next = m.onTick(draft, dt); if (next !== null && next !== false) commitState(room, next === undefined ? draft : next); }
+        catch (e) { log('gamedb hub tick error in', name, e); }
+      }
+    }, m.tickMs));
+  }
+  // ── cleanup: drop finished rooms after 10 minutes and abandoned ones after 2 ──
+  timers.push(setInterval(() => {
+    const t = now();
+    for (const r of db.query('SELECT code, status, updated FROM gk_rooms')) {
+      const anyone = members(r.code).some(m => m.connected);
+      if ((r.status === 'done' && t - r.updated > 600000) || (!anyone && t - r.updated > 120000)) db.transaction(() => dropRoom(r.code));
+    }
+  }, 30000));
+  for (const t of timers) if (t && t.unref) t.unref();
+
+  /** Stop the hub's timers and disconnect everyone. */
+  hub.close = () => {
+    for (const t of timers) clearInterval(t);
+    for (const t of grace.values()) clearTimeout(t); grace.clear();
+    if (boardTimer) clearTimeout(boardTimer);
+    stopWatching();
+    for (const s of [...online.values()]) s.conn.close(1001);
+  };
+  return hub;
+}
+
+return { sha256, utf8, toHex, sha256Hex, randomBytes, CODE_CHARS, randomCode, signable, createHub };
+};
+__defs["js/gamedb-id.js"] = function () {
+// GameDB identity — every device has its own key, and players find and trust each other by it.
+//
+//   const me = deviceIdentity(localStorage-like store);   // made on first use, kept for good
+//   me.playerId   the id boards and rooms know you by (unchanged from before keys existed)
+//   me.key        your public key (64 hex characters)
+//   me.friendCode the short form friends type in: 'K7QM-2PXA-9GHE'
+//   me.sign(bytes) -> signature (hex); verifyHex(key, bytes, signature) -> true/false
+//
+// Signatures are Schnorr signatures over the secp256k1 curve (BIP-340, the same kind Nostr uses),
+// written here in plain JavaScript, so they work on any page (http, https, a file opened by
+// double-click) and under Node, with nothing to install. Zero dependencies.
+const { sha256, utf8, toHex, randomBytes, CODE_CHARS } = __pb.req("js/gamedb-hub.js");
+
+// ───────────────────────── the curve ─────────────────────────
+
+const P = 2n ** 256n - 0x1000003d1n;
+const N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+const G = [0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798n, 0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8n, 1n];
+const mod = (a, m = P) => { const r = a % m; return r >= 0n ? r : r + m; };
+function inv(a, m = P) {
+  let lm = 1n, hm = 0n, low = mod(a, m), high = m;
+  if (low === 0n) throw new Error('no inverse');
+  while (low > 1n) { const r = high / low; [lm, hm] = [hm - lm * r, lm]; [low, high] = [high - low * r, low]; }
+  return mod(lm, m);
+}
+function pow(b, e, m = P) { let r = 1n; b = mod(b, m); while (e > 0n) { if (e & 1n) r = r * b % m; b = b * b % m; e >>= 1n; } return r; }
+// Points are [X, Y, Z] (Jacobian); Z = 0 is the point at infinity.
+function dbl([x, y, z]) {
+  if (z === 0n || y === 0n) return [0n, 1n, 0n];
+  const a = x * x % P, b = y * y % P, c = b * b % P, d = mod(2n * ((x + b) ** 2n - a - c)), e = 3n * a % P, f = e * e % P;
+  const x3 = mod(f - 2n * d);
+  return [x3, mod(e * (d - x3) - 8n * c), 2n * y * z % P];
+}
+function add(p1, p2) {
+  if (p1[2] === 0n) return p2; if (p2[2] === 0n) return p1;
+  const [x1, y1, z1] = p1, [x2, y2, z2] = p2, z1z1 = z1 * z1 % P, z2z2 = z2 * z2 % P;
+  const u1 = x1 * z2z2 % P, u2 = x2 * z1z1 % P, s1 = y1 * z2 % P * z2z2 % P, s2 = y2 * z1 % P * z1z1 % P;
+  const h = mod(u2 - u1), r = mod(s2 - s1);
+  if (h === 0n) return r === 0n ? dbl(p1) : [0n, 1n, 0n];
+  const h2 = h * h % P, h3 = h * h2 % P, u1h2 = u1 * h2 % P, x3 = mod(r * r - h3 - 2n * u1h2);
+  return [x3, mod(r * (u1h2 - x3) - s1 * h3), h * z1 % P * z2 % P];
+}
+function mul(k, p = G) { let r = [0n, 1n, 0n]; for (const bit of k.toString(2)) { r = dbl(r); if (bit === '1') r = add(r, p); } return r; }
+function affine([x, y, z]) { if (z === 0n) return null; const zi = inv(z), zi2 = zi * zi % P; return { x: x * zi2 % P, y: y * zi2 % P * zi % P }; }
+function liftX(x) {
+  if (x >= P) return null;
+  const c = mod(x ** 3n + 7n), y = pow(c, (P + 1n) / 4n);
+  if (y * y % P !== c) return null;
+  return [x, y & 1n ? P - y : y, 1n];
+}
+
+const big = bytes => bytes.length ? BigInt('0x' + toHex(bytes)) : 0n;
+const bytes32 = n => fromHex(n.toString(16).padStart(64, '0'));
+function fromHex(hex) {
+  if (typeof hex !== 'string' || hex.length % 2 || /[^0-9a-f]/i.test(hex)) throw new Error('not hex');
+  const out = new Uint8Array(hex.length / 2); for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16); return out;
+}
+function cat(...parts) { let n = 0; for (const p of parts) n += p.length; const out = new Uint8Array(n); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; }
+const tags = new Map();
+function tagged(tag, ...parts) { let t = tags.get(tag); if (!t) { t = sha256(utf8(tag)); tags.set(tag, t); } return sha256(cat(t, t, ...parts)); }
+
+// ───────────────────────── BIP-340 Schnorr ─────────────────────────
+
+/** A fresh secret key (32 bytes). */
+function newSecretKey() { for (;;) { const k = randomBytes(32), d = big(k); if (d > 0n && d < N) return k; } }
+/** The public key (32 bytes, x only) of a secret key. */
+function publicKey(sk) { const d = big(sk); if (d <= 0n || d >= N) throw new Error('bad secret key'); return bytes32(affine(mul(d)).x); }
+/** Sign a message (bytes) with a secret key (bytes). Returns 64 bytes. `aux` = 32 random bytes (given only by tests). */
+const signers = new Map(); // secret key -> its public point, worked out once (the slow part)
+function schnorrSign(msg, sk, aux = randomBytes(32)) {
+  const d0 = big(sk); if (d0 <= 0n || d0 >= N) throw new Error('bad secret key');
+  let pp = signers.get(d0); if (!pp) { pp = affine(mul(d0)); if (signers.size > 8) signers.clear(); signers.set(d0, pp); }
+  const d = pp.y & 1n ? N - d0 : d0, px = bytes32(pp.x);
+  const ax = tagged('BIP0340/aux', aux), t = bytes32(d).map((b, i) => b ^ ax[i]);
+  const k0 = mod(big(tagged('BIP0340/nonce', t, px, msg)), N); if (k0 === 0n) throw new Error('bad nonce');
+  const r = affine(mul(k0)), k = r.y & 1n ? N - k0 : k0, rx = bytes32(r.x);
+  const e = mod(big(tagged('BIP0340/challenge', rx, px, msg)), N);
+  return cat(rx, bytes32(mod(k + e * d, N)));
+}
+/** Check a signature. pub = 32 bytes, sig = 64 bytes. */
+function schnorrVerify(msg, pub, sig) {
+  if (!pub || pub.length !== 32 || !sig || sig.length !== 64) return false;
+  const pp = liftX(big(pub)); if (!pp) return false;
+  const r = big(sig.subarray(0, 32)), s = big(sig.subarray(32)); if (r >= P || s >= N) return false;
+  const e = mod(big(tagged('BIP0340/challenge', sig.subarray(0, 32), pub, msg)), N);
+  const R = affine(add(mul(s), mul(mod(N - e, N), pp)));
+  return !!R && !(R.y & 1n) && R.x === r;
+}
+/** Hex-in, hex-out forms (keys and signatures travel as hex). */
+function verifyHex(keyHex, msg, sigHex) { try { return schnorrVerify(msg, fromHex(keyHex), fromHex(sigHex)); } catch { return false; } }
+/**
+ * A secret both sides can work out and nobody else can (Diffie-Hellman on the same curve):
+ * shared(mySecret, theirPublic) === shared(theirSecret, myPublic). Returns 32 bytes, or null.
+ */
+function sharedSecret(sk, theirPub) {
+  try { const p = liftX(big(theirPub)), d = big(sk); if (!p || d <= 0n || d >= N) return null; const q = affine(mul(d, p)); return q ? sha256(cat(utf8('gamedb-dh'), bytes32(q.x))) : null; }
+  catch { return null; }
+}
+
+// ───────────────────────── friend codes ─────────────────────────
+
+/** The short code for a public key: 12 easy-to-read characters, 'K7QM-2PXA-9GHE'. */
+function friendCode(keyHex) {
+  const h = sha256(fromHex(keyHex)); let bits = 0n, out = '';
+  for (let i = 0; i < 8; i++) bits = (bits << 8n) | BigInt(h[i]);
+  for (let i = 0; i < 12; i++) out += CODE_CHARS[Number((bits >> BigInt(59 - i * 5)) & 31n)];
+  return `${out.slice(0, 4)}-${out.slice(4, 8)}-${out.slice(8)}`;
+}
+/** Tidy what someone typed into a friend code (or null if it cannot be one). */
+function cleanFriendCode(text) {
+  const c = String(text || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (c.length !== 12 || [...c].some(ch => !CODE_CHARS.includes(ch))) return null;
+  return `${c.slice(0, 4)}-${c.slice(4, 8)}-${c.slice(8)}`;
+}
+
+// ───────────────────────── this device ─────────────────────────
+
+function defaultStore() {
+  try { const ls = globalThis.localStorage; if (ls) return { get: k => ls.getItem(k), set: (k, v) => ls.setItem(k, v) }; } catch { /* storage blocked */ }
+  const m = new Map(); return { get: k => m.get(k) ?? null, set: (k, v) => { m.set(k, v); } };
+}
+const hex = n => toHex(randomBytes(n));
+
+/**
+ * This device's player: made on first use and kept in `store` ({ get, set }, localStorage by default).
+ * Older saves (an id and a secret from before keys) keep their id and gain a key.
+ * `profile` keeps several players apart on one device (tests, or two players sharing a computer).
+ */
+function deviceIdentity(store = defaultStore(), profile = '') {
+  const slot = `gamedb:me:${profile}`;
+  let saved = null; try { saved = JSON.parse(store.get(slot)); } catch { /* none yet */ }
+  if (!saved || typeof saved !== 'object') saved = {};
+  let changed = false;
+  if (typeof saved.playerId !== 'string' || typeof saved.secret !== 'string') { saved.playerId = `${hex(4)}-${hex(2)}-${hex(2)}-${hex(2)}-${hex(6)}`; saved.secret = hex(24); changed = true; }
+  let sk = null; try { sk = fromHex(saved.sk); publicKey(sk); } catch { sk = null; }
+  if (!sk) { sk = newSecretKey(); saved.sk = toHex(sk); changed = true; }
+  if (changed) { try { store.set(slot, JSON.stringify(saved)); } catch { /* storage full or blocked: this visit only */ } }
+  const key = toHex(publicKey(sk));
+  return {
+    playerId: saved.playerId, secret: saved.secret, key, friendCode: friendCode(key),
+    sign: msg => toHex(schnorrSign(msg, sk)),
+    shared: theirKey => { try { return sharedSecret(sk, fromHex(theirKey)); } catch { return null; } },
+    friends: friendsList(store, profile),
+  };
+}
+
+/** Text to sign (as bytes) for one purpose: purpose + each part, joined unambiguously. */
+function signable(purpose, ...parts) { return sha256(utf8(JSON.stringify([purpose, ...parts]))); }
+
+// ───────────────────────── friends ─────────────────────────
+
+/**
+ * The people this device has played with or added, kept in the same store:
+ *   list() -> [{ friendCode, key, playerId, name, seen }] newest first
+ *   remember({ key, playerId, name })   add or refresh (called for you after sharing a room)
+ *   forget(friendCode)
+ */
+function friendsList(store = defaultStore(), profile = '') {
+  const slot = `gamedb:friends:${profile}`;
+  const read = () => { try { const a = JSON.parse(store.get(slot)); return Array.isArray(a) ? a : []; } catch { return []; } };
+  const write = a => { try { store.set(slot, JSON.stringify(a.slice(0, 100))); } catch { /* full */ } };
+  return {
+    list: () => read().sort((a, b) => b.seen - a.seen),
+    remember({ key, playerId = null, name = null }) {
+      if (typeof key !== 'string' || !/^[0-9a-f]{64}$/.test(key)) return false;
+      const a = read(), i = a.findIndex(f => f.key === key), was = i >= 0 ? a[i] : null;
+      const f = { friendCode: friendCode(key), key, playerId: playerId || (was && was.playerId) || null, name: (name && String(name).slice(0, 24)) || (was && was.name) || null, seen: Date.now() };
+      if (i >= 0) a.splice(i, 1); a.unshift(f); write(a); return true;
+    },
+    forget(code) { const a = read(), b = a.filter(f => f.friendCode !== code && f.key !== code); write(b); return b.length !== a.length; },
+  };
+}
+
+return { fromHex, newSecretKey, publicKey, schnorrSign, schnorrVerify, verifyHex, sharedSecret, friendCode, cleanFriendCode, deviceIdentity, signable, friendsList };
+};
+__defs["js/gamedb-relays.js"] = function () {
+// GameDB meeting points — how two browsers that know nothing about each other's address find
+// each other. Free public services that pass short messages along:
+//   - MQTT brokers (message brokers anyone may use)
+//   - Nostr relays (a large network of independent relays)
+//   - WebTorrent trackers (the servers BitTorrent-in-the-browser uses to find peers)
+// All of them are raced at once, so any one being down, slow or blocked does not matter.
+// Everything sent through them is sealed first (see gamedb-p2p.js): they only ever see
+// unreadable text on a topic that is itself a hash. Nothing is stored there.
+//
+//   relays: ['wss://broker.example/mqtt', 'nostr:wss://relay.example', 'bt:wss://tracker.example']
+//   (a plain address is an MQTT broker)
+// Zero dependencies.
+const { sha256, utf8, toHex, randomBytes } = __pb.req("js/gamedb-hub.js");
+const { newSecretKey, publicKey, schnorrSign, fromHex } = __pb.req("js/gamedb-id.js");
+
+/** The public meeting points used by default. Checked by tests/check_relays.js (2026-11-21: all but HiveMQ delivered, 0.1 to 0.3 s). */
+const DEFAULT_RELAYS = [
+  'wss://broker.emqx.io:8084/mqtt', 'wss://test.mosquitto.org:8081/mqtt', 'wss://broker.hivemq.com:8884/mqtt',
+  'nostr:wss://nos.lol', 'nostr:wss://nostr.mom', 'nostr:wss://relay.primal.net',
+  'bt:wss://tracker.openwebtorrent.com', 'bt:wss://tracker.webtorrent.dev',
+];
+
+const dec = new TextDecoder();
+function concat(parts) { let n = 0; for (const p of parts) n += p.length; const out = new Uint8Array(n); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; }
+function b64(bytes) { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function unb64(text) { return Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)); }
+
+// ── sealing: everything that passes through a meeting point is encrypted and signed first ──
+// keys = { enc, mac } (32 bytes each). SHA-256 in counter mode + HMAC-SHA-256, pure JS so it
+// also works on plain http and file:// pages.
+function hmac(key, msg) {
+  const k = new Uint8Array(64); k.set(key.length > 64 ? sha256(key) : key);
+  const ipad = k.map(b => b ^ 0x36), opad = k.map(b => b ^ 0x5c);
+  return sha256(concat([opad, sha256(concat([ipad, msg]))]));
+}
+function keystream(key, nonce, n) {
+  const out = new Uint8Array(n), ctr = new Uint8Array(4);
+  for (let o = 0, i = 0; o < n; o += 32, i++) { new DataView(ctr.buffer).setUint32(0, i); out.set(sha256(concat([key, nonce, ctr])).subarray(0, Math.min(32, n - o)), o); }
+  return out;
+}
+/** Encrypt and sign a JSON-compatible value. Returns link-safe text. */
+function seal(keys, value) {
+  const pt = utf8(JSON.stringify(value)), nonce = randomBytes(12), ks = keystream(keys.enc, nonce, pt.length);
+  const ct = pt.map((b, i) => b ^ ks[i]);
+  return b64(concat([nonce, hmac(keys.mac, concat([nonce, ct])).subarray(0, 16), ct]));
+}
+/** The value inside text made by seal with the same keys, or null if it is not one. */
+function unseal(keys, text) {
+  try {
+    const raw = unb64(text); if (raw.length < 29) return null;
+    const nonce = raw.subarray(0, 12), tag = raw.subarray(12, 28), ct = raw.subarray(28);
+    const want = hmac(keys.mac, concat([nonce, ct])); let d = 0; for (let i = 0; i < 16; i++) d |= want[i] ^ tag[i];
+    if (d) return null;
+    const ks = keystream(keys.enc, nonce, ct.length);
+    return JSON.parse(dec.decode(ct.map((b, i) => b ^ ks[i])));
+  } catch { return null; }
+}
+
+/** What kind of meeting point an address is: { kind: 'mqtt' | 'nostr' | 'bt', url }. */
+function relayKind(spec) {
+  const s = String(spec);
+  if (s.startsWith('nostr:')) return { kind: 'nostr', url: s.slice(6) };
+  if (s.startsWith('bt:')) return { kind: 'bt', url: s.slice(3) };
+  return { kind: 'mqtt', url: s };
+}
+
+// Each opener resolves with { url, subscribe(topic), publish(topic, text), close() } once connected,
+// calls onMessage(topic, text) for messages on subscribed topics and onClose() if the line drops later.
+function socket(url, protocols, WS, timeoutMs, onUp, onData, onClose, rej) {
+  let ws; try { ws = protocols ? new WS(url, protocols) : new WS(url); } catch (e) { rej(e); return null; }
+  let up = false, done = false;
+  const s = {
+    send: data => { if (!done && ws.readyState === 1) ws.send(data); },
+    up: () => { if (up) return; up = true; clearTimeout(timer); onUp(); },
+    stop: why => {
+      if (done) return; done = true; clearTimeout(timer); if (s.onStop) s.onStop();
+      try { ws.close(); } catch { /* already closed */ }
+      if (up) { const f = onClose(); if (f) f(); } else rej(why instanceof Error ? why : new Error(String(why)));
+    },
+    ws, onStop: null,
+  };
+  const timer = setTimeout(() => s.stop('timed out'), timeoutMs);
+  ws.onerror = () => s.stop('could not connect');
+  ws.onclose = () => s.stop('closed');
+  ws.onmessage = ev => { try { onData(ev.data); } catch (e) { console.error(e); } };
+  return s;
+}
+
+// ── MQTT 3.1.1, just enough: connect, subscribe, publish (no delivery guarantees), keep-alive ──
+// (Connecting can take a while: a slow name lookup alone has been seen to take 10 seconds.)
+const CONNECT_MS = 12000;
+function mqttOpen(url, { onMessage, onClose, WS = globalThis.WebSocket, timeoutMs = CONNECT_MS }) {
+  return new Promise((res, rej) => {
+    let buf = new Uint8Array(0), pid = 0, ping = null, api = null;
+    const str = s => { const b = utf8(s); return concat([Uint8Array.of(b.length >> 8, b.length & 255), b]); };
+    const packet = (first, parts) => {
+      const body = concat(parts), head = [first]; let n = body.length;
+      do { let d = n % 128; n = Math.floor(n / 128); if (n) d |= 128; head.push(d); } while (n);
+      return concat([Uint8Array.from(head), body]);
+    };
+    const s = socket(url, 'mqtt', WS, timeoutMs, () => res(api), data => {
+      if (typeof data === 'string') return;
+      buf = concat([buf, new Uint8Array(data)]);
+      if (buf.length > 1048576) return s.stop('too much data');
+      for (;;) {
+        if (buf.length < 2) return;
+        let len = 0, mul = 1, i = 1, b;
+        do { if (i >= buf.length) return; if (i > 4) return s.stop('bad packet'); b = buf[i++]; len += (b & 127) * mul; mul *= 128; } while (b & 128);
+        if (buf.length < i + len) return;
+        const first = buf[0], body = buf.slice(i, i + len); buf = buf.slice(i + len);
+        const type = first >> 4;
+        if (type === 2) { // connection accepted (or not)
+          if (body[1] !== 0) return s.stop('refused');
+          ping = setInterval(() => s.send(Uint8Array.of(0xc0, 0)), 25000); if (ping.unref) ping.unref();
+          s.up();
+        } else if (type === 3 && body.length >= 2) { // a message
+          const tl = (body[0] << 8) | body[1], off = 2 + tl + ((first >> 1) & 3 ? 2 : 0);
+          if (off <= body.length) onMessage(dec.decode(body.subarray(2, 2 + tl)), dec.decode(body.subarray(off)));
+        }
+      }
+    }, () => onClose, rej);
+    if (!s) return;
+    s.ws.binaryType = 'arraybuffer';
+    s.onStop = () => clearInterval(ping);
+    s.ws.onopen = () => s.send(packet(0x10, [str('MQTT'), Uint8Array.of(4, 2, 0, 60), str('gdb' + toHex(randomBytes(8)))]));
+    api = {
+      url,
+      subscribe: topic => s.send(packet(0x82, [Uint8Array.of(++pid >> 8, pid & 255), str(topic), Uint8Array.of(0)])),
+      // retain: the broker keeps this message and hands it to whoever subscribes later (mailboxes, gamedb-mail.js).
+      publish: (topic, text, retain = false) => s.send(packet(retain ? 0x31 : 0x30, [str(topic), utf8(text)])),
+      close: () => { onClose = null; s.stop('closed'); },
+    };
+  });
+}
+
+// ── Nostr (NIP-01): signed events over a WebSocket ──
+// Kinds 20000-29999 are "ephemeral": relays hand them to whoever is listening and never store
+// them. Relays check every event's signature, so each bus signs with a throwaway key of its own.
+const NOSTR_KIND = 21059;
+// Kind 30078 (NIP-78, app data) is stored, one event per author + 'd' tag: mailboxes (gamedb-mail.js).
+const MAIL_KIND = 30078;
+function nostrSigner() {
+  const sk = newSecretKey(), pub = toHex(publicKey(sk)), made = new Map();
+  return (topic, text) => {
+    const k = topic + '\n' + text; let ev = made.get(k); if (ev) return ev;
+    const created_at = Math.floor(Date.now() / 1000), tags = [['x', topic]];
+    const id = toHex(sha256(utf8(JSON.stringify([0, pub, created_at, NOSTR_KIND, tags, text]))));
+    ev = { id, pubkey: pub, created_at, kind: NOSTR_KIND, tags, content: text, sig: toHex(schnorrSign(fromHex(id), sk)) };
+    if (made.size > 32) made.clear(); made.set(k, ev); return ev;
+  };
+}
+function nostrOpen(url, { onMessage, onClose, WS = globalThis.WebSocket, timeoutMs = CONNECT_MS, sign = nostrSigner() }) {
+  return new Promise((res, rej) => {
+    const subs = new Map(); let api = null;
+    const s = socket(url, null, WS, timeoutMs, () => res(api), data => {
+      if (typeof data !== 'string') return;
+      let m; try { m = JSON.parse(data); } catch { return; }
+      if (!Array.isArray(m) || m[0] !== 'EVENT' || !m[2] || typeof m[2].content !== 'string' || !Array.isArray(m[2].tags)) return;
+      const tag = m[2].tags.find(t => Array.isArray(t) && t[0] === 'x');
+      if (tag && subs.get(tag[1]) === m[1]) onMessage(tag[1], m[2].content, m[2]);
+    }, () => onClose, rej);
+    if (!s) return;
+    s.ws.onopen = () => s.up();
+    api = {
+      url,
+      // stored: also hand over the stored mailbox letters (MAIL_KIND) on this topic, not only new messages.
+      subscribe(topic, { stored = false } = {}) {
+        if (subs.has(topic)) return; const id = 'g' + toHex(randomBytes(6)); subs.set(topic, id);
+        s.send(JSON.stringify(['REQ', id, stored ? { kinds: [MAIL_KIND], '#x': [topic], limit: 200 } : { kinds: [NOSTR_KIND], '#x': [topic], since: Math.floor(Date.now() / 1000) - 60 }]));
+      },
+      publish: (topic, text) => s.send(JSON.stringify(['EVENT', sign(topic, text)])),
+      /** Send an event that is already signed (a mailbox letter, which the relay keeps). */
+      put: ev => s.send(JSON.stringify(['EVENT', ev])),
+      close: () => { onClose = null; for (const id of subs.values()) s.send(JSON.stringify(['CLOSE', id])); s.stop('closed'); },
+    };
+  });
+}
+
+// ── WebTorrent trackers: the "offer" relay of BitTorrent in the browser ──
+// A tracker groups peers by a 20-character swarm id and hands each "offer" a peer announces
+// to another peer of the same swarm, untouched. We use a swarm per topic and put our own
+// sealed text where the offer would go. Being in a swarm = being subscribed.
+const ALNUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const id20 = () => { let s = ''; for (const b of randomBytes(20)) s += ALNUM[b % ALNUM.length]; return s; };
+const swarmOf = topic => b64(sha256(utf8('gamedb-bt|' + topic))).slice(0, 20);
+function trackerOpen(url, { onMessage, onClose, WS = globalThis.WebSocket, timeoutMs = CONNECT_MS, copies = 3 }) {
+  return new Promise((res, rej) => {
+    const me = id20(), swarms = new Map(); let api = null, again = null;
+    const announce = (hash, extra = {}) => s.send(JSON.stringify({ action: 'announce', info_hash: hash, peer_id: me, numwant: (extra.offers || []).length, uploaded: 0, downloaded: 0, left: 1, ...extra }));
+    const s = socket(url, null, WS, timeoutMs, () => res(api), data => {
+      if (typeof data !== 'string') return;
+      let m; try { m = JSON.parse(data); } catch { return; }
+      if (!m || m.action !== 'announce' || !m.offer || typeof m.offer.sdp !== 'string') return;
+      const topic = swarms.get(m.info_hash); if (topic) onMessage(topic, m.offer.sdp);
+    }, () => onClose, rej);
+    if (!s) return;
+    s.onStop = () => clearInterval(again);
+    s.ws.onopen = () => {
+      // Trackers forget peers that stay quiet for a couple of minutes.
+      again = setInterval(() => { for (const h of swarms.keys()) announce(h); }, 50000); if (again.unref) again.unref();
+      s.up();
+    };
+    api = {
+      url,
+      subscribe(topic) { const h = swarmOf(topic); if (swarms.has(h)) return; swarms.set(h, topic); announce(h, { event: 'started' }); },
+      publish(topic, text) {
+        const h = swarmOf(topic), offers = []; for (let i = 0; i < copies; i++) offers.push({ offer_id: id20(), offer: { type: 'offer', sdp: text } });
+        announce(h, { offers });
+        if (!swarms.has(h)) announce(h, { event: 'stopped' }); // only passing through: leave that swarm again
+      },
+      close: () => { onClose = null; for (const h of swarms.keys()) announce(h, { event: 'stopped' }); s.stop('closed'); },
+    };
+  });
+}
+
+const OPENERS = { mqtt: mqttOpen, nostr: nostrOpen, bt: trackerOpen };
+
+// ───────────────────────── the bus ─────────────────────────
+// One "bus" = every meeting point we could reach, plus a same-computer channel between browser
+// tabs. A message is published on all of them; the first copy to arrive wins, the rest are dropped.
+
+/**
+ * Open a bus. onMessage(topic, text) is called once per distinct message.
+ * Returns { publish, subscribe, close, relaysUp(), settled } — `settled` resolves with the number
+ * of meeting points that connected, once every one has either connected or failed.
+ */
+function openBus({ relays = DEFAULT_RELAYS, WS = globalThis.WebSocket, onMessage, local = true, log = () => {} }) {
+  const links = new Set(), topics = new Set(), seen = new Set(), order = [], sign = nostrSigner();
+  let closed = false, bc = null;
+  const got = (topic, text) => {
+    // Sealed texts start with a random nonce and tag, so their opening characters tell them apart.
+    const id = text.length + ':' + text.slice(0, 48);
+    if (closed || !topics.has(topic) || seen.has(id)) return;
+    seen.add(id); order.push(id); if (order.length > 2000) seen.delete(order.shift());
+    onMessage(topic, text);
+  };
+  if (local && typeof BroadcastChannel !== 'undefined') {
+    try { bc = new BroadcastChannel('gamedb-p2p'); bc.onmessage = ev => { const m = ev.data; if (m && typeof m.t === 'string' && typeof m.x === 'string') got(m.t, m.x); }; if (bc.unref) bc.unref(); } catch { bc = null; }
+  }
+  const dial = (spec, wait = 5000) => {
+    const { kind, url } = relayKind(spec);
+    return OPENERS[kind](url, { WS, sign, onMessage: got, onClose: () => {
+      for (const l of links) if (l.spec === spec) links.delete(l);
+      if (!closed) setTimeout(() => { if (!closed) dial(spec, Math.min(wait * 2, 60000)).catch(() => {}); }, wait);
+    } }).then(link => { if (closed) { link.close(); return false; } link.spec = spec; links.add(link); for (const t of topics) link.subscribe(t); return true; });
+  };
+  const tries = WS ? relays.map(spec => dial(spec).catch(e => { log('gamedb: meeting point unavailable', spec, e && e.message); return false; })) : [];
+  return {
+    publish(topic, text) { for (const l of links) l.publish(topic, text); if (bc) bc.postMessage({ t: topic, x: text }); },
+    subscribe(topic) { if (topics.has(topic)) return; topics.add(topic); for (const l of links) l.subscribe(topic); },
+    relaysUp: () => links.size,
+    settled: Promise.all(tries).then(r => r.filter(Boolean).length),
+    close() { closed = true; for (const l of links) l.close(); links.clear(); if (bc) { try { bc.close(); } catch { /* closed */ } } },
+  };
+}
+
+/**
+ * A bus that lives inside one page or process: for tests and same-page demos.
+ *   const net = memoryBus();  pass `bus: net` to hostRoom and joinRoom.
+ *   net.loss = 0.2   drops one message in five (to test the relay lane);  net.down = true  drops all.
+ */
+function memoryBus({ loss = 0, seed = 7 } = {}) {
+  const subs = new Set();
+  let r = seed; const rand = () => { r = (r * 1103515245 + 12345) % 2147483648; return r / 2147483648; };
+  const factory = ({ onMessage }) => {
+    const me = { topics: new Set(), onMessage }; subs.add(me);
+    return {
+      publish(topic, text) {
+        for (const s of subs) {
+          if (s === me || !s.topics.has(topic) || factory.down || (factory.loss && rand() < factory.loss)) continue;
+          setTimeout(() => { if (subs.has(s)) s.onMessage(topic, text); }, 0);
+        }
+      },
+      subscribe(topic) { me.topics.add(topic); }, relaysUp: () => (factory.down ? 0 : 1), settled: Promise.resolve(factory.down ? 0 : 1), close() { subs.delete(me); },
+    };
+  };
+  factory.loss = loss; factory.down = false;
+  return factory;
+}
+
+return { DEFAULT_RELAYS, concat, b64, unb64, seal, unseal, relayKind, mqttOpen, NOSTR_KIND, MAIL_KIND, nostrSigner, nostrOpen, swarmOf, trackerOpen, openBus, memoryBus };
 };
 __pb.req('js/main.js').catch(function (e) { console.error(e); var m = document.getElementById('ld-msg'); if (m) m.textContent = 'Could not start: ' + e.message; });
 })();
