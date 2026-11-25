@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<script>
+/* iPhone Safari ignores user-scalable=no: cancel double-tap zoom and pinch (as on the arcade's other games). */
+(function () {
+  var last = 0;
+  document.addEventListener("touchend", function (e) { var now = Date.now(); if (now - last < 350) e.preventDefault(); last = now; }, { passive: false });
+  ["gesturestart", "gesturechange", "gestureend"].forEach(function (ev) { document.addEventListener(ev, function (e) { e.preventDefault(); }, { passive: false }); });
+  document.addEventListener("touchmove", function (e) { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+})();
+</script>
+<title>Dirt and Deeds</title>
+<link rel="icon" href="assets/icon.png">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<!-- arcade SEO tags (anthonyjctsg.online) -->
+<meta name="description" content="A 3D real-estate hustle in a small Southern town. Start with $1,800, a phone and a beat-up car: read distressed houses, knock on doors, earn a seller&#x27;s trust, run the numbers and assign contracts to cash buyers.">
+<link rel="canonical" href="https://anthonyjctsg.online/dirt-and-deeds/dirt-and-deeds.html">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AnthonyJCTSG Games">
+<meta property="og:title" content="Dirt and Deeds: free browser game">
+<meta property="og:description" content="A 3D real-estate hustle in a small Southern town. Start with $1,800, a phone and a beat-up car: read distressed houses, knock on doors, earn a seller&#x27;s trust, run the numbers and assign contracts to cash buyers.">
+<meta property="og:url" content="https://anthonyjctsg.online/dirt-and-deeds/dirt-and-deeds.html">
+<meta property="og:image" content="https://anthonyjctsg.online/dirt-and-deeds_thumbnail.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "VideoGame", "name": "Dirt and Deeds", "url": "https://anthonyjctsg.online/dirt-and-deeds/dirt-and-deeds.html", "image": "https://anthonyjctsg.online/dirt-and-deeds_thumbnail.jpg", "description": "A 3D real-estate hustle in a small Southern town. Start with $1,800, a phone and a beat-up car: read distressed houses, knock on doors, earn a seller's trust, run the numbers and assign contracts to cash buyers.", "genre": ["Business simulation", "Strategy", "Real estate", "3D"], "author": {"@type": "Person", "@id": "https://anthonyjctsg.com/#person", "name": "Anthony C Johnson", "url": "https://anthonyjctsg.com/"}, "gamePlatform": "Web Browser", "applicationCategory": "Game", "operatingSystem": "Any", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"}, "isPartOf": {"@type": "WebSite", "@id": "https://anthonyjctsg.online/#website", "name": "AnthonyJCTSG Games", "url": "https://anthonyjctsg.online/"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <div id="h-clock" class="chip"></div>
+  <div id="h-money" class="chip"></div>
+  <div id="h-rent" class="chip small"></div>
+  <div id="h-gps" class="chip small" hidden></div>
+  <div id="h-phone" class="chip small"><kbd>Tab</kbd> Phone <span id="h-badge" hidden></span></div>
+  <div id="h-day"><i id="h-daybar"></i></div>
+  <div id="h-keys" class="keys"></div>
+</div>
+<div id="prompt" hidden></div>
+<div id="houselabel" hidden></div>
+<div id="toast" hidden></div>
+<div id="vignette"></div>
+
+<!-- conversation -->
+<div id="talk" class="overlay" hidden>
+  <div class="tk-top">
+    <div class="tk-who"><b id="tk-name"></b><span id="tk-sub"></span></div>
+    <div class="tk-meters">
+      <div class="meter"><small>Trust</small><i><em id="m-trust"></em></i></div>
+      <div class="meter bad"><small>Tension</small><i><em id="m-tension"></em></i></div>
+    </div>
+  </div>
+  <div id="tk-log"></div>
+  <div id="tk-notes"></div>
+  <div id="tk-math"></div>
+  <div id="tk-opts"></div>
+</div>
+
+<!-- phone -->
+<div id="phone" class="overlay" hidden>
+  <div class="ph-frame">
+    <div class="ph-bar"><b id="ph-clock"></b><span>Pecan Hollow</span><button id="ph-x" title="Put it away (Tab)">&times;</button></div>
+    <nav class="ph-tabs" id="ph-tabs"></nav>
+    <div id="ph-page"></div>
+  </div>
+</div>
+
+<!-- generic card / summary -->
+<div id="card" class="overlay" hidden><div class="card-box"><div id="card-body"></div><div id="card-btns"></div></div></div>
+
+<!-- title / select / loading -->
+<div id="loading" class="screen">
+  <div class="load-box">
+    <img src="assets/ctsg-seal.png" class="seal" alt="">
+    <h1>DIRT <span>&amp;</span> DEEDS</h1>
+    <p class="tag">Start with a phone and a beat-up car.<br>End up owning the block.</p>
+    <div id="load-bar"><i><em id="load-fill"></em></i><small id="load-txt">Loading…</small></div>
+    <div class="t-btns">
+      <button id="t-play" class="primary" hidden>New game</button>
+      <button id="t-cont" hidden>Continue</button>
+      <button id="t-gfx" hidden>Graphics</button>
+    </div>
+    <p class="fine" id="t-fine"></p>
+  </div>
+</div>
+
+<div id="select" class="screen" hidden>
+  <div class="sel-top"><h2>Who are you?</h2><p>Six people, one town. Pick your edge.</p></div>
+  <div id="sel-cards"></div>
+  <div class="sel-bot"><div id="sel-info"></div><div class="t-btns"><button id="sel-back">Back</button><button id="sel-go" class="primary">Start the hustle</button></div></div>
+</div>
+
+<div id="pause" class="overlay" hidden>
+  <div class="card-box">
+    <h2>Paused</h2>
+    <div class="pz-btns">
+      <button id="pz-resume" class="primary">Back to it</button>
+      <button id="pz-save">Save game</button>
+      <button id="pz-gfx">Graphics: <span id="pz-gfxv"></span></button>
+      <button id="pz-music">Music: <span id="pz-musicv"></span></button>
+      <button id="pz-quit">Save &amp; quit to title</button>
+    </div>
+    <p class="fine pz-keys"></p>
+  </div>
+</div>
+<div id="err" hidden></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
