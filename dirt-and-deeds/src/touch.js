@@ -31,7 +31,7 @@ export const Touch = {
 #tc .btns button.lit { background: rgba(242,207,128,.9); color: #1a1409; }
 #tc .btns .out { display: none; } #tc.drive .btns .out { display: block; } #tc.drive .btns .run { display: none; }
 #tc .menu { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); pointer-events: auto; width: 46px; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,.35); background: rgba(10,14,20,.55); color: #f6eedd; font-size: 18px; }
-html.mobile #h-keys { display: none; }`;
+html.mobile #h-keys, html.mobile #h-phone { display: none; }`;
     document.head.appendChild(css);
     const el = document.createElement("div");
     el.id = "tc";
