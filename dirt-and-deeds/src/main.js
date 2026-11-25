@@ -1,7 +1,8 @@
 // Dirt and Deeds: boot, loop, player, camera, driving, people, interactions. Rules live in game.js, the town in world.js, the DOM in ui.js.
 // Keyboard + mouse AND Xbox pad: pad.js turns buttons into the same key events and gives main the analog sticks and triggers.
 import * as THREE from "three";
-import { loadClips, loadBody, Actor } from "./chars.js";
+import { loadClips, loadBody, Actor, setTextureScale, setAnisotropy } from "./chars.js";
+import { Touch } from "./touch.js";
 import * as G from "./game.js";
 import { T, HEROES, BODY, KEYS, WORKER_BODIES, RESIDENTS, LOITER, NICE_WALKERS, TOWN, money, clock } from "./data.js";
 import { makeLots, buildWorld, collide, skyAt, EDGE, STREET_Z } from "./world.js";
@@ -18,7 +19,12 @@ const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* pri
 
 // ---------------------------------------------------------------- graphics presets
 const GFX = { low: { pr: 1, shadow: 0, far: 150, aa: false }, med: { pr: 1.25, shadow: 1024, far: 220, aa: false }, high: { pr: 1.75, shadow: 2048, far: 320, aa: true } };
-let gfxName = Q.get("gfx") || lsGet("dd-gfx") || ((navigator.hardwareConcurrency || 4) <= 2 ? "low" : "med");
+// 2026-11-24 (user on iPhone: "a problem has repeatedly occurred" = Safari killed the tab for memory). Phones get a lean
+// town: low graphics, half-size character textures, a small cast (others borrow a loaded body of the same sex),
+// a third of the parked cars, and touch controls (touch.js). ?mobile=1 forces it on a PC for testing.
+const MOBILE = Q.get("mobile") === "1" || matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+if (MOBILE) { setTextureScale(0.5); setAnisotropy(1); document.documentElement.classList.add("mobile"); }
+let gfxName = Q.get("gfx") || lsGet("dd-gfx") || (MOBILE || (navigator.hardwareConcurrency || 4) <= 2 ? "low" : "med");
 if (!GFX[gfxName]) gfxName = "med";
 const GF = GFX[gfxName];
 
@@ -73,11 +79,13 @@ async function bootGame() {
   const want = new Set();
   for (const k of ["flats", "heights"]) for (const l of Object.values(RESIDENTS[k])) l.forEach((b) => want.add(b));
   LOITER.forEach((b) => want.add(b)); NICE_WALKERS.forEach((b) => want.add(b));
-  const list = [...want];
+  let list = [...want];
+  if (MOBILE) list = ["hoodie_m", "mateo", "sport1", "mai", "sport2", "elder_m", "elder_f", "suit_m", "blazer_f", "mate_m"];
   prog(0.03, "Animations…");
   await loadClips();
   // key people: first body in each fallback list that has a packed file
-  const keyIds = Object.values(KEYS).flat().concat(WORKER_BODIES.flat());
+  // (phones: only the first body of each list; a missing one falls through to the next list entry below)
+  const keyIds = MOBILE ? Object.values(KEYS).map((l) => l[0]).concat(WORKER_BODIES.slice(0, 2).map((l) => l[0])) : Object.values(KEYS).flat().concat(WORKER_BODIES.flat());
   const all = [...new Set([...list, ...keyIds])];
   let done = 0, next = 0;
   const worker = async () => {
@@ -89,7 +97,7 @@ async function bootGame() {
   };
   await Promise.all([worker(), worker(), worker()]);
   for (const [role, cands] of Object.entries(KEYS)) keyBody[role] = cands.find((b) => models[b]) || "hoodie_m";
-  for (const cands of WORKER_BODIES) workerBody.push(cands.find((b) => models[b]) || "construction_m");
+  for (const cands of WORKER_BODIES) workerBody.push(cands.find((b) => models[b]) || workerBody[workerBody.length % 2] || "hoodie_m");
   prog(0.9, "Cars…");
   await Promise.all(CAR_IDS.map((id) => loadCar(id).catch(() => {})));
   prog(0.95, "Building the town…");
@@ -145,6 +153,7 @@ function placeParked() {
   const ids = ["sedan", "sedan2", "suv", "pickup", "sedan", "van", "suv", "sedan2"];
   for (const sp of W.parked) {
     const h = Math.abs(Math.round(sp.x * 13.7 + sp.z * 7.3)), flats = sp.x < -84;
+    if (MOBILE && !sp.model && h % 3) continue;   // phones: a third of the parked cars
     // Heights drives: about one in five holds a luxury car; the showcase spots downtown name their own model.
     const lux = !flats && sp.x > 84 && !sp.rusty && h % 5 === 0;
     const id = sp.model || (sp.rusty ? "pickup" : lux ? LUX_IDS[(h >> 3) % LUX_IDS.length] : ids[h % ids.length]);
@@ -157,7 +166,15 @@ function placeParked() {
   }
 }
 
-function bodyOf(id) { return models[id] ? id : null; }
+// A body that wasn't loaded (phones load a small cast) borrows a loaded one of the same sex, picked by the id so it's stable.
+function bodyOf(id) {
+  if (models[id]) return id;
+  const sex = BODY[id] ? BODY[id][0] : "m";
+  const pool = Object.keys(models).filter((k) => models[k] && BODY[k] && BODY[k][0] === sex && !k.startsWith("hero_") && !k.endsWith("_biz"));
+  if (!pool.length) return null;
+  let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return pool[h % pool.length];
+}
 function makeNpc(bodyId, x, z, yaw, opts = {}) {
   const id = bodyOf(bodyId) || bodyOf("hoodie_m"); if (!id) return null;
   const a = new Actor(models[id], BODY[id] ? BODY[id][0] : "m");
@@ -657,7 +674,7 @@ function updateCar(dt) {
   const k = (c) => keys.has(c);
   let thr = (k("KeyW") || k("ArrowUp") ? 1 : 0) - (k("KeyS") || k("ArrowDown") ? 1 : 0);
   let st = (k("KeyA") || k("ArrowLeft") ? 1 : 0) - (k("KeyD") || k("ArrowRight") ? 1 : 0);
-  if (Pad.on || Pad.rt || Pad.lt) { thr += Pad.rt - Pad.lt; st += -Pad.lx; if (!Pad.rt && !Pad.lt && Math.abs(Pad.ly) > 0.3) thr -= Pad.ly; }
+  if (Pad.on || Pad.rt || Pad.lt || Pad.lx || Pad.ly) { thr += Pad.rt - Pad.lt; st += -Pad.lx; if (!Pad.rt && !Pad.lt && Math.abs(Pad.ly) > 0.3) thr -= Pad.ly; }
   thr = clamp(thr, -1, 1); st = clamp(st, -1, 1);
   const handbrake = k("Space");
   if (thr > 0) car.v += (car.v < -0.5 ? 16 : 7.5) * thr * dt; else if (thr < 0) car.v -= (car.v > 0.5 ? 16 : 5) * -thr * dt;
@@ -751,6 +768,8 @@ function updateCamera(dt) {
     cam.pos.lerp(cam.want, Math.min(1, dt * 3)); cam.look.lerp(cam.wantLook, Math.min(1, dt * 4));
   } else {
     if (Pad.on) { cam.yaw -= Pad.rx * 2.6 * dt; cam.pitch = clamp(cam.pitch + Pad.ry * 1.5 * dt, 0.04, 1.3); if (Pad.rx || Pad.ry) camManual = 1.5; }
+    const tl = Touch.takeLook();
+    if (tl[0] || tl[1]) { cam.yaw -= tl[0] * 0.006; cam.pitch = clamp(cam.pitch + tl[1] * 0.004, 0.04, 1.3); camManual = 1.5; }
     if (car.driving) {
       // chase: ease the camera yaw behind the heading unless you're looking around
       camManual = Math.max(0, camManual - dt);
@@ -859,5 +878,6 @@ document.addEventListener("keydown", (e) => { if (e.code === "Tab") e.preventDef
 
 window.DD = { get s() { return s; }, get P() { return P; }, get W() { return W; }, G, pl, car, cam, scene, camera, setMode, startRun, endOfDay, get mode() { return mode; }, interact, get target() { return target; }, npcs, talkAct, doKnock, doNote, openPhoneMode };
 Pad.init({});
+if (MOBILE) Touch.init({ playing: () => mode === "play", driving: () => car.driving });
 requestAnimationFrame(frame);
 bootGame().catch((e) => { const el = $("err"); el.hidden = false; el.textContent = "BOOT ERROR: " + e.message; console.error(e); });
