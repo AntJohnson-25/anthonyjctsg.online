@@ -28,6 +28,8 @@ export const Touch = {
 #tc .btns { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, 64px); gap: 10px; pointer-events: auto; }
 #tc .btns button { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: rgba(10,14,20,.55); color: #f6eedd; font: 700 12px system-ui, sans-serif; letter-spacing: .04em; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 #tc .btns button.use { background: rgba(217,162,74,.85); color: #1a1409; }
+#tc .btns .phone { position: relative; }
+#tc .btns .phone i { position: absolute; top: -4px; right: -4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: #d9402f; color: #fff; font: 700 12px/22px system-ui, sans-serif; font-style: normal; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
 #tc .btns button.lit { background: rgba(242,207,128,.9); color: #1a1409; }
 #tc .btns .out { display: none; } #tc.drive .btns .out { display: block; } #tc.drive .btns .run { display: none; }
 #tc .menu { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); pointer-events: auto; width: 46px; height: 34px; border-radius: 8px; border: 1px solid rgba(255,255,255,.35); background: rgba(10,14,20,.55); color: #f6eedd; font-size: 18px; }
@@ -37,7 +39,7 @@ html.mobile #h-keys, html.mobile #h-phone { display: none; }`;
     el.id = "tc";
     el.innerHTML = '<div class="zone zl"></div><div class="zone zr"></div><div class="base"></div><div class="knob"></div>' +
       '<button class="menu" aria-label="Pause">&#9776;</button>' +
-      '<div class="btns"><button class="run">RUN</button><button class="phone">PHONE</button><button class="out">OUT</button><button class="use">USE</button></div>';
+      '<div class="btns"><button class="run">RUN</button><button class="phone">PHONE<i hidden></i></button><button class="out">OUT</button><button class="use">USE</button></div>';
     document.body.appendChild(el);
     const base = el.querySelector(".base"), knob = el.querySelector(".knob");
     const zl = el.querySelector(".zl"), zr = el.querySelector(".zr");
@@ -85,7 +87,10 @@ html.mobile #h-keys, html.mobile #h-phone { display: none; }`;
     btn(".menu", () => tap("Escape"));
     btn(".run", (b) => { runOn = !runOn; b.classList.toggle("lit", runOn); });
 
+    // the unread count: mirror the HUD's phone badge (hidden on phones) onto the PHONE button
+    const hb = document.getElementById("h-badge"), pb = el.querySelector(".phone i");
     const tick = () => {
+      if (hb) { const show = !hb.hidden && hb.textContent.trim() !== ""; pb.hidden = !show; if (show && pb.textContent !== hb.textContent) pb.textContent = hb.textContent; }
       const on = host.playing();
       el.classList.toggle("on", on);
       el.classList.toggle("drive", on && host.driving());

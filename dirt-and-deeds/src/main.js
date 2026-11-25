@@ -754,7 +754,7 @@ function updateCamera(dt) {
   } else if (mode === "select") {
     cam.want.set(0.7, 1.55, 330 + 4.2); cam.wantLook.set(0, 1.0, 330);
     cam.pos.lerp(cam.want, 0.1); cam.look.lerp(cam.wantLook, 0.1);
-    if (stageHero) { stageHero.root.rotation.y += dt * 0.35; stageHero.update(dt, 0); if (!stageHero.busy && Math.random() < 0.004) stageHero.play(Math.random() < 0.5 ? "waving" : "victory"); }
+    if (stageHero) { stageHero.root.rotation.y += dt * 0.35; stageHero.update(dt, 0); if (!stageHero.busy && Math.random() < 0.003) stageHero.play("waving"); }   // "victory" sat them down mid-air (user 2026-11-24)
   } else if (cam.mode === "talk" && talk) {
     if (talk.kind === "door" && sellerNpc) {
       const a = { x: pl.x, z: pl.z }, b = { x: sellerNpc.x, z: sellerNpc.z };
