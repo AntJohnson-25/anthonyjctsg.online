@@ -941,7 +941,13 @@
     if (pzTail === undefined) pzTail = pz;
     // generate ahead
     let guard = 0;
-    while (cursorZ > pz - 190 && guard++ < 8) addNext(speed, dist);
+    // W.pace (racing friends): every screen must build the same course from the seed, so the pace a
+    // slab is laid out for comes from where the slab is (the leader is about 190 m behind it), not
+    // from the leader's live speed, which differs a little from screen to screen
+    while (cursorZ > pz - 190 && guard++ < 8) {
+      if (W.pace) { const d = Math.max(0, -cursorZ - 190); addNext(W.pace(d), d); }
+      else addNext(speed, dist);
+    }
     // recycle behind
     while (W.slabs.length > 3 && W.slabs[0].z1 > pzTail + 45) { dropSlab(W.slabs[0]); W.slabs.shift(); }
     // skyline segments

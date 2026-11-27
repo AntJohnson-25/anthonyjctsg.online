@@ -10,6 +10,8 @@
     .some(function (k) { return q.has(k); });
   if (skip) { el.remove(); return; }
 
+  // a friend's race link: say so
+  if (q.get("room")) { el.querySelector(".ld-play").textContent = "JOIN THE RACE"; el.querySelector(".ld-sub").textContent = "A FRIEND INVITED YOU TO RACE"; }
   const art = el.querySelector(".ld-art");
   let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0, gone = false;
   function move(x, y) { tx = (x / window.innerWidth - 0.5) * 2; ty = (y / window.innerHeight - 0.5) * 2; }

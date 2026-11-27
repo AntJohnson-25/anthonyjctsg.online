@@ -117,3 +117,35 @@ h1 span { color: var(--accent); }
 #pad #b-jacks { grid-column: 1 / -1; width: auto; height: clamp(40px, 10vw, 50px); border-color: #ff3b30; color: #ffd9d6; }
 #pad #b-jacks b { color: #ff3b30; margin-left: 4px; }
 #pad #b-jacks.empty { opacity: .4; }
+
+/* ---- racing friends: menu button + lobby (src/net.js, main.js "racing friends") ---- */
+#screen-lobby .panel { max-width: 500px; }
+#lb-code { margin-left: 6px; color: #ffd23f; }
+#lb-status { margin: 8px 0 12px; font-weight: 900; font-size: 22px; letter-spacing: .06em; line-height: 1.15; text-shadow: 0 2px 12px rgba(0,0,0,.7); min-height: 26px; }
+#lb-share { display: flex; gap: 8px; margin-bottom: 12px; }
+#lb-link { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: rgba(0,0,0,.4); color: var(--ink); font: 700 13px "Segoe UI", system-ui, sans-serif; user-select: text; -webkit-user-select: text; }
+#lb-copy { flex: none; padding: 0 16px; border: 0; border-radius: 10px; background: var(--accent); color: #1b0f08; font: inherit; font-weight: 900; letter-spacing: .12em; font-size: 13px; cursor: pointer; }
+#lb-ev, #lb-me { --c: var(--accent); display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 10px; border-radius: 12px; background: var(--glass); border-left: 5px solid var(--c); text-align: left; }
+#lb-ev > div, #lb-me > div { flex: 1; min-width: 0; }
+#lb-ev b, #lb-me b { display: block; font-weight: 900; font-size: 20px; letter-spacing: .08em; }
+#lb-ev small, #lb-me small { display: block; font-size: 11px; letter-spacing: .14em; font-weight: 800; color: var(--c); }
+.lobby .arr { flex: none; width: 42px; height: 42px; border-radius: 10px; border: 2px solid rgba(255,255,255,.25); background: rgba(0,0,0,.3); color: var(--ink); font-size: 16px; cursor: pointer; }
+#lb-ev .arr { visibility: hidden; }
+#lb-ev.host .arr { visibility: visible; }
+#lb-players { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
+.lp { --c: #fff; padding: 8px 10px; border-radius: 10px; background: var(--glass); border: 2px solid var(--c); text-align: left; }
+.lp.me { box-shadow: 0 0 14px var(--c); }
+.lp b { display: block; font-weight: 900; font-size: 16px; letter-spacing: .06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp small { font-size: 10px; letter-spacing: .12em; opacity: .8; font-weight: 800; }
+.lp.bots { border-style: dashed; border-color: rgba(255,255,255,.3); }
+#lb-slow { margin: 6px 0; font-size: 11px; letter-spacing: .08em; font-weight: 700; color: #ffd23f; }
+#lb-wait { margin: 14px 0 4px; font-weight: 800; letter-spacing: .2em; opacity: .8; }
+#lb-start:disabled { filter: grayscale(.8) brightness(.7); cursor: default; }
+#screen-lobby .btn { margin-top: 10px; }
+@media (max-height: 520px) {
+  #lb-status { font-size: 17px; margin: 4px 0 6px; }
+  #lb-ev, #lb-me { margin: 4px 0; padding: 4px 8px; } .lobby .arr { width: 36px; height: 36px; }
+  #lb-share { margin-bottom: 6px; } #lb-link { padding: 7px 10px; }
+  #screen-lobby .btn { display: inline-block; width: calc(50% - 5px); padding: 8px; min-height: 40px; font-size: 15px; margin-top: 6px; vertical-align: top; }
+  #lb-wait { margin: 6px 0 0; }
+}

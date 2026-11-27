@@ -10,7 +10,7 @@
   const T = window.THREE, W = G.World, A = G.Audio, PK = window.PK;
   const LANES = W.LANES;
   const V0 = 8.5, VMAX = 19, GRAV = 26, JUMPV = 9.5;
-  const RACE_LEN = 1500;                      // metres to the finish line
+  const RACE_LEN = +new URLSearchParams(location.search).get("fin") || 1500;   // metres to the finish line (?fin= tests a short one)
   const FINISH_Z = -RACE_LEN;
   const JACKS_N = 3;                        // handfuls of jacks per runner per race
   // A series is best of 3, first to 2 wins, and each race is a different side of the city
@@ -75,6 +75,10 @@
     seed: parseInt(params.get("seed") || "0", 10) || (Math.floor(Math.random() * 1e6) + 1),
     pick: 0, agents: [], player: null, finishers: 0, overT: 0, finishObj: null, auto: false, stats: { stumbles: 0, falls: 0, blocks: 0, parries: 0 }
   };
+  // racing friends (see the "racing friends" section and src/net.js)
+  const MP = g.mp = { on: false, inLobby: false, race: 0, goAt: 0, lobby: null, sendT: 0, delay: 0.12, raceDef: null, overAt: 0,
+    sentHits: 0, gotHits: 0, hitsOk: 0, snaps: 0, interp: 0, extrap: 0, jacksIn: 0, status: "", err: "", gone: {}, reported: false };
+  const Net = G.Net;
   const runners = {};
   let best = {};
   try { best = JSON.parse(localStorage.getItem("sr_best") || "{}"); if (localStorage.getItem("sr_muted") === "1") A.muted = true; } catch (e) {}
@@ -111,7 +115,10 @@
       cd: 0, spCd: 0, atk: null, blockT: 0, blockAge: 0, blockCd: 0, chain: 0, chainT: 0, punchIdx: 0, kickIdx: 0, spIdx: 0, face: null, faceT: 0, aim: 0, aimT: 0, lift: 0,
       hits: 0, taken: 0, finished: false, finishT: 0, place: 0, jacks: JACKS_N, jackT: 0, jackWind: 0, diagReq: 0, diagReqT: 0, diags: 0,
       bot: player ? null : { skill: 0.55 + Math.random() * 0.4, aggr: 0.5 + Math.random() * 0.9, climbPref: Math.random(), react: 0.85 + Math.random() * 0.2, seen: {} },
-      botDbg: ""
+      botDbg: "",
+      // racing friends: remote = another screen runs this runner (drawn from its updates); owner = that
+      // screen's player id; human = a person, not a bot
+      remote: false, owner: null, human: !!player, net: null, vis: true, hy: Math.PI, rz: 0
     };
   }
   function removeAgents() {
@@ -146,7 +153,7 @@
     return [0, 1, 2].sort(function (p, q) { return S.pts[q] - S.pts[p] || S.time[p] - S.time[q]; })[0];
   }
   async function startRace() {
-    if (g.loading) return;
+    if (g.loading || MP.on) return;          // racing friends: the host starts races from the lobby
     g.loading = true;
     A.unlock();
     show(null);
@@ -158,16 +165,21 @@
     try { await Promise.all(defs.map(function (d) { return loadChar(d.id); })); }
     catch (e) { $("loading-text").textContent = "COULD NOT LOAD A FIGHTER"; g.loading = false; return; }
     if (params.get("trace")) document.title = "BOOT loaded";
+    const lanes = [1, 0, 2].sort(function () { return Math.random() - 0.5; });
+    if (params.get("lane")) { const L = +params.get("lane"); lanes.splice(lanes.indexOf(L), 1); lanes.unshift(L); }   // test: the player's lane
+    setupRace(defs, lanes, 0, RC, params.get("seed") ? g.seed : Math.floor(Math.random() * 1e6) + 1);
+  }
+  // build the course and the runners and start the countdown. me = which of defs is the player.
+  function setupRace(defs, lanes, me, RC, seed) {
     removeAgents();
-    g.seed = params.get("seed") ? g.seed : Math.floor(Math.random() * 1e6) + 1;
+    g.seed = seed;
+    W.pace = MP.on ? cruiseOf : null;        // racing friends: the same course on every screen
     W.setRoute(params.get("route") || RC.route, RC.pal);
     W.reset(g.seed);
     clearJacks();
     g.truckZones = 0;
-    const lanes = [1, 0, 2].sort(function () { return Math.random() - 0.5; });
-    if (params.get("lane")) { const L = +params.get("lane"); lanes.splice(lanes.indexOf(L), 1); lanes.unshift(L); }   // test: the player's lane
-    g.agents = defs.map(function (d, i) { return newAgent(d, lanes[i], i === 0, i); });
-    g.player = g.agents[0];
+    g.agents = defs.map(function (d, i) { return newAgent(d, lanes[i], i === me, i); });
+    g.player = g.agents[me];
     g.agents.forEach(function (a) { a.runner.root.rotation.z = 0; a.runner.play("fistfight", { fade: 0, loop: true }); a.runner.update(0); });
     if (params.get("trace")) document.title = "BOOT agents built";
     W.update(0, V0, 0, 0);
@@ -176,9 +188,12 @@
     g.stats = { stumbles: 0, falls: 0, blocks: 0, parries: 0 };
     g.drops = 0; g.moveLog = {}; g.landLog = {}; g.jackLog = { thrown: 0, hit: 0 }; g.jkShown = -1;
     const S = g.series;
-    $("bn-race").textContent = "RACE " + (S.race + 1) + " OF 3";
     $("bn-name").textContent = RC.name; $("bn-blurb").textContent = RC.blurb;
-    $("series").innerHTML = "R" + (S.race + 1) + "/3" + S.winners.map(function (w) { return "<i style='background:#" + COLORS[w].toString(16).padStart(6, "0") + "'></i>"; }).join("");
+    if (MP.on) { $("bn-race").textContent = "RACE A FRIEND"; $("series").innerHTML = ""; }
+    else {
+      $("bn-race").textContent = "RACE " + (S.race + 1) + " OF 3";
+      $("series").innerHTML = "R" + (S.race + 1) + "/3" + S.winners.map(function (w) { return "<i style='background:#" + COLORS[w].toString(16).padStart(6, "0") + "'></i>"; }).join("");
+    }
     if (g.finishObj) { scene.remove(g.finishObj); g.finishObj = null; }
     g.agents.forEach(function (a) { place(a, 0); });
     updateCamera(0.016, true);
@@ -219,6 +234,7 @@
   };
   window.addEventListener("keydown", function (e) {
     if (e.repeat) return;
+    if (MP.inLobby && g.mode === "menu") { if (!e.defaultPrevented) lobbyKey(e); return; }   // (defaultPrevented: the landing's PLAY key)
     if (g.mode === "menu" && (e.code === "Enter" || e.code === "Space")) { e.preventDefault(); startRace(); return; }
     if (g.mode === "over" && g.overT > 1 && (e.code === "Enter" || e.code === "Space")) { e.preventDefault(); startRace(); return; }
     if (e.code === "Escape" || e.code === "KeyP") { togglePause(); return; }
@@ -719,31 +735,62 @@
     const clip = m.thrown ? "thrown" : "hitback", dur = PK.CLIPS[clip].dur;
     v.runner.play(clip, { t: 0, rate: Math.min(2.2, dur / (v.stateT + 0.05)), loop: false, fade: 0.05, y: "abs" });
   }
+  // A strike that reached its victim. The victim's half (block, parry, stun, knockdown) runs on the
+  // screen that runs the victim, the attacker's half (credit, chain, a parry knocking them over) on
+  // the attacker's. Racing friends: a victim on another screen gets an "h" message, the answer
+  // ("ho") brings the attacker's half back. Both halves run here when both runners are local.
   function applyHit(att, vic, m) {
+    const key = att.atk ? att.atk.key : "?";
+    const down = !!(m.down || (m.kind === "punch" && (att.chainT > 0 ? att.chain + 1 : 1) >= 3));
+    if (vic.remote) {
+      if (att.remote) return;
+      MP.sentHits++;
+      Net.send({ t: "h", n: MP.race, by: att.id, id: vic.id, k: key, dn: down ? 1 : 0 }, vic.owner);
+      return;
+    }
+    hitAttacker(att, vic, m, hitVictim(att, vic, m, down), down, key);
+  }
+  // returns what happened: "parry" | "block" | "hit" | "down"
+  function hitVictim(att, vic, m, down) {
     if (vic.state === "block" && vic.blockT > 0 && !m.grab) {
       if (vic.blockAge < 0.22) {                           // a parry: they swung into a fresh block
         vic.blockT = 0; vic.state = "start"; vic.stateT = 0.4; vic.runner.play("dodge", { t: 0.3, rate: 1.3, loop: false, fade: 0.05, y: "abs" });
-        knockdown(att, { kd: 1.6 });
-        A.block(); A.ko();
         if (vic.player) { toast("PARRY!"); g.stats.parries++; g.shake = 0.3; }
-        if (att.player) toast("PARRIED");
-      } else {
-        att.atk = null; att.state = "hit"; att.stateT = 0.5; att.face = null;
-        att.runner.play("hitpunch", { t: 0.05, rate: 1.6, loop: false, fade: 0.05, y: "abs" });
-        A.block();
-        if (vic.player) { toast("BLOCKED"); g.stats.blocks++; }
+        if (att.remote) { A.block(); A.ko(); }
+        return "parry";
       }
+      if (vic.player) { toast("BLOCKED"); g.stats.blocks++; }
+      if (att.remote) A.block();
+      return "block";
+    }
+    vic.taken++;
+    if (down) knockdown(vic, m, att); else stun(vic, m);
+    if (vic.player) { toast(m.grab ? "GRABBED!" : "OUCH"); g.shake = 0.45; }
+    if (att.remote) { if (m.kind === "punch" && !down) A.punch(); else A.kick(); if (down) A.ko(); }
+    return down ? "down" : "hit";
+  }
+  function hitAttacker(att, vic, m, res, down, key) {
+    if (!res || att.remote) return;
+    if (res === "parry") {
+      if (att.state === "atk" || canAct(att)) knockdown(att, { kd: 1.6 });
+      A.block(); A.ko();
+      if (att.player) toast("PARRIED");
       return;
     }
-    att.hits++; vic.taken++;
-    g.landLog[att.atk ? att.atk.key : "?"] = (g.landLog[att.atk ? att.atk.key : "?"] || 0) + 1;
+    if (res === "block") {
+      if (att.state === "atk") {
+        att.atk = null; att.state = "hit"; att.stateT = 0.5; att.face = null;
+        att.runner.play("hitpunch", { t: 0.05, rate: 1.6, loop: false, fade: 0.05, y: "abs" });
+      }
+      A.block();
+      return;
+    }
+    att.hits++;
+    g.landLog[key] = (g.landLog[key] || 0) + 1;
     att.chain = att.chainT > 0 ? att.chain + 1 : 1; att.chainT = 1.3;
-    const down = m.down || (m.kind === "punch" && att.chain >= 3);
-    if (down) knockdown(vic, m, att); else stun(vic, m);
     if (m.kind === "punch" && !down) A.punch(); else A.kick();
     if (down) A.ko();
     if (att.player) { toast(down ? m.label + "!  KO" : m.label); g.shake = Math.max(g.shake, 0.18); }
-    if (vic.player) { toast(m.grab ? "GRABBED!" : "OUCH"); g.shake = 0.45; }
   }
   function resolveStrike(a) {
     const atk = a.atk, m = atk.move;
@@ -851,13 +898,18 @@
     const ru = a.runner, hb = ru.bones[ru.m.BN.LeftHand];
     ru.root.updateMatrixWorld(true);
     if (hb) hb.getWorldPosition(_hand); else _hand.set(a.x, a.y + 1.4, a.z - 0.4);
+    const j = addJack({ id: a.id + ":" + (jackId++), owner: a, x: tx, z: tz, y: ty === null ? a.y - 9 : ty, lost: ty === null, tf: tf, fx: _hand.x, fy: _hand.y, fz: _hand.z, back: !tg });
+    // racing friends: the patch lands on every screen (each screen trips its own runners on it)
+    if (MP.on) netSend({ t: "jl", n: MP.race, id: a.id, jid: j.id, x: f2(j.x), z: f2(j.z), y: f2(j.y), lost: j.lost ? 1 : 0, tf: tf, fx: f2(j.fx), fy: f2(j.fy), fz: f2(j.fz), back: j.back ? 1 : 0, tg: tg ? tg.id : 0 });
+    if (a.player) { toast(tg ? "JACKS AT " + tg.name + "!" : "JACKS DROPPED"); A.whiff(); }
+  }
+  function addJack(o) {
     const grp = jackPatch();
-    const j = { id: jackId++, owner: a, x: tx, z: tz, y: ty === null ? a.y - 9 : ty, lost: ty === null, air: true, t: 0, tf: tf,
-      fx: _hand.x, fy: _hand.y, fz: _hand.z, group: grp, life: 0, back: !tg };
+    const j = { id: o.id, owner: o.owner, x: o.x, z: o.z, y: o.y, lost: o.lost, air: true, t: 0, tf: o.tf, fx: o.fx, fy: o.fy, fz: o.fz, group: grp, life: 0, back: o.back };
     grp.position.set(j.fx, j.fy, j.fz); scene.add(grp);
     jacks.push(j);
     g.jackLog.thrown++;
-    if (a.player) { toast(tg ? "JACKS AT " + tg.name + "!" : "JACKS DROPPED"); A.whiff(); }
+    return j;
   }
   function removeJack(i) { scene.remove(jacks[i].group); jacks.splice(i, 1); }
   function clearJacks() { for (let i = jacks.length - 1; i >= 0; i--) removeJack(i); }
@@ -891,9 +943,14 @@
       if (j.air || Math.abs(a.x - j.x) > 0.95 || Math.abs(a.z - j.z) > 0.75 || Math.abs(a.y - j.y) > 0.45) continue;
       if (j.owner === a && j.life < 1.2) continue;
       removeJack(i);
+      if (MP.on) netSend({ t: "jx", n: MP.race, jid: j.id });     // gone from every screen
       stumble(a, "jacks", null);
       g.jackLog.hit++;
-      if (j.owner !== a) { j.owner.hits++; a.taken++; }
+      if (j.owner !== a) {
+        a.taken++;
+        if (j.owner.remote) netSend({ t: "jh", n: MP.race, by: j.owner.id, id: a.id }, j.owner.owner);   // their screen credits them
+        else j.owner.hits++;
+      }
       if (a.player) toast(j.owner === a ? "YOUR OWN JACKS!" : "JACKED BY " + j.owner.name);
       else if (j.owner.player) { toast("JACKED " + a.name + "!"); A.ko(); }
       return true;
@@ -1113,6 +1170,7 @@
 
   function finishAgent(a) {
     a.finished = true; a.finishT = g.t; a.place = ++g.finishers;
+    if (MP.on) reorderFinish();
     a.state = "done"; a.atk = null; a.arm = null; a.air = false; a.vy = 0; a.blockT = 0; a.face = null;
     a.y = W.floor(a.x, a.z, 99) || a.y;
     a.runner.play(a.place === 1 ? "twirl" : "idle", { loop: a.place !== 1, fade: 0.2, y: "abs", t: 0 });
@@ -1281,6 +1339,7 @@
 
   function placeCountdown(dt) {
     const n = Math.ceil(3.4 - g.cdT);
+    if (n > 3) { g.cdN = Math.max(4, g.cdN); return; }     // racing friends: still waiting for the host's count to begin
     if (n !== g.cdN) {
       g.cdN = n;
       const el = $("count");
@@ -1296,12 +1355,13 @@
     dt *= g.timeScale;
     g.t += dt;
     if (g.mode === "countdown") {
-      g.cdT += dt;
+      // racing friends: every screen counts down to the same moment on the host's clock
+      g.cdT = MP.on && MP.goAt ? 3.4 - (MP.goAt - Net.now()) / 1000 : g.cdT + dt;
       placeCountdown(dt);
-      g.agents.forEach(function (a) { a.runner.update(dt); });
+      g.agents.forEach(function (a) { if (a.remote) stepRemote(a, dt); else a.runner.update(dt); });
       if (g.cdT >= 3.4) {
-        g.mode = "play"; g.t = 0;
-        g.agents.forEach(function (a) { a.state = "start"; a.stateT = 0.5; a.runner.play("start", { loop: false, fade: 0.1, y: "abs" }); });
+        g.mode = "play"; g.t = MP.on ? Math.min(5, g.cdT - 3.4) : 0;     // a screen that loaded late starts late
+        g.agents.forEach(function (a) { if (!a.remote) { a.state = "start"; a.stateT = 0.5; a.runner.play("start", { loop: false, fade: 0.1, y: "abs" }); } });
       }
       return;
     }
@@ -1309,16 +1369,16 @@
     const zs = g.agents.map(function (a) { return a.z; });
     G.Traffic.tick(dt, zs);
     // bots (and the test mode where the bot also drives the player)
-    g.agents.forEach(function (a) { if (!a.finished && (a.bot || g.auto)) botDrive(a, dt); });
+    g.agents.forEach(function (a) { if (!a.finished && !a.remote && (a.bot || g.auto)) botDrive(a, dt); });
     // rubber band: the bot far ahead eases off a touch, the one far behind catches up a touch
     g.agents.forEach(function (a) {
-      if (!a.bot) { a.band = 1; return; }
+      if (!a.bot || a.remote) { a.band = 1; return; }
       const others = g.agents.filter(function (o) { return o !== a; }).map(function (o) { return o.z; });
       const bestOther = Math.min.apply(null, others);
       a.band = a.z < bestOther - 45 ? 0.97 : (a.z > bestOther + 60 ? 1.04 : 1);
     });
     stepJacks(dt);
-    g.agents.forEach(function (a) { stepAgent(a, dt); });
+    g.agents.forEach(function (a) { if (a.remote) stepRemote(a, dt); else stepAgent(a, dt); });
     // the world follows the leader and keeps what the last runner still stands on
     const leadA = g.agents.reduce(function (m, a) { return a.z < m.z ? a : m; }, g.agents[0]);
     W.update(leadA.z, cruiseOf(leadA.dist), leadA.dist, Math.max.apply(null, g.agents.map(function (a) { return a.z; })));
@@ -1327,7 +1387,7 @@
     track();
     if (g.mode === "finishing") {
       g.overT += dt / g.timeScale;
-      g.timeScale = Math.max(0.5, g.timeScale - dt * 0.5);
+      if (!MP.on) g.timeScale = Math.max(0.5, g.timeScale - dt * 0.5);    // (no slow-motion when friends are still running)
       if (g.overT > 2.4) raceOver();
     }
     if (g.mode === "play" && g.agents.every(function (a) { return a.finished; })) raceOver();
@@ -1336,6 +1396,15 @@
   const _up = new T.Vector3(0, 1, 0);
   function place(a, dt) {
     const r = a.runner;
+    if (a.remote) {                     // drawn the way its own screen drew it
+      r.root.position.set(a.x, a.y + a.lift, a.z);
+      r.holder.rotation.y = a.hy; r.root.rotation.z = a.rz;
+      r.root.visible = a.vis;
+      const fr = W.floor(a.x, a.z, a.y + 0.05);
+      a.blob.visible = a.ring.visible = fr !== null && a.vis;
+      if (fr !== null) { a.blob.position.set(a.x, fr + 0.04, a.z); a.blob.scale.setScalar(Math.max(0.3, 1 - Math.max(0, a.y - fr) * 0.12)); a.ring.position.set(a.x, fr + 0.06, a.z); a.ring.scale.setScalar(1); }
+      return;
+    }
     r.root.position.set(a.x, a.y + (a.state === "atk" ? a.lift : 0), a.z);
     const dxl = Math.max(-2.5, Math.min(2.5, a.tx - a.x));
     let yaw = Math.PI - dxl * 0.12;
@@ -1357,6 +1426,8 @@
     if (g.mode === "over") return;
     g.mode = "over"; g.overT = 0; g.timeScale = 1;
     $("hud").classList.remove("on"); $("pad").classList.remove("on"); $("banner").classList.remove("on");
+    $("btn-menu").style.display = ""; $("btn-menu").textContent = "CHANGE FIGHTER"; $("btn-again").disabled = false;
+    if (MP.on) { mpOver(); return; }
     const list = rank(), p = g.player, S = g.series, RC = RACES[S.race];
     // series bookkeeping: a win, 3/2/1 points, and time (a runner still out there gets an estimate)
     list.forEach(function (a, i) {
@@ -1453,28 +1524,34 @@
     }
     setHint(h);
   }
-  function show(id) { ["screen-menu", "screen-over", "screen-pause"].forEach(function (n) { $(n).classList.toggle("show", n === id); }); }
+  function show(id) { ["screen-menu", "screen-over", "screen-pause", "screen-lobby"].forEach(function (n) { $(n).classList.toggle("show", n === id); }); }
   function toMenu() {
-    removeAgents(); clearJacks(); g.player = null; g.mode = "menu"; g.series = null;
+    removeAgents(); clearJacks(); g.player = null; g.mode = "menu"; g.series = null; MP.inLobby = false; g.overlay = false;
     if (!g.opp) g.opp = pickOpponents(); showVs();
     $("banner").classList.remove("on");
     $("hud").classList.remove("on"); $("pad").classList.remove("on");
     show("screen-menu"); setHint("");
   }
   function togglePause() {
+    // racing friends: the race can't stop for one runner, so this is only a menu over it
+    if (MP.on && !MP.inLobby) {
+      if (g.overlay) { g.overlay = false; show(null); }
+      else if (g.mode === "play" || g.mode === "countdown" || g.mode === "finishing") { g.overlay = true; show("screen-pause"); }
+      return;
+    }
     if (g.mode === "play" || g.mode === "countdown") { g.prevMode = g.mode; g.mode = "paused"; show("screen-pause"); A.wind(0, false); }
     else if (g.mode === "paused") { g.mode = g.prevMode || "play"; show(null); }
   }
   function toggleMute() { A.setMuted(!A.muted); $("btn-mute").textContent = A.muted ? "🔇" : "🔊"; }
   $("btn-play").addEventListener("click", startRace);
-  $("btn-again").addEventListener("click", startRace);
-  $("btn-menu").addEventListener("click", toMenu);
+  $("btn-again").addEventListener("click", function () { if (MP.on) { if (Net.isHost() && Net.players().length > 1) mpNext(); else toLobby(); } else startRace(); });
+  $("btn-menu").addEventListener("click", function () { if (MP.on) toLobby(); else toMenu(); });
   $("btn-resume").addEventListener("click", togglePause);
-  $("btn-quit").addEventListener("click", function () { g.mode = "paused"; toMenu(); });
+  $("btn-quit").addEventListener("click", function () { if (MP.on) { toLobby(); return; } g.mode = "paused"; toMenu(); });
   $("btn-pause").addEventListener("click", togglePause);
   $("btn-mute").addEventListener("click", function () { A.unlock(); toggleMute(); });
   $("btn-mute").textContent = A.muted ? "🔇" : "🔊";
-  document.addEventListener("visibilitychange", function () { if (document.hidden && (g.mode === "play" || g.mode === "countdown")) togglePause(); });
+  document.addEventListener("visibilitychange", function () { if (document.hidden && !MP.on && (g.mode === "play" || g.mode === "countdown")) togglePause(); });
   $("controls-text").innerHTML = mobile
     ? "<b>Swipe</b> ← → lane · ↑ jump · ↓ slide · tap twice to flip<br>Buttons: PUNCH · KICK · SPECIAL · BLOCK · <b>JACKS</b><br>Moves change with where your rival is: beside you, ahead, behind.<br>3 handfuls of jacks a race: they trip whoever runs over them."
     : "<b>← →</b> lane · <b>↑ / Space</b> jump (twice to flip) · <b>↓</b> slide<br><b>J</b> punch · <b>K</b> kick · <b>L</b> special · <b>U / Shift</b> block · <b>I</b> jacks<br>Moves change with where your rival is: beside you, ahead, behind.<br>3 handfuls of jacks a race: they trip whoever runs over them.";
@@ -1493,6 +1570,441 @@
   const bestVals = Object.keys(best).map(function (k) { return best[k]; });
   $("menu-best").textContent = bestVals.length ? "Best time " + Math.min.apply(null, bestVals) + " s" : "";
 
+  // ---------------- racing friends ----------------
+  // A room of up to three people, joined through a link (?room=CODE); bots fill the empty lanes.
+  // Every screen runs its own runner with the same parkour code as always; the host's screen also
+  // runs the bots. The course is the same everywhere: the host's seed, and W.pace keeps the generator
+  // off live speeds. About 15 times a second each screen sends where its runners are and which clip
+  // they show at what time; the others draw them a little in the past so they glide between updates.
+  // A strike at someone else's runner goes to the screen that runs it, which decides block / parry /
+  // hit there and answers. Jacks land on every screen; each screen trips its own runners. Trucks wake
+  // for the same runners everywhere; the drums they drop are each screen's own.
+  // Messages: k = my fighter (to the host), l = the lobby (host), g = go (host), s = runners' state,
+  // h = a hit, ho = its answer, jl = jacks thrown, jx = a patch gone, jh = your jacks tripped someone,
+  // q = I left the race.
+  const NORENDER = params.get("norender") === "1", MPREPORT = params.get("mpreport") === "1";
+  const f2 = function (v) { return Math.round(v * 100) / 100; }, f3 = function (v) { return Math.round(v * 1000) / 1000; };
+  const wrapA = function (x) { return ((x + 3 * Math.PI) % (2 * Math.PI)) - Math.PI; };
+  const hex = function (c) { return "#" + c.toString(16).padStart(6, "0"); };
+  function netSend(d, to) { if (MP.on) Net.send(d, to); }
+  function byId(id) { for (let i = 0; i < g.agents.length; i++) if (g.agents[i].id === id) return g.agents[i]; return null; }
+  function rosterIndex(id) { for (let i = 0; i < ROSTER.length; i++) if (ROSTER[i].id === id) return i; return -1; }
+  function shuffled(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function reorderFinish() {
+    const fin = g.agents.filter(function (a) { return a.finished; }).sort(function (p, q) { return p.finishT - q.finishT; });
+    fin.forEach(function (a, i) { a.place = i + 1; });
+    g.finishers = fin.length;
+  }
+
+  function pack(a) {
+    const r = a.runner;
+    const fl = (a.air ? 1 : 0) | (a.ghost > 0 ? 2 : 0) | (a.finished ? 4 : 0) | (r.root.visible ? 8 : 0) | (r.loop ? 16 : 0);
+    return [a.id, f2(a.x), f2(a.y), f2(a.z), a.state, r.cur || "", f3(r.curT), f2(r.rate), typeof r.yMode === "number" ? f2(r.yMode) : r.yMode, fl,
+      f3(r.holder.rotation.y), f3(r.root.rotation.z), f2(a.state === "atk" ? a.lift : 0), a.lane, f2(a.speed), a.finished ? f2(a.finishT) : -1,
+      a.jacks, a.hits, a.taken, r.ov ? f3(r.ov.t) : -1, a.atk ? a.atk.key : 0, a.atk ? f3(a.atk.tHit) : 0, f2(Math.max(0, a.blockT)), f2(a.tx), a.diags];
+  }
+  function onSnap(m) {
+    if (m.n !== MP.race || !Array.isArray(m.r)) return;
+    m.r.forEach(function (v) {
+      let a = byId(v[0]);
+      // a runner who went quiet and was taken off the course comes back when their screen does
+      if (!a && MP.gone[v[0]] && !MP.inLobby && g.agents.length) {
+        a = MP.gone[v[0]]; delete MP.gone[v[0]];
+        g.agents.push(a); scene.add(a.runner.root); scene.add(a.ring); scene.add(a.blob);
+        toast(a.name + " IS BACK");
+      }
+      if (!a || !a.remote || !a.net) return;
+      const b = a.net.buf, s = { ts: +m.ts, x: v[1], y: v[2], z: v[3], st: v[4], c: v[5], ct: v[6], rr: v[7], ym: v[8], fl: v[9], hy: v[10], rz: v[11], lift: v[12],
+        ln: v[13], v: v[14], fin: v[15], jk: v[16], hi: v[17], tk: v[18], ov: v[19], ak: v[20], th: v[21], bk: v[22], tx: v[23], dg: v[24] };
+      if (b.length && s.ts <= b[b.length - 1].ts) return;   // out of order: drop it
+      if (b.length) {
+        const gap = s.ts - b[b.length - 1].ts;
+        a.net.gapMax = Math.max(a.net.gapMax || 0, gap); a.net.gapSum = (a.net.gapSum || 0) + gap; a.net.gapN = (a.net.gapN || 0) + 1;
+        a.net.gapEma = a.net.gapEma ? a.net.gapEma * 0.9 + Math.min(gap, 1000) * 0.1 : Math.min(gap, 1000);
+      }
+      b.push(s); if (b.length > 24) b.shift();
+      a.net.last = Net.now(); a.net.n = (a.net.n || 0) + 1; MP.snaps++;
+    });
+  }
+  const MOVING = { run: 1, air: 1, slide: 1, roll: 1, start: 1, atk: 1, block: 1, hit: 1 };
+  // someone else's runner: placed from their updates (between the two around "now - delay"), showing
+  // the clip their screen showed at that moment
+  function stepRemote(a, dt) {
+    const b = a.net && a.net.buf, r = a.runner;
+    if (!b || !b.length) { r.update(dt); return; }
+    const delay = Math.max(MP.delay * 1000, Math.min(600, (a.net.gapEma || 67) * 1.8 + 30));
+    const rt = Net.now() - delay;
+    let p = b[0], c = null, k = 0;
+    for (let i = b.length - 1; i >= 0; i--) if (b[i].ts <= rt) { p = b[i]; c = b[i + 1] || null; break; }
+    if (c) {
+      k = Math.max(0, Math.min(1, (rt - p.ts) / Math.max(1, c.ts - p.ts)));
+      a.x = p.x + (c.x - p.x) * k; a.y = p.y + (c.y - p.y) * k; a.z = p.z + (c.z - p.z) * k;
+      a.hy = p.hy + wrapA(c.hy - p.hy) * k; a.rz = p.rz + (c.rz - p.rz) * k; a.lift = p.lift + (c.lift - p.lift) * k;
+      MP.interp++;
+    } else {
+      // ran out of updates: carry on up the road for a moment (then hold still)
+      const e = Math.max(0, Math.min(0.3, (rt - p.ts) / 1000));
+      a.x = p.x; a.y = p.y; a.z = p.z - (MOVING[p.st] ? p.v * e : 0); a.hy = p.hy; a.rz = p.rz; a.lift = p.lift;
+      MP.extrap++;
+    }
+    const s = c && k > 0.5 ? c : p;
+    a.state = s.st; a.air = !!(s.fl & 1); a.ghost = s.fl & 2 ? 1 : 0; a.vis = !!(s.fl & 8);
+    a.lane = s.ln; a.tx = s.tx; a.speed = s.v; a.jacks = s.jk; a.hits = s.hi; a.taken = s.tk; a.diags = s.dg;
+    a.blockT = s.bk; if (a.state !== "block") a.blockAge = 0;
+    if (-a.z > a.dist) a.dist = -a.z;
+    if (s.ak && MOVES[s.ak]) { if (!a.atk || a.atk.key !== s.ak) a.atk = { key: s.ak, move: MOVES[s.ak], tHit: s.th, t0: 0, tEnd: 99, done: false, target: null, t: 0 }; }
+    else a.atk = null;
+    const clip = PK.CLIPS[s.c];
+    if (clip) {
+      const loop = !!(s.fl & 16);
+      let t = s.ct + Math.max(0, (rt - s.ts) / 1000) * s.rr;
+      t = loop ? t % clip.dur : Math.min(t, clip.dur);
+      if (r.cur !== s.c) { r.play(s.c, { t: t, rate: s.rr, loop: loop, fade: 0.1, y: s.ym, restart: true }); r.curT = Math.max(0, t - dt * s.rr); }
+      else {
+        r.rate = s.rr; r.loop = loop; r.yMode = s.ym;
+        let d = t - r.curT;
+        if (loop) d = ((d + clip.dur * 1.5) % clip.dur) - clip.dur / 2;
+        if (Math.abs(d) > 0.12) { r.curT = Math.max(0, t - dt * s.rr); if (r.curT < clip.dur) r.done = false; }
+      }
+      if (a.atk && r.curT >= a.atk.tHit) a.atk.done = true;
+    }
+    if (s.ov >= 0 && !r.ov) r.overlay("throw", { t: s.ov, t1: THROW.t1, rate: THROW.rate });
+    else if (s.ov < 0 && r.ov && r.ov.t1 - r.ov.t > 0.3) r.overlay(null);
+    r.update(dt);
+    if (!a.finished && (s.fl & 4)) { a.finished = true; a.finishT = s.fin; reorderFinish(); if (g.mode === "over") mpRows(); }
+  }
+  // a strike at a runner this screen runs, thrown on someone else's screen
+  function onHit(m, from) {
+    if (m.n !== MP.race) return;
+    const vic = byId(m.id), att = byId(m.by), mv = MOVES[m.k];
+    if (!vic || vic.remote || !att || !mv) return;
+    MP.gotHits++;
+    let res = null;
+    // they must really be within reach here too (slack for the trip across)
+    if (g.mode !== "countdown" && !untouchable(vic) && Math.hypot(vic.x - att.x, vic.z - att.z) < 9 && Math.abs(vic.y - att.y) < 2.2) res = hitVictim(att, vic, mv, !!m.dn);
+    Net.send({ t: "ho", n: MP.race, by: m.by, id: m.id, k: m.k, dn: m.dn, res: res }, from);
+  }
+  function onHitAnswer(m) {
+    if (m.n !== MP.race) return;
+    const att = byId(m.by), vic = byId(m.id), mv = MOVES[m.k];
+    if (!att || att.remote || !vic || !mv || !m.res) return;
+    if (m.res === "hit" || m.res === "down") MP.hitsOk++;
+    hitAttacker(att, vic, mv, m.res, !!m.dn, m.k);
+  }
+  function onJacks(m) {
+    if (m.n !== MP.race) return;
+    const owner = byId(m.id);
+    if (!owner || !owner.remote) return;
+    MP.jacksIn++;
+    addJack({ id: m.jid, owner: owner, x: +m.x, z: +m.z, y: +m.y, lost: !!m.lost, tf: +m.tf || 0.6, fx: +m.fx, fy: +m.fy, fz: +m.fz, back: !!m.back });
+    if (g.player && m.tg === g.player.id) toast(owner.name + " THREW JACKS!");
+  }
+  function onJacksGone(m) { if (m.n !== MP.race) return; for (let i = jacks.length - 1; i >= 0; i--) if (jacks[i].id === m.jid) removeJack(i); }
+  function onJacksHit(m) {
+    if (m.n !== MP.race) return;
+    const own = byId(m.by), v = byId(m.id);
+    if (!own || own.remote) return;
+    own.hits++;
+    if (own.player) { toast("JACKED " + (v ? v.name : "THEM") + "!"); A.ko(); }
+  }
+  function dropAgent(a) {
+    if (!a || !a.remote || g.agents.indexOf(a) < 0) return;
+    scene.remove(a.runner.root); scene.remove(a.ring); scene.remove(a.blob);
+    g.agents.splice(g.agents.indexOf(a), 1);
+    a.net.buf.length = 0; MP.gone[a.id] = a;
+    toast(a.name + " LEFT");
+    if (g.mode === "over") mpRows();
+  }
+  function onQuit(m) { if (m.n === MP.race && Array.isArray(m.ids)) m.ids.forEach(function (id) { dropAgent(byId(id)); }); }
+  // a runner whose screen went quiet leaves the course: after 6 s if their player left the room,
+  // 15 s otherwise (a stalled tab, a long reconnect); they come back if their screen does (onSnap)
+  function dropQuiet() {
+    const now = Net.now(), here = {};
+    Net.players().forEach(function (p) { here[p.id] = true; });
+    g.agents.slice().forEach(function (a) { if (a.remote && a.net && now - a.net.last > (here[a.owner] ? 15000 : 6000)) dropAgent(a); });
+  }
+  function sendState(dt) {
+    if (!MP.on || MP.inLobby || !g.agents.length || g.mode === "menu") return;
+    MP.delay = Net.lane() === "relay" ? 0.45 : 0.12;
+    MP.sendT -= dt;
+    if (MP.sendT > 0) return;
+    MP.sendT = Net.lane() === "relay" ? 0.2 : 1 / 15;
+    const mine = g.agents.filter(function (a) { return !a.remote; });
+    if (mine.length) netSend({ t: "s", n: MP.race, ts: Net.now(), r: mine.map(pack) });
+    dropQuiet();
+    mpReport();
+  }
+
+  // ----- the lobby -----
+  function lobbyPicks() {
+    // the host keeps everyone on a different fighter: a clash moves the later one to the next free one
+    const L = MP.lobby, taken = {}, out = {};
+    Net.players().forEach(function (p) {
+      let i = rosterIndex(L.picks[p.id]);
+      if (i < 0) i = 0;
+      for (let n = 0; n < ROSTER.length && taken[ROSTER[i].id]; n++) i = (i + 1) % ROSTER.length;
+      taken[ROSTER[i].id] = true; out[p.id] = ROSTER[i].id;
+    });
+    L.picks = out;
+  }
+  function hostLobby() {
+    if (!Net.isHost() || !MP.lobby) return;
+    lobbyPicks();
+    netSend({ t: "l", race: MP.lobby.race, picks: MP.lobby.picks });
+    applyLobby();
+  }
+  function applyLobby() {
+    const L = MP.lobby;
+    if (!L) return;
+    const mine = rosterIndex(L.picks[Net.myId()]);
+    if (mine >= 0 && mine !== g.pick && MP.inLobby) { g.pick = mine; refreshPick(); }
+    // fetch the picked fighters now, so the race starts sooner
+    Object.keys(L.picks).forEach(function (p) { if (rosterIndex(L.picks[p]) >= 0) loadChar(L.picks[p]).catch(function () {}); });
+    renderLobby();
+  }
+  function onLobby(m, from) {
+    if (from !== Net.hostId() || !RACES[m.race] || !m.picks) return;
+    MP.lobby = { race: m.race, picks: m.picks };
+    applyLobby();
+  }
+  function onPick(m, from) {
+    if (!Net.isHost() || !MP.lobby || rosterIndex(m.id) < 0) return;
+    const was = MP.lobby.picks[from];
+    MP.lobby.picks[from] = m.id;
+    const taken = Object.keys(MP.lobby.picks).some(function (p) { return p !== from && MP.lobby.picks[p] === m.id; });
+    if (taken) MP.lobby.picks[from] = was && was !== m.id ? was : m.id;
+    hostLobby();
+  }
+  function lobbyRider(d) {
+    let i = g.pick;
+    const taken = {};
+    if (MP.lobby) Object.keys(MP.lobby.picks).forEach(function (p) { if (p !== Net.myId()) taken[MP.lobby.picks[p]] = true; });
+    for (let n = 0; n < ROSTER.length; n++) { i = (i + d + ROSTER.length) % ROSTER.length; if (!taken[ROSTER[i].id]) break; }
+    g.pick = i; refreshPick();
+    if (!MP.on) { renderLobby(); return; }
+    if (MP.lobby) MP.lobby.picks[Net.myId()] = ROSTER[i].id;
+    if (Net.isHost()) hostLobby(); else { netSend({ t: "k", id: ROSTER[i].id }, Net.hostId()); renderLobby(); }
+  }
+  function lobbyRace(d) {
+    if (!Net.isHost() || !MP.lobby) return;
+    MP.lobby.race = (MP.lobby.race + d + RACES.length) % RACES.length;
+    hostLobby();
+  }
+  function lobbyKey(e) {
+    const c = e.code;
+    if (c === "ArrowLeft" || c === "KeyA") lobbyRider(-1);
+    else if (c === "ArrowRight" || c === "KeyD") lobbyRider(1);
+    else if (c === "ArrowUp" || c === "KeyW") lobbyRace(-1);
+    else if (c === "ArrowDown" || c === "KeyS") lobbyRace(1);
+    else if (c === "Enter" || c === "Space") { A.unlock(); hostGo(); }
+    else return;
+    e.preventDefault();
+  }
+  function renderLobby() {
+    const ps = Net.players(), host = Net.isHost(), me = Net.myId(), L = MP.lobby;
+    const RC = RACES[L ? L.race : 0];
+    $("lb-status").textContent = MP.err || MP.status || (!MP.on ? "" : host ? (ps.length < 2 ? "SEND THIS LINK TO A FRIEND" : "READY WHEN YOU ARE") : "WAITING FOR THE HOST TO START");
+    $("lb-share").style.display = MP.on && Net.code ? "" : "none";
+    $("lb-link").value = Net.link();
+    $("lb-code").textContent = Net.code ? "· ROOM " + Net.code : "";
+    $("lb-ev-name").textContent = RC.name;
+    $("lb-ev-sub").textContent = RC.blurb.toUpperCase() + (host ? "  ·  ▲ ▼ CHANGES IT" : "");
+    $("lb-ev").classList.toggle("host", host);
+    $("lb-players").innerHTML = ps.map(function (p, i) {
+      const d = L && ROSTER[rosterIndex(L.picks[p.id])] || null;
+      return "<div class=\"lp" + (p.id === me ? " me" : "") + "\" style=\"--c:" + hex(COLORS[i % 3]) + "\"><b>" + (d ? d.name : "…") + "</b><small>" + (p.id === Net.hostId() ? "HOST" : "FRIEND") + (p.id === me ? " · YOU" : "") + "</small></div>";
+    }).join("") + (MP.on && ps.length < 3 ? "<div class=\"lp bots\"><b>+" + (3 - ps.length) + " BOT" + (ps.length < 2 ? "S" : "") + "</b><small>FILL THE LANES</small></div>" : "");
+    $("lb-me-name").textContent = ROSTER[g.pick].name;
+    const start = $("lb-start");
+    start.style.display = MP.on && host ? "" : "none";
+    start.disabled = ps.length < 2;
+    $("lb-wait").style.display = MP.on && !host ? "" : "none";
+    $("lb-slow").style.display = MP.on && Net.lane() === "relay" ? "" : "none";
+  }
+  function toLobby() {
+    if (MP.on && !MP.inLobby && g.agents.length) netSend({ t: "q", n: MP.race, ids: g.agents.filter(function (a) { return !a.remote; }).map(function (a) { return a.id; }) });
+    removeAgents(); clearJacks(); g.player = null; g.mode = "menu"; g.series = null; g.overlay = false; g.timeScale = 1;
+    MP.inLobby = true; MP.goAt = 0; MP.race = -1;
+    $("banner").classList.remove("on"); $("hud").classList.remove("on"); $("pad").classList.remove("on"); $("loading").classList.add("gone");
+    setHint(""); show("screen-lobby"); renderLobby();
+  }
+  function hostGo() {
+    if (!Net.isHost() || !MP.lobby) return;
+    const ps = Net.players();
+    if (ps.length < 2 && !params.get("mpsolo")) return;
+    lobbyPicks();
+    // seats in room order (their lobby colours), bots after; the lanes are what's shuffled
+    const field = ps.slice(0, 3).map(function (p) { return { id: MP.lobby.picks[p.id], o: p.id }; });
+    const used = {}; field.forEach(function (f) { used[f.id] = true; });
+    shuffled(ROSTER.filter(function (d) { return !used[d.id]; })).slice(0, 3 - field.length).forEach(function (d) { field.push({ id: d.id, o: Net.myId(), b: 1 }); });
+    const lanes = shuffled([0, 1, 2]);
+    field.forEach(function (f, i) { f.l = lanes[i]; });
+    const m = { t: "g", n: Net.now(), race: MP.lobby.race, seed: +params.get("seed") || Math.floor(Math.random() * 1e6) + 1, at: Net.now() + 6000, f: field };
+    netSend(m);
+    onGo(m, Net.myId());
+  }
+  function onGo(m, from) {
+    if (from !== Net.hostId() || !RACES[m.race] || !Array.isArray(m.f) || !m.f.length) return;
+    const me = Net.myId(), defs = m.f.map(function (f) { return ROSTER[rosterIndex(f.id)]; });
+    if (defs.some(function (d) { return !d; })) return;
+    MP.race = m.n; MP.goAt = +m.at; MP.inLobby = false; MP.raceDef = RACES[m.race]; MP.gone = {}; MP.reported = false;
+    if (MP.lobby) MP.lobby.race = m.race;
+    g.overlay = false;
+    show(null);
+    $("loading").classList.remove("gone"); $("loading-text").textContent = "LOADING FIGHTERS";
+    Promise.all(defs.map(function (d) { return loadChar(d.id); })).then(function () {
+      if (MP.race !== m.n || !MP.on) return;
+      const mine = m.f.findIndex(function (f) { return f.o === me && !f.b; });
+      if (mine < 0) { toLobby(); return; }
+      setupRace(defs, m.f.map(function (f) { return f.l; }), mine, MP.raceDef, m.seed);
+      g.agents.forEach(function (a, i) {
+        const f = m.f[i];
+        a.owner = f.o; a.human = !f.b; a.remote = f.o !== me; if (a.remote) a.bot = null;
+        a.net = { buf: [], last: Net.now() };
+      });
+      g.cdT = 3.4 - (MP.goAt - Net.now()) / 1000;
+    }, function () { $("loading-text").textContent = "COULD NOT LOAD A FIGHTER"; });
+  }
+
+  // ----- the results -----
+  function mpOver() {
+    g.overlay = false; MP.overAt = performance.now(); overTickT = 0;
+    $("over-title").textContent = "RACE A FRIEND · " + (MP.raceDef || RACES[0]).name;
+    $("over-best").textContent = ""; $("over-best").classList.remove("new");
+    show("screen-over");
+    mpOverTick();
+  }
+  function mpRows() {
+    const list = rank(), p = g.player;
+    if (!p) return;
+    $("over-place").textContent = ordinal(p.rank); $("over-place").classList.remove("word");
+    $("over-rows").innerHTML = list.map(function (a, i) {
+      const right = a.finished ? a.finishT.toFixed(1) + " s" : "+" + Math.max(0, Math.round(a.z - list[0].z)) + " m";
+      return "<div class='" + (a.player ? "me" : "") + "'><span>" + (i + 1) + ". " + a.name + (a.player ? " (YOU)" : a.human ? "" : " (BOT)") + "</span><span>" + a.hits + " hits · " + right + "</span></div>";
+    }).join("");
+  }
+  // the host can start the next race once every friend is over the line (or after 25 s)
+  let overTickT = 0;
+  function mpOverTick() {
+    const now = performance.now();
+    if (now - overTickT < 400) return;
+    overTickT = now;
+    mpRows();
+    const host = Net.isHost(), alone = Net.players().length < 2, again = $("btn-again"), menu = $("btn-menu");
+    if (host && !alone) {
+      const ready = g.agents.every(function (a) { return !a.human || a.finished; }) || now - MP.overAt > 25000;
+      again.textContent = ready ? "NEXT RACE · " + RACES[((MP.lobby ? MP.lobby.race : 0) + 1) % RACES.length].name : "WAITING FOR FRIENDS…";
+      again.disabled = !ready;
+      menu.style.display = ""; menu.textContent = "LOBBY";
+      $("over-series").textContent = "";
+    } else {
+      again.textContent = "LOBBY"; again.disabled = false;
+      menu.style.display = "none";
+      $("over-series").textContent = host ? "YOUR FRIENDS LEFT THE ROOM" : "THE HOST STARTS THE NEXT RACE";
+    }
+  }
+  function mpNext() {
+    if (!MP.lobby) return;
+    MP.lobby.race = (MP.lobby.race + 1) % RACES.length;
+    hostLobby();
+    hostGo();
+  }
+
+  Net.on.msg = function (d, from) {
+    const t = d.t;
+    if (t === "s") onSnap(d);
+    else if (t === "h") onHit(d, from);
+    else if (t === "ho") onHitAnswer(d);
+    else if (t === "jl") onJacks(d);
+    else if (t === "jx") onJacksGone(d);
+    else if (t === "jh") onJacksHit(d);
+    else if (t === "q") onQuit(d);
+    else if (t === "l") onLobby(d, from);
+    else if (t === "g") onGo(d, from);
+    else if (t === "k") onPick(d, from);
+  };
+  Net.on.joined = function () {
+    MP.on = true; MP.status = ""; MP.err = "";
+    if (Net.isHost()) {
+      const r0 = Math.max(0, Math.min(RACES.length - 1, (parseInt(params.get("mprace"), 10) || 1) - 1));
+      MP.lobby = { race: r0, picks: {} };
+      MP.lobby.picks[Net.myId()] = ROSTER[g.pick].id;
+      hostLobby();
+    } else {
+      netSend({ t: "k", id: ROSTER[g.pick].id }, Net.hostId());
+      renderLobby();
+    }
+  };
+  Net.on.room = function () { if (Net.isHost()) hostLobby(); else renderLobby(); autoStart(); };
+  Net.on.host = function () { MP.status = ""; hostLobby(); toast("YOU'RE THE HOST NOW"); };
+  Net.on.dropped = function () { MP.status = "RECONNECTING…"; renderLobby(); };
+  Net.on.back = function () { MP.status = ""; renderLobby(); };
+  Net.on.slow = function () { renderLobby(); };
+  Net.on.error = function (msg) { MP.err = String(msg || "Couldn't connect.").toUpperCase(); MP.status = ""; renderLobby(); };
+  Net.on.left = function (reason) {
+    MP.on = false; MP.lobby = null; MP.goAt = 0; MP.inLobby = false; W.pace = null;
+    try { history.replaceState(null, "", location.pathname + location.search.replace(/[?&]room=[^&]*/, "").replace(/^&/, "?")); } catch (e) { /* fine */ }
+    toMenu();
+    if (reason) toast(String(reason).toUpperCase());
+  };
+  function openRoom() {
+    if (!Net.enabled) return;
+    A.unlock();
+    MP.err = ""; MP.status = "OPENING A ROOM…";
+    toLobby();
+    Net.create(ROSTER[g.pick].name, params.get("mphost") || null).then(function (ok) { if (!ok && !MP.err) MP.err = "COULDN'T OPEN A ROOM"; MP.status = ""; renderLobby(); });
+  }
+  function joinRoom(code) {
+    MP.err = ""; MP.status = "JOINING ROOM " + code + "…";
+    toLobby();
+    Net.join(code, ROSTER[g.pick].name).then(function (ok) { if (!ok && !MP.err) MP.err = "COULDN'T REACH THAT ROOM"; if (ok) MP.status = ""; renderLobby(); });
+  }
+  // test hook: ?mpstart=N starts the race once N people are in the room (once)
+  let autoStarted = false;
+  function autoStart() {
+    const n = +params.get("mpstart") || 0;
+    if (n && !autoStarted && Net.isHost() && MP.inLobby && Net.players().length >= n && g.mode === "menu") { autoStarted = true; setTimeout(hostGo, 1500); }
+  }
+  function copyLink() {
+    const link = Net.link(), inp = $("lb-link");
+    const done = function () { $("lb-copy").textContent = "COPIED!"; setTimeout(function () { $("lb-copy").textContent = "COPY LINK"; }, 1500); };
+    if (navigator.share && mobile) { navigator.share({ title: "X-Parkour", text: "Race me in X-Parkour", url: link }).catch(function () {}); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(done, function () { inp.select(); document.execCommand("copy"); done(); });
+    else { inp.select(); document.execCommand("copy"); done(); }
+  }
+  $("btn-mp").style.display = Net.enabled ? "" : "none";
+  $("btn-mp").addEventListener("click", openRoom);
+  $("lb-copy").addEventListener("click", copyLink);
+  $("lb-link").addEventListener("focus", function () { this.select(); });
+  $("lb-start").addEventListener("click", function () { A.unlock(); hostGo(); });
+  $("lb-leave").addEventListener("click", function () { if (MP.on) Net.leave(); else toMenu(); });
+  $("lb-me-l").addEventListener("click", function () { lobbyRider(-1); });
+  $("lb-me-r").addEventListener("click", function () { lobbyRider(1); });
+  $("lb-ev-l").addEventListener("click", function () { lobbyRace(-1); });
+  $("lb-ev-r").addEventListener("click", function () { lobbyRace(1); });
+
+  // test hook: ?mpreport=1 posts what the network did to /report (and a line to /log every 5 s) for tools/mp-check.mjs
+  if (MPREPORT) setInterval(function () {
+    const line = { p: Net.profile || "1", mode: g.mode, on: MP.on, lobby: MP.inLobby, host: Net.isHost(), code: Net.code, players: Net.players().length, status: MP.status, err: MP.err,
+      t: +(g.t || 0).toFixed(1), agents: g.agents.map(function (a) { return a.id + (a.remote ? "~" : "") + ":" + Math.round(-a.z) + ":" + a.state; }).join(" "), snaps: MP.snaps, lane: Net.lane() };
+    fetch("/log", { method: "POST", body: JSON.stringify(line) }).catch(function () {});
+  }, 5000);
+  function mpReport() {
+    if (!MPREPORT || MP.reported || g.mode !== "over") return;
+    if (!g.agents.every(function (a) { return !a.human || a.finished; }) && performance.now() - MP.overAt < 20000) return;
+    MP.reported = true;
+    const rep = {
+      who: Net.isHost() ? "host" : "join", lane: Net.lane(), offset: Math.round(Net.offset), seed: g.seed, route: MP.raceDef && MP.raceDef.route, t: +g.t.toFixed(1),
+      sentHits: MP.sentHits, gotHits: MP.gotHits, hitsOk: MP.hitsOk, snaps: MP.snaps, interp: MP.interp, extrap: MP.extrap, jacksIn: MP.jacksIn, jacks: g.jackLog,
+      course: W.slabs.filter(function (s) { return s.z0 < FINISH_Z + 150; }).map(function (s) { return s.kind.charAt(0) + Math.round(s.z0) + "/" + s.obs.length; }).join(" "),
+      agents: g.agents.map(function (a) {
+        return { id: a.id, remote: !!a.remote, human: !!a.human, place: a.place, fin: a.finished ? +a.finishT.toFixed(2) : null, m: Math.round(-a.z), st: a.state, hits: a.hits, taken: a.taken,
+          net: a.net && a.remote ? { n: a.net.n || 0, gapAvg: a.net.gapN ? Math.round(a.net.gapSum / a.net.gapN) : null, gapMax: a.net.gapMax || null } : null };
+      })
+    };
+    fetch("/report", { method: "POST", body: JSON.stringify(rep) }).catch(function () {});
+  }
+
   // ---------- loop ----------
   let last = performance.now(), acc = 0, ft = 16, frames = 0, tAcc = 0, resizeNext = false;
   function frame(now) {
@@ -1504,9 +2016,11 @@
     let n = 0;
     while (acc >= 1 / 60 && n < 5) { step(1 / 60); acc -= 1 / 60; n++; }
     if (n === 5) acc = 0;
+    sendState(dt);
+    if (MP.on && g.mode === "over") mpOverTick();
     hints();
     updateCamera(dt, false);
-    renderer.render(scene, camera);
+    if (!NORENDER) renderer.render(scene, camera);
     ft += (dt * 1000 - ft) * 0.05; frames++; tAcc += dt;
     if (tAcc > 1.2 && frames > 30) {
       if (ft > 24 && pixelRatio > 0.6) { pixelRatio = Math.max(0.6, pixelRatio - 0.15); resizeNext = true; }
@@ -1535,10 +2049,18 @@
   $("loading").classList.add("gone");
   show("screen-menu");
   requestAnimationFrame(frame);
+  // racing friends: a friend's link (?room=CODE) goes straight into their room; ?mphost=CODE (tests)
+  // opens one with that code
+  if (Net.enabled) {
+    const code = (params.get("room") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    if (code) joinRoom(code);
+    else if (params.get("mphost")) openRoom();
+  }
 
   // ?auto=1: the bot drives the player too (and starts the race); ?sim=N runs N seconds headless and
   // reports in the page title; ?until=fight|climb|finish freezes a frame for a screenshot
   (async function () {
+    if (params.get("room") || params.get("mphost")) { g.auto = !!params.get("auto"); return; }   // racing friends tests: the room starts the race
     if (!params.get("auto") && !params.get("sim") && !params.get("until")) return;
     if (params.get("pick")) { g.pick = Math.max(0, Math.min(ROSTER.length - 1, parseInt(params.get("pick"), 10) || 0)); g.opp = pickOpponents(); }
     g.auto = !!params.get("auto");
