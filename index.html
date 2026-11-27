@@ -12,19 +12,6 @@
     <meta name="theme-color" content="#080c16">
     <link rel="canonical" href="https://anthonyjctsg.online/">
 
-    <!-- Seasonal theme: fall runs Oct 1 to Nov 30 and switches itself off on Dec 1
-         (nothing to revert); November adds the Thanksgiving greeting. ?season=fall or
-         ?season=thanksgiving previews it any day, ?season=off hides it.
-         Set here in the head so the colours are right on the first paint. -->
-    <script>
-        (function () {
-            var q = /[?&]season=([a-z]+)/.exec(location.search), s = q ? q[1] : null,
-                m = new Date().getMonth(), c = document.documentElement.classList;
-            if (s === 'fall' || s === 'thanksgiving' || (!s && (m === 9 || m === 10))) { c.add('fall'); }
-            if (s === 'thanksgiving' || (!s && m === 10)) { c.add('thanksgiving'); }
-        }());
-    </script>
-
     <!-- Open Graph -->
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="AnthonyJCTSG Games">
@@ -1675,63 +1662,6 @@
         footer .proud { margin: 0 0 0.6rem; }
         footer .proud a { color: var(--accent); font-weight: 600; }
 
-        /* ---- Fall / Thanksgiving (html.fall: Oct-Nov; html.thanksgiving: Nov) ----
-           Colours here; the moon, leaves, haze and pumpkins are added by fall.js
-           into the fixed background layer, behind everything. */
-        html.fall {
-            --bg: #0c0705;
-            --accent: #f0903a;
-            --accent-soft: rgba(240, 144, 58, 0.18);
-            --blue: #f3b56b;
-        }
-        html.fall .liquid-bg .blob-1 { background: radial-gradient(circle at 35% 35%, #e0701c, transparent 70%); opacity: 0.4; }
-        html.fall .liquid-bg .blob-2 { background: radial-gradient(circle at 60% 40%, #9a2c1a, transparent 70%); }
-        html.fall .liquid-bg .blob-3 { background: radial-gradient(circle at 50% 50%, #6e3a18, transparent 70%); }
-        html.fall .liquid-bg .blob-4 { background: radial-gradient(circle at 50% 50%, #e6b13c, transparent 70%); opacity: 0.2; }
-        html.fall .carousel-head h1 { text-shadow: 0 0 22px rgba(240, 130, 40, 0.5), 0 2px 24px rgba(0, 0, 0, 0.6); }
-        html.fall .carousel-head::before {
-            content: "Happy Fall from the Arcade";
-            display: block;
-            margin-bottom: 0.2rem;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-            font-size: 0.68rem;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: #f3a04a;
-        }
-        html.thanksgiving .carousel-head::before { content: "Happy Thanksgiving from the Arcade"; }
-        html.fall .card.is-active .cabinet-art { box-shadow: 0 0 0 2px rgba(240, 144, 58, 0.85), 0 0 46px rgba(224, 112, 28, 0.42); }
-        html.fall .tile:hover { box-shadow: 0 0 30px rgba(224, 112, 28, 0.3); }
-        /* A Thanksgiving cornucopia by the logo with a soft warm glow. */
-        html.fall .brand-logo::after {
-            content: "";
-            display: inline-block;
-            width: 34px;
-            height: 34px;
-            margin-left: 8px;
-            vertical-align: -6px;
-            filter: drop-shadow(0 0 6px rgba(240, 150, 60, 0.6));
-            background: url("cornucopia.svg") center / contain no-repeat;
-        }
-        /* The background pieces (fall.js). */
-        .fl-moon { position: absolute; top: 9vh; right: 8vw; width: 15vmin; height: 15vmin; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #fff1d0, #f2c27a 60%, #d8923e); box-shadow: 0 0 60px 22px rgba(255, 190, 100, 0.32), 0 0 160px 60px rgba(240, 130, 50, 0.18); opacity: 0.85; }
-        .fl-haze { position: absolute; left: -20%; right: -20%; bottom: -6vh; height: 30vh; background: radial-gradient(ellipse 40% 60% at 20% 70%, rgba(230, 140, 60, 0.16), transparent 70%), radial-gradient(ellipse 45% 55% at 65% 80%, rgba(180, 70, 30, 0.16), transparent 70%), radial-gradient(ellipse 35% 50% at 95% 60%, rgba(230, 170, 70, 0.12), transparent 70%); filter: blur(10px); animation: fl-haze 38s ease-in-out infinite alternate; }
-        @keyframes fl-haze { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
-        .fl-leaf { position: absolute; top: -56px; animation: fl-drop linear infinite; will-change: transform; }
-        .fl-leaf i { display: block; width: 100%; height: 100%; perspective: 240px; animation: fl-sway ease-in-out infinite alternate; }
-        .fl-leaf svg { display: block; width: 100%; height: 100%; overflow: visible; }
-        @keyframes fl-drop { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--drift), calc(100vh + 112px), 0); } }
-        @keyframes fl-sway { from { transform: translateX(calc(var(--sway) * -1)) rotate(calc(var(--swing) * -1)); } to { transform: translateX(var(--sway)) rotate(var(--swing)); } }
-        @keyframes fl-flip { from { transform: rotate3d(1, var(--axis), 0, 0deg); } to { transform: rotate3d(1, var(--axis), 0, 360deg); } }
-        @keyframes fl-rock { from { transform: rotate3d(1, var(--axis), 0, -55deg); } to { transform: rotate3d(1, var(--axis), 0, 55deg); } }
-        .fl-horn { position: absolute; bottom: 8px; width: 96px; filter: drop-shadow(0 0 12px rgba(240, 140, 50, 0.4)); }
-        .fl-horn img { display: block; width: 100%; height: auto; }
-        .fl-horn--l { left: 14px; }
-        .fl-horn--r { right: 14px; width: 80px; transform: scaleX(-1); }
-        @media (max-width: 600px) {
-            .fl-horn { width: 60px; } .fl-horn--r { width: 50px; }
-        }
-
         /* ---- Phones ------------------------------------------------------ */
         @media (max-width: 600px) {
             .container,
@@ -2398,7 +2328,6 @@
     </footer>
 
     <script src="ctsg-data.js"></script>
-    <script src="fall.js?v=2"></script>
     <script>
         // Game carousel: one vertical stack of cards, the selected one in the
         // middle and its neighbours dimmed above and below (the user picked this
